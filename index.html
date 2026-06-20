@@ -2237,7 +2237,7 @@ window.onerror=function(msg,src,line,col,err){
 // ════════════════════════════════════════════════════════
 // ════ 수양회 접수 뷰어 JS (v4 — 통합 리빌드) ════
 
-function _vwGetUrl(){ return API_URL && API_URL !== 'YOUR_APPS_SCRIPT_URL_HERE' ? API_URL : ''; }
+function _vwGetUrl(){ return (API_URL && API_URL.startsWith('http')) ? API_URL : ''; }
 function _vwSetUrl(v){ /* API_URL은 saveApiUrl()에서 관리 — 뷰어에서 별도 저장 불필요 */ }
 
 // ── 컬럼 정의 ──────────────────────────────────────────
@@ -6272,13 +6272,26 @@ var filtered    = [];
 var currentPage = 1;
 var PAGE_SIZE   = 15;
 var homeFilter  = 'today';
-var API_URL     = (function(){ try{return localStorage.getItem('retreat_api_url')||'YOUR_APPS_SCRIPT_URL_HERE';}catch(e){return 'YOUR_APPS_SCRIPT_URL_HERE';} }());
-var USE_SHEET   = function(){ return API_URL!=='YOUR_APPS_SCRIPT_URL_HERE'&&API_URL.startsWith('http'); };
+// ── Google Sheets 연동 기본 URL (배포 시 고정값) ──
+// localStorage에 저장된 값이 없는 모든 상황(새 기기/브라우저, 시크릿 모드, 캐시 삭제 등)의
+// 최종 폴백. 엑셀관리 페이지에서 URL을 변경/저장하면 이 값도 같이 갱신되지만(saveApiUrl()),
+// 그건 "이번 세션 안에서"만이고 코드 파일 자체가 바뀌는 건 아니므로, 실제 배포된 다른 기기까지
+// 전부 새 URL을 쓰게 하려면 이 값을 코드에서 직접 갱신하고 재배포해야 한다.
+var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwUZ_eFv7mDMtLvVNGuZ-6fNnNWg_n8OXeh4pwrE7vHO9ihnfikrALgAHyXn5EDKzmx/exec';
+var DEFAULT_API_URL_ORIGINAL = DEFAULT_API_URL; // 페이지 로드 시점의 원본값(이후 저장 시 비교용)
+
+var API_URL     = (function(){
+  try{
+    var saved = localStorage.getItem('retreat_api_url');
+    return (saved && saved.startsWith('http')) ? saved : DEFAULT_API_URL;
+  } catch(e){ return DEFAULT_API_URL; }
+}());
+var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v79_badge_role_scope';
+var CACHE_VERSION = 'v80_default_api_url';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -9117,10 +9130,32 @@ function saveApiUrl() {
   }
   _ls.set('retreat_api_url', val);
   API_URL = val;
+  DEFAULT_API_URL = val;  // 이번 세션 안에서는 즉시 동기화 (코드 파일 자체는 안 바뀜 — 아래 안내 참고)
   apiUrlRefreshUI();
   var st = $id('api-status');
-  if (st) st.innerHTML = '<span style="color:var(--green);">✅ URL이 저장되었습니다. 연결 테스트로 확인해 보세요.</span>';
+  if (val !== DEFAULT_API_URL_ORIGINAL) {
+    // 코드에 박혀있는 기본값과 달라짐 → 이 브라우저에서만 적용된 상태.
+    // 다른 기기/새 브라우저에도 동일하게 적용하려면 코드의 DEFAULT_API_URL을 갱신 후 재배포해야 함을 안내.
+    if (st) st.innerHTML =
+      '<div style="color:var(--green);margin-bottom:6px;">✅ URL이 저장되었습니다. 연결 테스트로 확인해 보세요.</div>'+
+      '<div style="background:#fdf6e3;border:1px solid #f0d080;border-radius:7px;padding:8px 11px;font-size:.78rem;color:#8a6300;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+      '<span>⚠️ 이 URL은 현재 브라우저에만 저장됩니다. 다른 기기에서도 똑같이 쓰려면 코드의 <code>DEFAULT_API_URL</code>을 이 값으로 바꿔서 재배포해 주세요.</span>'+
+      '<button class="btn btn-sm" style="background:#fff;border:1px solid #f0d080;" onclick="copyApiUrlForDeploy(this)">📋 복사</button>'+
+      '</div>';
+  } else if (st) {
+    st.innerHTML = '<span style="color:var(--green);">✅ URL이 저장되었습니다. 연결 테스트로 확인해 보세요.</span>';
+  }
   showToast('✅ Google Sheets URL이 저장되었습니다.', 'success');
+}
+// 배포용 DEFAULT_API_URL 값을 클립보드로 복사 (재배포 시 코드에 붙여넣기 편하도록)
+function copyApiUrlForDeploy(btn){
+  var text = DEFAULT_API_URL;
+  function done(){ if(btn){ var orig=btn.textContent; btn.textContent='✅ 복사됨'; setTimeout(function(){ btn.textContent=orig; },1500); } }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function(){ showToast('복사 실패 — 직접 선택해 복사해 주세요.','error'); });
+  } else {
+    showToast('이 브라우저는 자동 복사를 지원하지 않습니다.','error');
+  }
 }
 function testApiUrl() {
   // 편집 행이 보이면 입력값 우선, 아닌 경우 저장된 API_URL 사용
@@ -9676,7 +9711,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'accHandleCSV','accConfirmUpload','accCancelUpload',
     'accDownloadTemplate','accExportCSV','accSaveToSheet',
     'exportExcel','downloadTemplate','vwConfirmUpload','vwCancelUpload',
-    'saveApiUrl','testApiUrl','closeModal','apiUrlEditMode','apiUrlRefreshUI',
+    'saveApiUrl','copyApiUrlForDeploy','testApiUrl','closeModal','apiUrlEditMode','apiUrlRefreshUI',
     'saveGasApiKey','clearGasApiKey',
     'mypageChangePw',
     'openSidebar','closeSidebar',
@@ -9729,7 +9764,7 @@ document.addEventListener('DOMContentLoaded', function() {
     accDownloadTemplate:accDownloadTemplate, accExportCSV:accExportCSV, accSaveToSheet:accSaveToSheet,
     exportExcel:exportExcel,
     downloadTemplate:downloadTemplate, vwConfirmUpload:vwConfirmUpload, vwCancelUpload:vwCancelUpload,
-    saveApiUrl:saveApiUrl, testApiUrl:testApiUrl, closeModal:closeModal,
+    saveApiUrl:saveApiUrl, copyApiUrlForDeploy:copyApiUrlForDeploy, testApiUrl:testApiUrl, closeModal:closeModal,
     apiUrlEditMode:apiUrlEditMode, apiUrlRefreshUI:apiUrlRefreshUI,
     saveGasApiKey:saveGasApiKey, clearGasApiKey:clearGasApiKey,
     mypageChangePw:mypageChangePw, mypageRender:mypageRender,
