@@ -615,7 +615,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       </div>
       <button class="btn btn-navy btn-full" onclick="doLogin()">로그인</button>
       <div class="login-hint">
-        <div><strong>교구장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||</span> 00b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 → <strong style="color:var(--navy);">user0100b</strong></span></div>
+        <div><strong>전도인</strong>&nbsp;&nbsp;ID: admin <span style="color:var(--navy2);font-weight:700;">||교구||구역||</span> b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 11구역 → <strong style="color:var(--navy);">admin0111b</strong></span></div>
+        <div style="margin-top:2px;"><strong>교구장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||</span> 00b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 → <strong style="color:var(--navy);">user0100b</strong></span></div>
         <div style="margin-top:2px;"><strong>구역장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||구역||</span> b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 11구역 → <strong style="color:var(--navy);">user0111b</strong></span></div>
         <div style="margin-top:8px;font-size:.71rem;color:var(--text-dim);">※ 초기 비밀번호는 아이디와 동일합니다. 계정은 관리자 메뉴에서 관리합니다.</div>
       </div>
@@ -1601,7 +1602,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div class="card" style="margin-bottom:14px;">
             <div class="card-header">
               <div class="card-title">📂 일괄 등록 / 내보내기</div>
-              <span style="font-size:.73rem;color:var(--muted);">CSV 형식: 아이디,비밀번호,이름,직분,권한,교구,구역</span>
+              <span style="font-size:.73rem;color:var(--muted);">CSV 형식: 교구,구역,직분,이름 (신규·자동생성) 또는 아이디,비밀번호,이름,직분,권한,교구,구역 (기존)</span>
             </div>
 
             <!-- 업로드 영역 -->
@@ -1615,7 +1616,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 onchange="accHandleCSV(this.files[0]);this.value='';">
               <div style="font-size:1.4rem;margin-bottom:6px;">📋</div>
               <div style="font-size:.84rem;font-weight:700;color:var(--navy);margin-bottom:3px;">CSV 파일을 드래그하거나 클릭해서 업로드</div>
-              <div style="font-size:.74rem;color:var(--muted);">헤더: 아이디, 비밀번호, 이름, 직분, 권한(admin/district/parish), 교구, 구역</div>
+              <div style="font-size:.74rem;color:var(--muted);">신규: 교구, 구역, 직분(교구장/구역장/전도인/관리자), 이름 — 아이디·비밀번호 자동생성<br>기존: 아이디, 비밀번호, 이름, 직분, 권한(admin/district/parish), 교구, 구역</div>
             </div>
 
             <!-- 업로드 결과 배너 -->
@@ -1649,6 +1650,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <!-- 액션 버튼 행 -->
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <button class="btn btn-primary btn-sm" onclick="accDownloadTemplate()">📄 CSV 양식 다운로드</button>
+              <button class="btn btn-sm" style="background:#eef2f7;color:var(--navy);border:1px solid var(--border2);" onclick="accDownloadTemplateLegacy()">📄 기존 형식 양식</button>
               <button class="btn btn-green btn-sm"   onclick="accExportCSV()">⬇️ 현재 계정 CSV 내보내기</button>
               <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
                 <span style="font-size:.74rem;color:var(--muted);">구글 시트:</span>
@@ -6291,7 +6293,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v80_default_api_url';
+var CACHE_VERSION = 'v84_goal_autoload_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -7079,35 +7081,56 @@ function buildAggregateTable(rows, parishList, includeGrandTotal){
   return result;
 }
 
+// ── 달성율 계산 헬퍼 ──────────────────────────────
+// 목표(target)가 없거나 0이면 0% 처리. 100% 이상만 초록색 강조.
+function calcRate(value, target){
+  if(!target || target<=0) return 0;
+  return Math.round((value/target)*100);
+}
+function fmtRate(rate){
+  if(rate>=100) return '<span style="font-weight:700;color:#1a8a4a;">'+rate+'%</span>';
+  return rate+'%';
+}
+
 // ── 집계 테이블 DOM 렌더 ──────────────────────────
-function renderAggregateTableDOM(containerId, table){
+// rateCfg: {goalTotal:목표총량, districtsCount:구역수} — 달성율 계산용 (없으면 전부 0%)
+function renderAggregateTableDOM(containerId, table, rateCfg){
   var el = $id(containerId);
   if(!el) return;
+  rateCfg = rateCfg || {};
+  var goalTotal      = parseFloat(rateCfg.goalTotal) || 0;
+  var districtsCount = parseFloat(rateCfg.districtsCount) || 0;
+  var perDistrictTarget = districtsCount>0 ? (goalTotal/districtsCount) : 0;
+  var perParishTarget   = goalTotal>0 ? (goalTotal/4) : 0;
+
   var thGroups = GROUP_KEYS.map(function(g){ return '<th>'+GROUP_DISPLAY[g]+'</th>'; }).join('');
   var html = '<table><thead><tr><th>교구</th><th>구역</th><th>달성율</th><th>합계</th>'+thGroups+'</tr></thead><tbody>';
 
   table.parishes.forEach(function(p){
     p.districts.forEach(function(d){
+      var dRate = calcRate(d.total, perDistrictTarget);
       html += '<tr>'
         + '<td>'+esc(p.parish)+'</td>'
         + '<td>'+esc(d.district)+'</td>'
-        + '<td>-</td>'
+        + '<td>'+fmtRate(dRate)+'</td>'
         + '<td><strong>'+d.total+'</strong></td>'
         + GROUP_KEYS.map(function(g){ return '<td>'+d.counts[g]+'</td>'; }).join('')
         + '</tr>';
     });
+    var pRate = calcRate(p.total, perParishTarget);
     html += '<tr style="background:#f5f5f7;font-weight:700;">'
       + '<td colspan="2">'+esc(p.parish)+' 합계</td>'
-      + '<td>-</td>'
+      + '<td>'+fmtRate(pRate)+'</td>'
       + '<td>'+p.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+p.counts[g]+'</td>'; }).join('')
       + '</tr>';
   });
 
   if(table.grand){
+    var gRate = calcRate(table.grand.total, goalTotal);
     html += '<tr style="background:#e8edf5;font-weight:900;">'
       + '<td colspan="2">총계</td>'
-      + '<td>-</td>'
+      + '<td>'+fmtRate(gRate)+'</td>'
       + '<td>'+table.grand.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+table.grand.counts[g]+'</td>'; }).join('')
       + '</tr>';
@@ -7148,10 +7171,24 @@ function renderHome(filter) {
   });
   var table2 = buildAggregateTable(evangRows, scopeParishes, isAdmin);
 
-  homeAggCurrent = { year:year, table1:table1, table2:table2 };
+  // ── 달성율 계산용: 선택 연도와 일치하는 교회목표 행 매칭 ──
+  // 목표 데이터가 없는 연도(또는 미로딩)는 goalRow가 undefined → goalTotal 0 처리되어 calcRate()가 0% 반환
+  var goalRow = _goalRows.find(function(r){ return r.year===String(year); });
+  var districtsCount = goalRow ? (parseFloat(goalRow.districts)||0) : 0;
+  var rateCfg1 = { goalTotal: goalRow ? (parseFloat(goalRow.retreat)||0) : 0, districtsCount: districtsCount };
+  var rateCfg2 = { goalTotal: goalRow ? (parseFloat(goalRow.evangel)||0) : 0, districtsCount: districtsCount };
 
-  renderAggregateTableDOM('home-table1', table1);
-  renderAggregateTableDOM('home-table2', table2);
+  homeAggCurrent = { year:year, table1:table1, table2:table2, rateCfg1:rateCfg1, rateCfg2:rateCfg2 };
+
+  renderAggregateTableDOM('home-table1', table1, rateCfg1);
+  renderAggregateTableDOM('home-table2', table2, rateCfg2);
+
+  // ── 달성율 계산용 교회목표 백그라운드 자동 로드 (미로딩 시 1회) ──
+  // switchPanel의 skipRender 여부와 무관하게 항상 동작하도록 renderHome() 자체에 둠
+  // (로그인 직후 initApp()→switchPanel('home', true)는 skipRender=true라 그쪽 트리거가 실행되지 않는 경로였음)
+  if(!_goalLoaded && USE_SHEET() && !_goalLoading){
+    _goalFetchFromSheet(function(){ renderHome(); }); // 로드 완료 후 1회 재렌더 → % 채워짐
+  }
 }
 
 // ── 조회 버튼: 선택 연도로 구글시트 재조회 후 재집계 ──────
@@ -7174,22 +7211,30 @@ function homeAggExportCSV(){
     while(r.length < len) r.push('');
     return r;
   }
-  function tableBodyRows(table){
+  function tableBodyRows(table, rateCfg){
+    rateCfg = rateCfg || {};
+    var goalTotal      = parseFloat(rateCfg.goalTotal) || 0;
+    var districtsCount = parseFloat(rateCfg.districtsCount) || 0;
+    var perDistrictTarget = districtsCount>0 ? (goalTotal/districtsCount) : 0;
+    var perParishTarget   = goalTotal>0 ? (goalTotal/4) : 0;
     var rows = [];
     table.parishes.forEach(function(p){
       p.districts.forEach(function(d){
-        rows.push([p.parish, d.district, '-', d.total].concat(GROUP_KEYS.map(function(g){ return d.counts[g]; })));
+        var dRate = calcRate(d.total, perDistrictTarget);
+        rows.push([p.parish, d.district, dRate+'%', d.total].concat(GROUP_KEYS.map(function(g){ return d.counts[g]; })));
       });
-      rows.push([p.parish+' 합계', '', '-', p.total].concat(GROUP_KEYS.map(function(g){ return p.counts[g]; })));
+      var pRate = calcRate(p.total, perParishTarget);
+      rows.push([p.parish+' 합계', '', pRate+'%', p.total].concat(GROUP_KEYS.map(function(g){ return p.counts[g]; })));
     });
     if(table.grand){
-      rows.push(['총계', '', '-', table.grand.total].concat(GROUP_KEYS.map(function(g){ return table.grand.counts[g]; })));
+      var gRate = calcRate(table.grand.total, goalTotal);
+      rows.push(['총계', '', gRate+'%', table.grand.total].concat(GROUP_KEYS.map(function(g){ return table.grand.counts[g]; })));
     }
     return rows;
   }
 
-  var body1 = tableBodyRows(homeAggCurrent.table1);
-  var body2 = tableBodyRows(homeAggCurrent.table2);
+  var body1 = tableBodyRows(homeAggCurrent.table1, homeAggCurrent.rateCfg1);
+  var body2 = tableBodyRows(homeAggCurrent.table2, homeAggCurrent.rateCfg2);
   // 표1·표2는 항상 동일한 교구/구역 구조로 만들어져 행수가 같지만, 방어적으로 부족분은 빈 행으로 채움
   var blankBody = function(){ return padArr([], W); };
   var rowCount = Math.max(body1.length, body2.length);
@@ -8253,6 +8298,13 @@ function accGenId(role, parish, district){
   if(!dNum) return '';
   return 'user' + pNum + dNum + 'b';
 }
+// 전도인 전용 아이디 생성 — admin||교구||구역||b  예) 1교구 11구역 → admin0111b
+function accGenIdEvangelist(parish, district){
+  var pNum = accParishNum(parish);
+  var dNum = accDistrictNum(district);
+  if(!pNum || !dNum) return '';
+  return 'admin' + pNum + dNum + 'b';
+}
 // 미리보기 갱신 (acc prefix 전용)
 function accAutoGenId(prefix){
   if(prefix !== 'acc') return;
@@ -8496,6 +8548,10 @@ function deleteAccount(id, fromModal){
 var ACC_CSV_HEADERS = ['아이디','비밀번호','이름','직분','권한','교구','구역'];
 var ACC_CSV_KEYS    = ['id','pw','name','position','role','parish','district'];
 
+// ── 신규 자동생성 CSV 포맷 (교구,구역,직분,이름) ──
+var ACC_CSV_HEADERS_AUTO = ['교구','구역','직분','이름'];
+var POSITION_ROLE_MAP = { '교구장':'parish', '구역장':'district', '관리자':'admin', '전도인':'admin' };
+
 // role 정규화
 function normalizeRole(v){
   var s=(v||'').trim().toLowerCase();
@@ -8527,7 +8583,22 @@ function accParseUpload(text, filename){
   }
   var header = rows[0].map(function(h){ return String(h||'').trim(); });
 
-  // 컬럼 인덱스 매핑
+  // 포맷 자동판별: '아이디' 컬럼이 없고 교구/구역/직분/이름이 모두 있으면 신규(auto) 포맷
+  var isAutoFormat = header.indexOf('교구')>=0 && header.indexOf('구역')>=0 &&
+                      header.indexOf('직분')>=0 && header.indexOf('이름')>=0 &&
+                      header.indexOf('아이디')<0;
+
+  var parsed = isAutoFormat ? accParseRowsAuto(rows, header) : accParseRowsLegacy(rows, header);
+  if(parsed === null) return; // 파싱 함수 내부에서 오류 토스트 처리됨
+
+  if(!parsed.length){ showToast('유효한 행이 없습니다.','error'); return; }
+
+  accUploadPending = parsed;
+  accShowPreview(parsed, filename);
+}
+
+// ── 기존 포맷 파싱 (아이디,비밀번호,이름,직분,권한,교구,구역) ──
+function accParseRowsLegacy(rows, header){
   var idxMap = {};
   ACC_CSV_KEYS.forEach(function(k, i){
     var hi = header.indexOf(ACC_CSV_HEADERS[i]);
@@ -8535,10 +8606,9 @@ function accParseUpload(text, filename){
   });
 
   if(idxMap['id'] < 0 || idxMap['name'] < 0){
-    showToast('필수 컬럼(아이디, 이름)을 찾을 수 없습니다.','error'); return;
+    showToast('필수 컬럼(아이디, 이름)을 찾을 수 없습니다.','error'); return null;
   }
 
-  // 파싱
   var parsed = [];
   for(var i=1; i<rows.length; i++){
     var row = rows[i]; if(!row||!row.length) continue;
@@ -8554,48 +8624,119 @@ function accParseUpload(text, filename){
       district: getV('district'),
       regDate:  today(),
       regBy:    currentUser ? currentUser.id : 'admin',
+      _format:  'legacy',
       _status:  ACCOUNTS.find(function(a){ return a.id===id; }) ? 'dup' : 'new'
     });
   }
+  return parsed;
+}
 
-  if(!parsed.length){ showToast('유효한 행이 없습니다.','error'); return; }
+// ── 신규 자동생성 포맷 파싱 (교구,구역,직분,이름) ──
+// 직분→권한: 교구장=parish, 구역장=district, 관리자/전도인=admin
+// 아이디: 전도인은 admin+교구+구역+b, 나머지는 기존 accGenId() 규칙 그대로
+// 비밀번호 = 아이디 / 중복(기존 계정 또는 같은 파일 내) → 건너뜀(skip)
+function accParseRowsAuto(rows, header){
+  var idx = {
+    parish:   header.indexOf('교구'),
+    district: header.indexOf('구역'),
+    position: header.indexOf('직분'),
+    name:     header.indexOf('이름')
+  };
+  var idsSeenInBatch = {};
+  var parsed = [];
 
-  accUploadPending = parsed;
-  accShowPreview(parsed, filename);
+  for(var i=1; i<rows.length; i++){
+    var row = rows[i]; if(!row||!row.length) continue;
+    var getV = function(k){ var c=idx[k]; return c>=0?String(row[c]||'').trim():''; };
+    var parish   = getV('parish');
+    var district = getV('district');
+    var position = getV('position');
+    var name     = getV('name');
+    if(!name) continue;
+
+    var role = POSITION_ROLE_MAP[position];
+    if(!role){
+      parsed.push({ _format:'auto', _status:'error', _error:'직분 매핑 불가: "'+position+'"',
+                     parish:parish, district:district, position:position, name:name, id:'-', role:'' });
+      continue;
+    }
+
+    var id;
+    if(position === '전도인'){
+      if(!district){
+        parsed.push({ _format:'auto', _status:'error', _error:'전도인은 구역 값이 필수입니다',
+                       parish:parish, district:district, position:position, name:name, id:'-', role:role });
+        continue;
+      }
+      id = accGenIdEvangelist(parish, district);
+    } else {
+      if(role==='district' && !district){
+        parsed.push({ _format:'auto', _status:'error', _error:'구역장은 구역 값이 필수입니다',
+                       parish:parish, district:district, position:position, name:name, id:'-', role:role });
+        continue;
+      }
+      id = accGenId(role, parish, district);
+    }
+    if(!id){
+      parsed.push({ _format:'auto', _status:'error', _error:'교구 형식 오류로 아이디 생성 실패',
+                     parish:parish, district:district, position:position, name:name, id:'-', role:role });
+      continue;
+    }
+
+    var isDup = !!ACCOUNTS.find(function(a){ return a.id===id; }) || !!idsSeenInBatch[id];
+    if(!isDup) idsSeenInBatch[id] = true;
+
+    parsed.push({
+      id: id, pw: id, name: name, position: position, role: role,
+      parish: parish, district: district,
+      regDate: today(), regBy: currentUser ? currentUser.id : 'admin',
+      _format: 'auto',
+      _status: isDup ? 'skip' : 'new'
+    });
+  }
+  return parsed;
 }
 
 function accShowPreview(parsed, filename){
-  var newCnt = parsed.filter(function(r){ return r._status==='new'; }).length;
-  var dupCnt = parsed.filter(function(r){ return r._status==='dup'; }).length;
+  var newCnt  = parsed.filter(function(r){ return r._status==='new'; }).length;
+  var dupCnt  = parsed.filter(function(r){ return r._status==='dup'; }).length;   // 기존 포맷 → 덮어쓰기
+  var skipCnt = parsed.filter(function(r){ return r._status==='skip'; }).length;  // 신규 포맷 → 건너뜀
+  var errCnt  = parsed.filter(function(r){ return r._status==='error'; }).length;
 
   // 배너
   var banner = $id('acc-upload-banner');
   if(banner){
     banner.style.display='';
-    banner.style.background = dupCnt>0 ? '#fffbeb' : '#edf7f2';
-    banner.style.border     = '1px solid '+(dupCnt>0?'#fde68a':'#b8dfc8');
-    banner.style.color      = dupCnt>0 ? '#92400e' : '#1a6640';
+    banner.style.background = errCnt>0 ? '#fef2f2' : ((dupCnt>0||skipCnt>0) ? '#fffbeb' : '#edf7f2');
+    banner.style.border     = '1px solid '+(errCnt>0?'#fecaca':((dupCnt>0||skipCnt>0)?'#fde68a':'#b8dfc8'));
+    banner.style.color      = errCnt>0 ? '#991b1b' : ((dupCnt>0||skipCnt>0) ? '#92400e' : '#1a6640');
     banner.innerHTML =
       '📄 <strong>'+filename+'</strong> — '+parsed.length+'행 읽음 &nbsp;|&nbsp; ' +
       '<span style="color:var(--green);font-weight:700;">신규 '+newCnt+'명</span>' +
-      (dupCnt>0?' &nbsp;|&nbsp; <span style="color:var(--gold);font-weight:700;">중복(덮어쓰기) '+dupCnt+'명</span>':'') +
-      '<br><small style="opacity:.8;">비밀번호가 비어있으면 <strong>changeme</strong>로 설정됩니다.</small>';
+      (dupCnt>0 ?' &nbsp;|&nbsp; <span style="color:var(--gold);font-weight:700;">중복(덮어쓰기) '+dupCnt+'명</span>':'') +
+      (skipCnt>0?' &nbsp;|&nbsp; <span style="color:var(--gold);font-weight:700;">중복(건너뜀) '+skipCnt+'명</span>':'') +
+      (errCnt>0 ?' &nbsp;|&nbsp; <span style="color:#dc2626;font-weight:700;">오류 '+errCnt+'명</span>':'') +
+      '<br><small style="opacity:.8;">기존 형식(아이디 포함)은 중복 시 덮어쓰기, 신규 형식(자동생성)은 중복 시 건너뜁니다.</small>';
   }
 
   // 미리보기 테이블
   var tbody = $id('acc-preview-body');
   if(tbody){
     tbody.innerHTML = parsed.map(function(r){
-      var ri = roleInfo(r.role);
-      var statusBadge = r._status==='dup'
-        ? '<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 7px;font-size:.7rem;font-weight:700;">중복</span>'
-        : '<span style="background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 7px;font-size:.7rem;font-weight:700;">신규</span>';
+      var statusBadge;
+      if(r._status==='error')     statusBadge='<span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 7px;font-size:.7rem;font-weight:700;">오류</span>';
+      else if(r._status==='dup')  statusBadge='<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 7px;font-size:.7rem;font-weight:700;">중복(덮어쓰기)</span>';
+      else if(r._status==='skip') statusBadge='<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 7px;font-size:.7rem;font-weight:700;">중복(건너뜀)</span>';
+      else                        statusBadge='<span style="background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 7px;font-size:.7rem;font-weight:700;">신규</span>';
+      var ri = r.role ? roleInfo(r.role) : null;
+      var roleCell = ri ? '<span class="badge '+ri.badge+'" style="font-size:.65rem;">'+ri.icon+' '+ri.label+'</span>' : '-';
+      var idCell = r._status==='error' ? ('<span style="color:#991b1b;">'+esc(r._error||'오류')+'</span>') : esc(r.id);
       return '<tr style="border-bottom:1px solid var(--border2);">'+
         '<td style="padding:6px 10px;">'+statusBadge+'</td>'+
-        '<td style="padding:6px 10px;font-weight:600;">'+esc(r.id)+'</td>'+
-        '<td style="padding:6px 10px;">'+maskName(r.name)+'</td>'+
+        '<td style="padding:6px 10px;font-weight:600;">'+idCell+'</td>'+
+        '<td style="padding:6px 10px;">'+(r._status==='error'?esc(r.name):maskName(r.name))+'</td>'+
         '<td style="padding:6px 10px;color:var(--muted);">'+esc(r.position||'-')+'</td>'+
-        '<td style="padding:6px 10px;"><span class="badge '+ri.badge+'" style="font-size:.65rem;">'+ri.icon+' '+ri.label+'</span></td>'+
+        '<td style="padding:6px 10px;">'+roleCell+'</td>'+
         '<td style="padding:6px 10px;font-size:.78rem;">'+esc(r.parish||'-')+'</td>'+
         '<td style="padding:6px 10px;font-size:.78rem;">'+esc(r.district||'-')+'</td>'+
       '</tr>';
@@ -8604,12 +8745,15 @@ function accShowPreview(parsed, filename){
 
   var pw = $id('acc-preview-wrap'); if(pw) pw.style.display='';
   var btn = $id('acc-preview-confirm-btn');
-  if(btn) btn.textContent = '✅ '+newCnt+'명 등록'+(dupCnt>0?' + '+dupCnt+'명 덮어쓰기':'');
+  if(btn) btn.textContent = '✅ '+newCnt+'명 등록'+(dupCnt>0?' + '+dupCnt+'명 덮어쓰기':'')+((skipCnt+errCnt)>0?' ('+(skipCnt+errCnt)+'명 제외)':'');
 }
 
 function accConfirmUpload(){
   if(!accUploadPending.length){ showToast('업로드할 데이터가 없습니다.','error'); return; }
-  var pending = accUploadPending.slice();
+  // 신규(new)와 기존포맷 중복(dup=덮어쓰기)만 저장 대상. skip(신규포맷 중복)·error는 제외 → ACCOUNTS·구글시트 영향 없음
+  var pending = accUploadPending.filter(function(r){ return r._status==='new' || r._status==='dup'; });
+  if(!pending.length){ showToast('등록할 신규 항목이 없습니다.','error'); accCancelUpload(); return; }
+
   var processed = 0;
   var added = 0, updated = 0;
 
@@ -8646,8 +8790,26 @@ function accCancelUpload(){
   var tbody=$id('acc-preview-body'); if(tbody) tbody.innerHTML='';
 }
 
-// ── 계정 CSV 양식 다운로드 ──────────────────────────
+// ── 계정 CSV 양식 다운로드 (신규 자동생성 포맷) ──────
 function accDownloadTemplate(){
+  var sample = [
+    ACC_CSV_HEADERS_AUTO,
+    ['1교구','11','교구장','김동균A'],
+    ['1교구','11','구역장','최선범'],
+    ['1교구','11','전도인','박전도'],
+  ];
+  var csv = '\uFEFF' + sample.map(function(r){
+    return r.map(function(v){ return /[,"]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(',');
+  }).join('\r\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='계정_업로드_양식.csv';
+  a.click();
+  showToast('📄 계정 양식 다운로드 완료!','success');
+}
+
+// ── 계정 CSV 양식 다운로드 (기존 포맷 — 아이디·비밀번호 직접 지정용) ──
+function accDownloadTemplateLegacy(){
   var sample = [
     ACC_CSV_HEADERS,
     ['user01','pass1234','홍길동','집사','district','1교구','3구역'],
@@ -8659,9 +8821,9 @@ function accDownloadTemplate(){
   }).join('\r\n');
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download='계정_업로드_양식.csv';
+  a.download='계정_업로드_양식_기존형식.csv';
   a.click();
-  showToast('📄 계정 양식 다운로드 완료!','success');
+  showToast('📄 기존 형식 양식 다운로드 완료!','success');
 }
 
 // ── 계정 CSV 내보내기 ────────────────────────────────
@@ -8795,20 +8957,22 @@ function loadAccountsFromSheet(){
 // ── 교회 목표 관리 ───────────────────────────────────
 var _goalRows = [];        // 시트에서 로드한 전체 행 [{연도, 수양회목표, 성도접수목표, 전도목표, 구역수, 등록일, 등록자}]
 var _goalLoaded = false;
+var _goalLoading = false;  // 중복 fetch 방지 플래그
 
-function goalOpenModal(){
-  $id('goal-modal').classList.add('show');
-  if(_goalLoaded){
-    goalRenderYearOptions();
-    return;
-  }
+// 교회목표 시트 로드 공통 함수 (모달용/홈 화면 백그라운드용 겸용)
+// opts.showSpinner: 로딩 오버레이 표시 여부, opts.notify: 결과 토스트 표시 여부
+function _goalFetchFromSheet(callback, opts){
+  opts = opts || {};
+  if(_goalLoading){ return; } // 이미 로딩 중이면 중복 요청하지 않음 (진행 중인 요청의 콜백이 처리)
   if(!USE_SHEET()){
-    showToast('Google Sheets URL이 설정되지 않았습니다. 먼저 연동해 주세요.','error');
     _goalRows = [];
-    goalRenderYearOptions();
+    _goalLoaded = true;
+    if(opts.notify) showToast('Google Sheets URL이 설정되지 않았습니다. 먼저 연동해 주세요.','error');
+    if(callback) callback();
     return;
   }
-  showLoading(true);
+  _goalLoading = true;
+  if(opts.showSpinner) showLoading(true);
   apiCall({action:'getAll', sheetName:'교회목표'})
     .then(function(res){
       if(res && res.success){
@@ -8825,18 +8989,30 @@ function goalOpenModal(){
         }).filter(function(r){ return r.year; });
       } else {
         _goalRows = [];
-        showToast('교회목표 조회 실패: '+(res&&res.message||'알 수 없는 오류'),'error');
+        if(opts.notify) showToast('교회목표 조회 실패: '+(res&&res.message||'알 수 없는 오류'),'error');
       }
       _goalLoaded = true;
-      goalRenderYearOptions();
+      if(callback) callback();
     })
     .catch(function(e){
       _goalRows = [];
       _goalLoaded = true;
-      showToast('서버 연결 오류: '+(e&&e.message||e),'error');
-      goalRenderYearOptions();
+      if(opts.notify) showToast('서버 연결 오류: '+(e&&e.message||e),'error');
+      if(callback) callback();
     })
-    .finally(function(){ showLoading(false); });
+    .finally(function(){
+      _goalLoading = false;
+      if(opts.showSpinner) showLoading(false);
+    });
+}
+
+function goalOpenModal(){
+  $id('goal-modal').classList.add('show');
+  if(_goalLoaded){
+    goalRenderYearOptions();
+    return;
+  }
+  _goalFetchFromSheet(function(){ goalRenderYearOptions(); }, {showSpinner:true, notify:true});
 }
 
 function goalRenderYearOptions(){
@@ -8974,13 +9150,13 @@ function accSaveToSheet(){
   });
   var payload={sheetName:'계정목록',mode:'overwrite',headers:headers,rows:rows};
   fetch(API_URL,{method:'POST',headers:_gasHeaders({'Content-Type':'text/plain'}),body:JSON.stringify(payload),redirect:'follow'})
-    .catch(function(){}) // CORS no-cors
+    .then(function(){ showToast('✅ '+ACCOUNTS.length+'개 계정을 구글 시트(계정목록)에 저장했습니다.','success'); })
+    .catch(function(){ showToast('⚠️ 구글 시트 전송 실패 — 네트워크 상태를 확인하고 다시 시도해 주세요.','error'); })
     .finally(function(){
       if(btn){
         btn.disabled=false;
         btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>계정 → 구글 시트';
       }
-      showToast('✅ '+ACCOUNTS.length+'개 계정을 구글 시트(계정목록)에 저장했습니다.','success');
     });
 }
 
@@ -9709,7 +9885,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'openAccDetail','openAccEditMode','cancelAccEdit','saveAccEdit','renderAccounts',
     'accRoleChange','accParishChange','confirmDeleteAccount',
     'accHandleCSV','accConfirmUpload','accCancelUpload',
-    'accDownloadTemplate','accExportCSV','accSaveToSheet',
+    'accDownloadTemplate','accDownloadTemplateLegacy','accExportCSV','accSaveToSheet',
     'exportExcel','downloadTemplate','vwConfirmUpload','vwCancelUpload',
     'saveApiUrl','copyApiUrlForDeploy','testApiUrl','closeModal','apiUrlEditMode','apiUrlRefreshUI',
     'saveGasApiKey','clearGasApiKey',
@@ -9761,7 +9937,7 @@ document.addEventListener('DOMContentLoaded', function() {
     accRoleChange:accRoleChange, accParishChange:accParishChange,
     confirmDeleteAccount:confirmDeleteAccount,
     accHandleCSV:accHandleCSV, accConfirmUpload:accConfirmUpload, accCancelUpload:accCancelUpload,
-    accDownloadTemplate:accDownloadTemplate, accExportCSV:accExportCSV, accSaveToSheet:accSaveToSheet,
+    accDownloadTemplate:accDownloadTemplate, accDownloadTemplateLegacy:accDownloadTemplateLegacy, accExportCSV:accExportCSV, accSaveToSheet:accSaveToSheet,
     exportExcel:exportExcel,
     downloadTemplate:downloadTemplate, vwConfirmUpload:vwConfirmUpload, vwCancelUpload:vwCancelUpload,
     saveApiUrl:saveApiUrl, copyApiUrlForDeploy:copyApiUrlForDeploy, testApiUrl:testApiUrl, closeModal:closeModal,
