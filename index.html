@@ -1703,6 +1703,20 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <div class="panel" id="panel-room">
           <!-- 액션 바 -->
           <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+            <!-- 년도 콤보 -->
+            <select id="room-sel-year"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+            </select>
+            <!-- 수양회종류 콤보 -->
+            <select id="room-sel-type"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="춘계">춘계</option>
+              <option value="하계" selected>하계</option>
+              <option value="추계">추계</option>
+              <option value="동계">동계</option>
+            </select>
             <button class="btn btn-navy btn-sm" onclick="roomImportFromRetreat()">
               🔗 참석인원 숙소 불러오기
             </button>
@@ -1729,6 +1743,27 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
         <!-- ROOM VIEW - 숙소 배정 현황 (구역장/교구장 포함) -->
         <div class="panel" id="panel-roomview">
+
+        <!-- ── 조회 필터 바 ── -->
+        <div id="roomview-filter-bar"
+             style="display:flex;gap:6px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+          <!-- 년도 콤보: switchPanel에서 동적 생성 -->
+          <select id="roomview-sel-year"
+            style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                   font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
+          </select>
+          <!-- 수양회종류 콤보 -->
+          <select id="roomview-sel-type"
+            style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                   font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+            <option value="춘계">춘계</option>
+            <option value="하계" selected>하계</option>
+            <option value="추계">추계</option>
+            <option value="동계">동계</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="roomviewSearch()">🔍 조회</button>
+        </div>
+
         <!-- M-03: 수양관 안내도 이미지 -->
         <div id="roomview-map-wrap" style="margin-bottom:16px;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#f4f6fc;border-bottom:1px solid var(--border);">
@@ -3261,8 +3296,14 @@ function _busRestoreFromSheet(){
           if(arrTeamRows.length || lvTeamRows.length){
             function parseTeamRows(rows){
               return rows.map(function(r,i){
-                var parish   = String(r['교구']||r['parish']||'');
-                var district = String(r['구역/팀명']||r['district']||'');
+                var parish   = String(r['교구']||r['parish']||'').trim();
+                var district = String(r['구역/팀명']||r['district']||'').trim();
+                // 기존 오염 데이터: parish 공란, district에 "1교구 11구역" 혼합 저장된 경우 역분리
+                if(!parish && district){
+                  var _pp = _busParseParish(district);
+                  parish   = _pp.parish;
+                  district = _pp.district;
+                }
                 var count    = parseInt(r['인원수']||r['count'])||0;
                 var isJH     = district==='중고등부'||parish==='중고등부';
                 var name     = isJH ? '중고등부' : (parish+' '+district).trim();
@@ -3332,7 +3373,9 @@ function _busRowsToBuses(rows){
         var tCount = parseInt(m[2])||0;
         var team = teams.find(function(t){ return t.name===tName; });
         if(!team){
-          team = {id:busUid(), name:tName, count:tCount, color:'#4a7fc1'};
+          var _pp = _busParseParish(tName);
+          team = {id:busUid(), name:tName, count:tCount, color:'#4a7fc1',
+                  parish:_pp.parish, isJH:(tName==='중고등부')};
           teams.push(team);
         }
         if(!bus.slots.find(function(s){ return s.teamId===team.id; })){
@@ -3357,7 +3400,31 @@ function busSaveMeta(){
   busUpdateCapSummary();
 }
 
+// ── 순수 네트워크 차단 오류 판별 헬퍼 ───────────────────
+// Safari: "Load failed" / Chrome: "Failed to fetch" / Firefox: "NetworkError"
+// CORS 차단·샌드박스 iframe·타임아웃 abort 도 여기에 해당
+// → 실제 GAS 응답 오류(success:false)와 구분하여 토스트 레벨 조정에 사용
+function _isNetworkErr(e){
+  if(!e) return false;
+  var msg = (e.message||'').toLowerCase();
+  return e.name==='AbortError'
+      || msg.indexOf('load failed')>=0
+      || msg.indexOf('failed to fetch')>=0
+      || msg.indexOf('networkerror')>=0;
+}
+
 function busUid(){ return Math.random().toString(36).substr(2,9); }
+
+// ── parish 역추출 헬퍼 ────────────────────────────────
+// team.name("1교구 11구역") → {parish:"1교구", district:"11구역"}
+// 기존 오염 데이터(parish 공란, district에 full name) 복원에도 사용
+function _busParseParish(name){
+  if(!name) return {parish:'', district:''};
+  if(name==='중고등부') return {parish:'중고등부', district:'중고등부'};
+  var m = name.match(/^(\d+교구)\s+(.+)$/);
+  if(m) return {parish:m[1], district:m[2]};
+  return {parish:'', district:name};
+}
 function busLoad2(bus){ return bus.slots.reduce(function(s,sl){ return s+sl.count; },0); }
 function busTeamAssigned(tid, type){
   var buses = type==='leave' ? busLeaveBuses : busArriveBuses;
@@ -3882,7 +3949,9 @@ function busAddTeam(){
   var name=($id('bus-new-name').value||'').trim();
   var count=parseInt($id('bus-new-count').value);
   if(!name||isNaN(count)||count<1){ showToast('팀명과 인원수를 입력해 주세요.','error'); return; }
-  busTeams.push({id:busUid(),name:name,count:count,color:BUS_COLORS[busTeams.length%BUS_COLORS.length]});
+  var _pp = _busParseParish(name);
+  busTeams.push({id:busUid(),name:name,count:count,color:BUS_COLORS[busTeams.length%BUS_COLORS.length],
+                 parish:_pp.parish, isJH:(name==='중고등부')});
   $id('bus-new-name').value=''; $id('bus-new-count').value='';
   busSave(); busRenderTeams();
   showToast(name+' 팀 추가됨','success');
@@ -3936,7 +4005,10 @@ function busHandleCSV(input){
       var cols=line.split(',');
       var name=(cols[0]||'').trim(); var count=parseInt(cols[1]);
       if(name&&!isNaN(count)&&count>0){
-        added.push({id:busUid(),name:name,count:count,color:BUS_COLORS[(busTeams.length+added.length)%BUS_COLORS.length]});
+        var _pp = _busParseParish(name);
+        added.push({id:busUid(),name:name,count:count,
+                    color:BUS_COLORS[(busTeams.length+added.length)%BUS_COLORS.length],
+                    parish:_pp.parish, isJH:(name==='중고등부')});
       }
     });
     busTeams=busTeams.concat(added);
@@ -4120,10 +4192,9 @@ function _busUpdateTeamSheetFromBuses(type){
         return b.name + (assignedBuses.length>1 ? '('+sl.count+'명)' : '');
       }).join(', ');
       // 구역/팀명: team.name에서 parish 접두어 제거 (예: "1교구 11구역" → "11구역")
-      var _parish = (team.parish||'').trim();
-      var _fullNm = (team.name||'').trim();
-      var _distNm = (_parish && _fullNm.indexOf(_parish)===0)
-        ? _fullNm.slice(_parish.length).trim() : _fullNm;
+      var _pp = _busParseParish(team.name||'');
+      var _parish = (team.parish||'').trim() || _pp.parish;
+      var _distNm = _parish ? _pp.district : (team.name||'').trim();
       return [
         idx+1,
         _parish,
@@ -4759,8 +4830,14 @@ function _busLoadOneTeamSheet(type, cb){
       if(rows.length){
         var existingTeams = type==='leave' ? busLeaveTeams : busArriveTeams;
         var rebuilt = rows.map(function(r,i){
-          var parish   = String(r['교구']||r['parish']||'');
-          var district = String(r['구역/팀명']||r['district']||'');
+          var parish   = String(r['교구']||r['parish']||'').trim();
+          var district = String(r['구역/팀명']||r['district']||'').trim();
+          // 기존 오염 데이터: parish 공란, district에 "1교구 11구역" 혼합 저장된 경우 역분리
+          if(!parish && district){
+            var _pp = _busParseParish(district);
+            parish   = _pp.parish;
+            district = _pp.district;
+          }
           var count    = parseInt(r['인원수']||r['count'])||0;
           var status   = String(r['배정상태']||r['status']||'미배정');
           var busName  = String(r['버스']||r['bus']||'');
@@ -5930,7 +6007,7 @@ function busSaveTeamsToSheet() {
 
   var teamHdr = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
 
-  // 로컬 팀 → 행 변환 헬퍼
+  // 로컬 팀 → 행 변환 헬퍼 (parish 역추출 포함)
   function teamToRow(t, no){
     var busName = '';
     buses.forEach(function(b){
@@ -5939,9 +6016,9 @@ function busSaveTeamsToSheet() {
     });
     var isSplit  = buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===t.id; }); }).length > 1;
     var assigned = busTeamAssigned(t.id, type) > 0;
-    var parish   = (t.parish||'').trim();
-    var fullName = (t.name||'').trim();
-    var distNm   = (parish && fullName.indexOf(parish)===0) ? fullName.slice(parish.length).trim() : fullName;
+    var _pp = _busParseParish(t.name||'');
+    var parish = (t.parish||'').trim() || _pp.parish;
+    var distNm = parish ? _pp.district : (t.name||'').trim();
     return [no, parish, distNm, t.count||0, assigned?'배정':'미배정', busName, isSplit?'분산배정':'', t.isJH?'중고등부':''];
   }
 
@@ -5952,19 +6029,22 @@ function busSaveTeamsToSheet() {
     .then(function(res){
       var sheetRows = (res&&res.success)?(res.data||res.rows||[]):[];
 
-      // 시트에 이미 있는 (교구+구역/팀명) key set
+      // 시트에 이미 있는 구역/팀명 key set (오염 데이터 대비: district 기준으로 통일)
       var existKeys = {};
       sheetRows.forEach(function(r){
-        var k = String(r['교구']||'').trim()+'|'+String(r['구역/팀명']||'').trim();
-        existKeys[k] = true;
+        var sp = String(r['교구']||'').trim();
+        var sd = String(r['구역/팀명']||'').trim();
+        // 오염 데이터: parish 공란이고 district에 full name → 역분리 후 key
+        if(!sp && sd){ var _fp=_busParseParish(sd); sp=_fp.parish; sd=_fp.district; }
+        existKeys[sp+'|'+sd] = true;
       });
 
       var nextNo = sheetRows.length + 1;
       var newRows = [];
       teams.forEach(function(t){
-        var parish   = (t.parish||'').trim();
-        var fullName = (t.name||'').trim();
-        var distNm   = (parish && fullName.indexOf(parish)===0) ? fullName.slice(parish.length).trim() : fullName;
+        var _pp2 = _busParseParish(t.name||'');
+        var parish = (t.parish||'').trim() || _pp2.parish;
+        var distNm = parish ? _pp2.district : (t.name||'').trim();
         var k = parish+'|'+distNm;
         if(!existKeys[k]){
           newRows.push(teamToRow(t, nextNo++));
@@ -6154,8 +6234,10 @@ function _busUpdateTeamStatus(type, status, assignedKeys, cb){
       b.slots.forEach(function(sl){
         var t = teams.find(function(x){ return x.id===sl.teamId; });
         if(t){
-          var key = (t.parish||'')+'|'+(t.name||'');
-          assignedKeys[key] = true;
+          var _pp = _busParseParish(t.name||'');
+          var _p  = (t.parish||'').trim() || _pp.parish;
+          var _d  = _p ? _pp.district : (t.name||'').trim();
+          assignedKeys[_p+'|'+_d] = true;
         }
       });
     });
@@ -6168,8 +6250,14 @@ function _busUpdateTeamStatus(type, status, assignedKeys, cb){
       if(!rows.length) return;
       var teamHdr = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
       var updated = rows.map(function(r){
-        var parish   = String(r['교구']||r['parish']||'');
-        var district = String(r['구역/팀명']||r['district']||'');
+        var parish   = String(r['교구']||r['parish']||'').trim();
+        var district = String(r['구역/팀명']||r['district']||'').trim();
+        // 오염 데이터: parish 공란 + district에 full name → 역분리
+        if(!parish && district){
+          var _fp = _busParseParish(district);
+          parish   = _fp.parish;
+          district = _fp.district;
+        }
         var count    = String(r['인원수']||r['count']||'');
         var bus      = String(r['버스']||r['bus']||'');
         var split    = String(r['분산배정']||r['split']||'');
@@ -6293,7 +6381,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v84_goal_autoload_fix';
+var CACHE_VERSION = 'v89_hide_register';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -6463,9 +6551,17 @@ function apiCall(params, timeoutMs) {
       var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, timeoutMs) : null;
       // T3: GAS_API_KEY 헤더 추가
-      var fetchOpts = ctrl ? { signal: ctrl.signal, headers: _gasHeaders({}) } : { headers: _gasHeaders({}) };
+      var baseHeaders = _gasHeaders({});
+      var fetchOpts = ctrl ? { signal: ctrl.signal, headers: baseHeaders } : { headers: baseHeaders };
       return fetch(url.toString(), fetchOpts)
         .then(function(res){ return res.json(); })
+        .catch(function(err){
+          // Safari/WebKit 샌드박스: AbortSignal 복제 실패 → signal 없이 재시도
+          if(err && (err.name==='DataCloneError' || (err.message&&err.message.indexOf('can not be cloned')>=0))){
+            return fetch(url.toString(), { headers: baseHeaders }).then(function(res){ return res.json(); });
+          }
+          return Promise.reject(err);
+        })
         .finally(function(){ if(timer) clearTimeout(timer); });
     } catch(e) { return Promise.reject(new Error('API URL 오류: ' + e.message)); }
   }
@@ -6485,8 +6581,16 @@ function apiCall(params, timeoutMs) {
     var timer2 = ctrl2 ? setTimeout(function(){ ctrl2.abort(); }, timeoutMs) : null;
     var opts = { method:'POST', headers:_gasHeaders({'Content-Type':'text/plain'}), body:JSON.stringify(body), redirect:'follow' };
     if (ctrl2) opts.signal = ctrl2.signal;
+    var optsNoSignal = { method:'POST', headers:_gasHeaders({'Content-Type':'text/plain'}), body:JSON.stringify(body), redirect:'follow' };
     return fetch(API_URL, opts)
       .then(function(r){ return r.text(); })
+      .catch(function(err){
+        // Safari/WebKit 샌드박스: AbortSignal 복제 실패 → signal 없이 재시도
+        if(err && (err.name==='DataCloneError' || (err.message&&err.message.indexOf('can not be cloned')>=0))){
+          return fetch(API_URL, optsNoSignal).then(function(r){ return r.text(); });
+        }
+        return Promise.reject(err);
+      })
       .then(function(txt){
         try { return JSON.parse(txt); }
         catch(e){ return { success:false, error:'응답 파싱 오류: '+String(txt).slice(0,120) }; }
@@ -6818,10 +6922,12 @@ function initApp() {
   var roleLabel = isAdmin?'⭐ 관리자': isDistrict?('🟢 구역장 '+(currentUser.parish||'')+' '+(currentUser.district||'')).trim(): ('🟡 교구장 '+(currentUser.parish||'')).trim();
   $id('sb-role').textContent=roleLabel;
   // 메뉴 노출 — role별 제어
-  // 관리자 전용 메뉴
-  ['nav-register','nav-bus','nav-excel','nav-accounts','nav-room','admin-section'].forEach(function(id){
+  // 관리자 전용 메뉴 (자료 등록 제외 — 향후 재활성화 예정)
+  ['nav-bus','nav-excel','nav-accounts','nav-room','admin-section'].forEach(function(id){
     var el=$id(id); if(el) el.style.display=isAdmin?'':'none';
   });
+  // 자료 등록: 항상 숨김
+  var navReg=$id('nav-register'); if(navReg) navReg.style.display='none';
   var ew=$id('btn-export-wrap'); if(ew) ew.style.display=isAdmin?'':'none';
   // 선탑자 지정 탭 버튼: 관리자만 표시
   var leaderTab=$id('bus-tab-leader'); if(leaderTab) leaderTab.style.display=isAdmin?'':'none';
@@ -6950,9 +7056,34 @@ function switchPanel(name, skipRender) {
     }
     if(name==='busview')  { busviewReload(); }
     if(name==='roomview') {
+      // 년도 콤보 동적 생성 (당해년도 ~ +5), 첫 진입 1회만
+      var rvYrSel = $id('roomview-sel-year');
+      if(rvYrSel && !rvYrSel.options.length){
+        var rvYr = new Date().getFullYear();
+        for(var ri=0; ri<=5; ri++){
+          var rvOpt=document.createElement('option');
+          rvOpt.value = String(rvYr+ri);
+          rvOpt.textContent = String(rvYr+ri)+'년';
+          if(ri===0) rvOpt.selected=true;
+          rvYrSel.appendChild(rvOpt);
+        }
+      }
       if(USE_SHEET()){ roomRestore(roomRenderView); } else { roomRenderView(); }
     }
-    if(name==='room')     roomTab(roomCurrentTab||'buildings');
+    if(name==='room'){
+      // 년도 콤보 동적 생성 (당해년도 ~ +5)
+      var yrSel = $id('room-sel-year');
+      if(yrSel && !yrSel.options.length){
+        var curYr = new Date().getFullYear();
+        for(var yi=0; yi<=5; yi++){
+          var opt=document.createElement('option');
+          opt.value = String(curYr+yi);
+          opt.textContent = String(curYr+yi)+'년';
+          yrSel.appendChild(opt);
+        }
+      }
+      roomTab(roomCurrentTab||'buildings');
+    }
     if(name==='mypage')   mypageRender();
   }
   var sb=$id('sidebar'); if(sb) sb.classList.remove('open');
@@ -7940,7 +8071,16 @@ function loadRosterIndex(){
         else                   rosterLeaveIndex  = idx;
       })
       .catch(function(e){
-        failedSheets.push(sn+'(네트워크 오류: '+(e&&e.message||'')+')');
+        if(_isNetworkErr(e)){
+          // 순수 네트워크 차단(샌드박스·GAS 장애·CORS): info 레벨 토스트 + console.warn
+          console.warn('[loadRosterIndex]', sn, '네트워크 오류:', e&&e.message);
+          failedSheets.push(sn+'(네트워크 미연결)');
+          failedSheets._netOnly = (failedSheets._netOnly === undefined ? true : failedSheets._netOnly);
+        } else {
+          // GAS 응답 오류 등 실제 문제: 기존대로 error 레벨
+          failedSheets.push(sn+'(오류: '+(e&&e.message||'')+')');
+          failedSheets._netOnly = false;
+        }
         if(sn==='탑승자_참석') rosterArriveIndex = {};
         else                   rosterLeaveIndex  = {};
       })
@@ -7949,7 +8089,10 @@ function loadRosterIndex(){
         // 둘 다 완료되면 그리드 재렌더 (버스배정 컬럼 값 반영)
         if(done===sheetNames.length){
           if(failedSheets.length){
-            showToast('⚠️ 버스배정 인덱스 로드 문제: '+failedSheets.join(' / '),'error');
+            // 순수 네트워크 오류만 있으면 info, 실제 GAS 오류 포함 시 error
+            var lvl = (failedSheets._netOnly === true) ? 'info' : 'error';
+            var icon = lvl==='info' ? 'ℹ️' : '⚠️';
+            showToast(icon+' 버스배정 인덱스 미로드: '+failedSheets.join(' / '), lvl);
           }
           renderTable();
           updateBusUnassignedBadge();
@@ -8950,6 +9093,16 @@ function loadAccountsFromSheet(){
       }
     })
     .catch(function(e){
+      // DataCloneError(Safari AbortSignal 문제)는 재시도 후에도 실패한 경우 — 조용히 무시
+      if(e && (e.name==='DataCloneError' || (e.message&&e.message.indexOf('can not be cloned')>=0))){
+        return; // 계정 데이터는 로컬캐시 유지
+      }
+      // 순수 네트워크 오류(Load failed 등)도 로컬캐시 유지 후 조용히 종료
+      // → 온라인 환경에서 GAS 장애 시 계정은 로컬캐시로 계속 동작
+      if(_isNetworkErr(e)){
+        console.warn('계정 시트 네트워크 오류 (로컬캐시 유지):', e.message);
+        return;
+      }
       console.warn('계정 시트 로드 실패:', e.message);
     });
 }
@@ -9390,6 +9543,8 @@ function roomRestore(onDone){
           roomData = rows.map(function(r){
             return {
               no: no++,
+              year:      String(r['년도']||r.year||'').trim(),
+              retreatType: String(r['수양회종류']||r.retreatType||'').trim(),
               receiptId: String(r['접수ID']||r.receiptId||'').trim(),
               building:  String(r['건물명']||r.building||'').trim(),
               room:      String(r['배정호']||r.room||'').trim(),
@@ -9428,6 +9583,9 @@ var roomCurrentBuilding = ''; // 현재 선택된 건물(숙소1) 탭
 function roomImportFromRetreat(){
   function buildUI(rows){
     // 숙소1(건물명) + 숙소2(호실) + 교구 + 구역 + 이름 집계
+    // 년도·수양회종류는 콤보 선택값 사용
+    var selYear = (function(){ var el=$id('room-sel-year'); return el?el.value:String(new Date().getFullYear()); })();
+    var selType = (function(){ var el=$id('room-sel-type'); return el?el.value:'하계'; })();
     roomData = [];
     var no = 1;
     rows.forEach(function(r){
@@ -9438,6 +9596,7 @@ function roomImportFromRetreat(){
       var name     = String(r.name||r['성명']||'').trim();
       if(!building) return; // 숙소1 없으면 제외
       roomData.push({no:no++,
+                     year:selYear, retreatType:selType,
                      receiptId: String(r.receiptId||r['접수ID']||'').trim(),
                      building:building, room:room,
                      parish:parish, district:district, name:name});
@@ -9567,9 +9726,9 @@ function roomSaveToSheet(){
   if(!USE_SHEET()){ showToast('구글 시트 URL이 설정되지 않았습니다.','error'); return; }
   if(!roomData.length){ showToast('저장할 숙소 배정 데이터가 없습니다. 먼저 불러오기를 실행해 주세요.','error'); return; }
 
-  var headers = ['NO','접수ID','건물명','배정호','교구','구역','이름'];
+  var headers = ['NO','년도','수양회종류','접수ID','건물명','배정호','교구','구역','이름'];
   var rows = roomData.map(function(d){
-    return [d.no, d.receiptId||'', d.building, d.room||'', d.parish, d.district, d.name];
+    return [d.no, d.year||'', d.retreatType||'', d.receiptId||'', d.building, d.room||'', d.parish, d.district, d.name];
   });
   var emptyRow = headers.map(function(){ return ''; });
   var payload = {sheetName:'숙소배정내역', mode:'overwrite', headers:headers, rows:rows.length?rows:[emptyRow]};
@@ -9591,9 +9750,9 @@ function roomSaveToSheet(){
 
 function roomExportCSV(){
   if(!roomData.length){ showToast('내보낼 데이터가 없습니다.','error'); return; }
-  var rows=[['NO','접수ID','건물명','배정호','교구','구역','이름']];
+  var rows=[['NO','년도','수양회종류','접수ID','건물명','배정호','교구','구역','이름']];
   roomData.forEach(function(d){
-    rows.push([d.no, d.receiptId||'', d.building, d.room||'', d.parish, d.district, d.name]);
+    rows.push([d.no, d.year||'', d.retreatType||'', d.receiptId||'', d.building, d.room||'', d.parish, d.district, d.name]);
   });
   var csv='\uFEFF'+rows.map(function(r){
     return r.map(function(v){ return /[,"]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v); }).join(',');
@@ -9632,6 +9791,20 @@ function roomRenderGroups(){ }
 function roomRenderAssignGrid(){ }
 function roomRenderSummary(){ }
 function roomSelectBuilding(b){ roomCurrentBuilding=b; roomRenderTabs(); }
+// 숙소배정현황 조회 버튼 핸들러
+// 선택된 년도·수양회종류 기준으로 시트 재조회 후 렌더링
+function roomviewSearch(){
+  if(USE_SHEET()){
+    showLoading(true);
+    roomRestore(function(){
+      showLoading(false);
+      roomRenderView();
+    });
+  } else {
+    roomRenderView();
+  }
+}
+
 /* ── 숙소 배정 현황 뷰어 (roomview 패널) ──────────────────────────────────
    건물별로 교구·구역 인원수를 카드 형태로 보여주고,
    카드 클릭 시 해당 구역/교구의 상세 배정 인원 목록을 펼쳐 보여줍니다.
@@ -9655,13 +9828,34 @@ function roomRenderView(){
   if(!roomData.length){
     elEmpty.style.display='';
     elContent.style.display='none';
+    elEmpty.innerHTML='<div style="text-align:center;padding:40px 0;"><div style="font-size:2.5rem;">🏠</div>'
+      +'<div style="margin-top:12px;color:var(--muted);font-size:.9rem;">배정이 완료되지 않았습니다.<br>숙소 배정을 완료하면 여기서 확인할 수 있습니다.</div></div>';
+    return;
+  }
+
+  // 필터 후 데이터 없음
+  if(!baseData.length){
+    elEmpty.style.display='';
+    elContent.style.display='none';
+    elEmpty.innerHTML='<div style="text-align:center;padding:40px 0;"><div style="font-size:2rem;">🔍</div>'
+      +'<div style="margin-top:12px;color:var(--muted);font-size:.9rem;">선택한 연도·수양회 배정 데이터가 없습니다.<br>조회 조건을 변경하거나 배정 후 다시 확인해 주세요.</div></div>';
     return;
   }
 
   var current = (typeof currentUser!=='undefined'&&currentUser)?currentUser:{};
 
+  // ── 년도·수양회종류 필터 (조회 콤보 기준) ──
+  var rvYear = (function(){ var el=$id('roomview-sel-year'); return el?el.value:''; })();
+  var rvType = (function(){ var el=$id('roomview-sel-type'); return el?el.value:''; })();
+
+  var yearTypeData = roomData.filter(function(d){
+    if(rvYear && String(d.year||'').trim() !== rvYear) return false;
+    if(rvType && String(d.retreatType||'').trim() !== rvType) return false;
+    return true;
+  });
+
   // 역할별 필터
-  var baseData = roomData.filter(function(d){
+  var baseData = yearTypeData.filter(function(d){
     if(!current.parish && !current.district) return true;
     if(current.district) return d.district===current.district;
     if(current.parish)   return d.parish===current.parish;
@@ -9911,6 +10105,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'roomTab','roomImportFromRetreat','roomRenderTabs','roomRenderTable','roomSelectBuilding',
     'roomResetConfirm','roomResetAll','roomSaveToSheet','roomExportCSV','roomRestore',
     'roomAddBuilding','roomAddGroup','roomAutoAssign','roomRenderBuildings','roomRenderView',
+    'roomviewSearch',
     'rvOpenRoster','rvRosterRender','rvRosterFilter','rvRosterClose',
     'roomRosterOpen','roomRosterClose','roomRosterFilter',
     'busRosterOpen','busRosterClose','busRosterFilter',
@@ -9974,6 +10169,7 @@ document.addEventListener('DOMContentLoaded', function() {
     roomSaveToSheet:roomSaveToSheet, roomExportCSV:roomExportCSV, roomRestore:roomRestore,
     roomAddBuilding:roomAddBuilding, roomAddGroup:roomAddGroup,
     roomAutoAssign:roomAutoAssign, roomRenderBuildings:roomRenderBuildings, roomRenderView:roomRenderView,
+    roomviewSearch:roomviewSearch,
     rvOpenRoster:rvOpenRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose,
     roomRosterOpen:roomRosterOpen, roomRosterClose:roomRosterClose, roomRosterFilter:roomRosterFilter,
     busRosterOpen:busRosterOpen, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
