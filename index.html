@@ -959,13 +959,41 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <!-- BUS ASSIGNMENT -->
         <div class="panel" id="panel-bus">
 
-          <!-- ② 메인 탭 메뉴 -->
-          <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+          <!-- ② 필터 콤보 + 메인 탭 메뉴 — 1줄 flex -->
+          <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+            <!-- 년도 콤보: switchPanel에서 동적 생성 -->
+            <select id="bus-sel-year"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
+            </select>
+            <!-- 수양회종류 콤보 -->
+            <select id="bus-sel-season"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="춘계">춘계</option>
+              <option value="하계" selected>하계</option>
+              <option value="추계">추계</option>
+              <option value="동계">동계</option>
+            </select>
+            <!-- 행사명(회차) 콤보 -->
+            <select id="bus-sel-event"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="1차" selected>1차</option>
+              <option value="2차">2차</option>
+              <option value="3차">3차</option>
+              <option value="4차">4차</option>
+              <option value="5차">5차</option>
+              <option value="6차">6차</option>
+              <option value="7차">7차</option>
+            </select>
+            <!-- 구분선 -->
+            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;"></div>
+            <!-- 메인 탭 버튼 -->
             <button id="bus-tab-teams"   class="btn btn-navy btn-sm"   onclick="busTab('teams')">👥 팀 관리</button>
             <button id="bus-tab-assign"  class="btn btn-primary btn-sm" onclick="busTab('assign')">🚌 버스 배정</button>
             <button id="bus-tab-leader"  class="btn btn-primary btn-sm" onclick="busTab('leader')" style="display:none;">🎯 선탑자 지정</button>
             <button id="bus-tab-summary" class="btn btn-primary btn-sm" onclick="busTab('summary')">📋 배정 현황</button>
-
           </div>
 
           <!-- ③ 팀 관리 탭 -->
@@ -1209,32 +1237,71 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <!-- BUS VIEW - 배정 현황 (일반사용자 포함) -->
         <div class="panel" id="panel-busview">
 
-          <!-- 참석/귀가 탭 + 조회 버튼 (한 줄, 항상 표시) -->
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;border-bottom:2px solid var(--border2);padding-bottom:0;flex-wrap:wrap;">
-            <div style="display:flex;gap:6px;">
-              <button id="bvw-tab-arrive"
-                onclick="bvwSetType('arrive')"
-                style="padding:7px 22px;border:none;border-bottom:3px solid var(--navy);background:none;font-weight:700;font-size:.88rem;color:var(--navy);cursor:pointer;margin-bottom:-2px;">
-                🚌 참석 배정
-              </button>
-              <button id="bvw-tab-leave"
-                onclick="bvwSetType('leave')"
-                style="padding:7px 22px;border:none;border-bottom:3px solid transparent;background:none;font-weight:600;font-size:.88rem;color:var(--muted);cursor:pointer;margin-bottom:-2px;">
-                🏠 귀가 배정
-              </button>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <button id="btn-bvw-export"
-                onclick="bvwExportBusSchedule()"
-                style="background:#fff;color:#1a6b45;border:1.5px solid #1a6b45;border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:8px;">
-                📥 <span id="btn-bvw-export-label">참석 배차표 다운로드</span>
-              </button>
-              <button id="btn-busview-reload"
-                onclick="busviewReload()"
-                style="background:#1a6b45;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:8px;">
-                🔍 조회
-              </button>
-            </div>
+          <!-- 필터 콤보 + 탭 + 조회 + 배차표 — 1줄 flex -->
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;
+                      border-bottom:2px solid var(--border2);padding-bottom:8px;flex-wrap:wrap;">
+
+            <!-- 년도 콤보: switchPanel에서 동적 생성 -->
+            <select id="busview-sel-year"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
+            </select>
+            <!-- 수양회종류 콤보 -->
+            <select id="busview-sel-season"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="춘계">춘계</option>
+              <option value="하계" selected>하계</option>
+              <option value="추계">추계</option>
+              <option value="동계">동계</option>
+            </select>
+            <!-- 행사명(회차) 콤보 -->
+            <select id="busview-sel-event"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="1차" selected>1차</option>
+              <option value="2차">2차</option>
+              <option value="3차">3차</option>
+              <option value="4차">4차</option>
+              <option value="5차">5차</option>
+              <option value="6차">6차</option>
+              <option value="7차">7차</option>
+            </select>
+
+            <!-- 구분선 -->
+            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;flex-shrink:0;"></div>
+
+            <!-- 참석/귀가 탭 -->
+            <button id="bvw-tab-arrive"
+              onclick="bvwSetType('arrive')"
+              style="padding:5px 18px;border:none;border-bottom:3px solid var(--navy);background:none;
+                     font-weight:700;font-size:.88rem;color:var(--navy);cursor:pointer;">
+              🚌 참석 배정
+            </button>
+            <button id="bvw-tab-leave"
+              onclick="bvwSetType('leave')"
+              style="padding:5px 18px;border:none;border-bottom:3px solid transparent;background:none;
+                     font-weight:600;font-size:.88rem;color:var(--muted);cursor:pointer;">
+              🏠 귀가 배정
+            </button>
+
+            <!-- 조회 버튼 -->
+            <button id="btn-busview-reload"
+              onclick="busviewReload()"
+              style="height:32px;background:#1a6b45;color:#fff;border:none;border-radius:6px;
+                     padding:0 14px;font-size:.82rem;font-weight:600;cursor:pointer;
+                     display:flex;align-items:center;gap:5px;">
+              🔍 조회
+            </button>
+
+            <!-- 배차표 다운로드 — 맨 뒤 -->
+            <button id="btn-bvw-export"
+              onclick="bvwExportBusSchedule()"
+              style="height:32px;background:#fff;color:#1a6b45;border:1.5px solid #1a6b45;
+                     border-radius:6px;padding:0 14px;font-size:.82rem;font-weight:600;
+                     cursor:pointer;display:flex;align-items:center;gap:5px;">
+              📥 <span id="btn-bvw-export-label">참석 배차표 다운로드</span>
+            </button>
           </div>
 
           <div id="busview-empty" class="empty-state" style="padding:24px 20px;">
@@ -2075,13 +2142,26 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <button class="modal-close" onclick="closeModal('goal-modal')">✕</button>
     </div>
 
-    <!-- 연도 선택 -->
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px;">
-      <div class="form-group" style="margin:0;flex:1;">
+    <!-- 연도 + 강서교회회차(행사명) 선택 -->
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;flex:1;min-width:90px;">
         <label>연도</label>
-        <select id="goal-year-sel" onchange="goalYearChange()"></select>
+        <select id="goal-year-sel" onchange="goalKeyChange()"></select>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="goalAddNewYear()" style="margin-top:18px;white-space:nowrap;">+ 새 연도</button>
+      <button class="btn btn-primary btn-sm" onclick="goalAddNewYear()" style="margin-bottom:1px;white-space:nowrap;">+ 신규</button>
+      <div class="form-group" style="margin:0;flex:1;min-width:120px;">
+        <label>강서교회회차</label>
+        <select id="goal-event-sel" onchange="goalKeyChange()"
+          style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
+          <option value="1차" selected>1차</option>
+          <option value="2차">2차</option>
+          <option value="3차">3차</option>
+          <option value="4차">4차</option>
+          <option value="5차">5차</option>
+          <option value="6차">6차</option>
+          <option value="7차">7차</option>
+        </select>
+      </div>
     </div>
 
     <!-- 목표 입력 -->
@@ -3257,9 +3337,9 @@ function _busRestoreFromSheet(){
       .finally(function(){
         done++;
         if(done < sheetNames.length) return;
-        // 버스 배정 복원 (요약 시트 기준)
-        var arrived = _busRowsToBuses(results['버스배정_참석요약']);
-        var leaved  = _busRowsToBuses(results['버스배정_귀가요약']);
+        // 버스 배정 복원 (요약 시트 기준) — 년도·수양회종류·행사명 필터 적용
+        var arrived = _busRowsToBuses(_busFilterRows(results['버스배정_참석요약']));
+        var leaved  = _busRowsToBuses(_busFilterRows(results['버스배정_귀가요약']));
         // 팀내역 시트에서 sheetStatus/sheetBus 보강하는 공통 함수
         function enrichTeamsWithSheetStatus(teams, teamRows){
           if(!teamRows||!teamRows.length) return teams;
@@ -3290,9 +3370,9 @@ function _busRestoreFromSheet(){
           _ls.set('bus_leave_buses',  JSON.stringify(busLeaveBuses));
           showToast('☁️ 구글 시트에서 버스 배정 현황 로드 완료','success');
         } else {
-          // 요약 없으면 팀내역 시트만 확인
-          var arrTeamRows = results['버스배정_참석팀내역'] || [];
-          var lvTeamRows  = results['버스배정_귀가팀내역'] || [];
+          // 요약 없으면 팀내역 시트만 확인 — 년도·수양회종류·행사명 필터 적용
+          var arrTeamRows = _busFilterRows(results['버스배정_참석팀내역'] || []);
+          var lvTeamRows  = _busFilterRows(results['버스배정_귀가팀내역'] || []);
           if(arrTeamRows.length || lvTeamRows.length){
             function parseTeamRows(rows){
               return rows.map(function(r,i){
@@ -3415,6 +3495,33 @@ function _isNetworkErr(e){
 
 function busUid(){ return Math.random().toString(36).substr(2,9); }
 
+// ── 버스배정 필터 콤보값 읽기 헬퍼 ─────────────────────────
+// 패널 상단 년도·수양회종류·행사명 콤보값 반환
+// 저장 시 각 시트 행에 prepend, 불러오기 시 사전 필터링에 사용
+function _busGetFilter(){
+  return {
+    year:   (($id('bus-sel-year')   ||{}).value||'').trim(),
+    season: (($id('bus-sel-season') ||{}).value||'').trim(),
+    event:  (($id('bus-sel-event')  ||{}).value||'').trim()
+  };
+}
+
+// ── 버스배정 필터 공통 rows 필터링 헬퍼 ───────────────────
+// 시트 rows 또는 retreat 배열을 년도·수양회종류·행사명 콤보값으로 필터링
+// 콤보값이 모두 빈 문자열이면 원본 rows 반환 (필터 없음)
+// 사용처: _busRestoreFromSheet / busTab assign·summary 인라인 로드 /
+//         busAssignSubTab 팀내역 로드 / _busLoadOneTeamSheet / busReAssignFromSheet
+function _busFilterRows(rows){
+  var bf = _busGetFilter();
+  if(!bf.year && !bf.season && !bf.event) return rows;
+  return rows.filter(function(r){
+    if(bf.year   && String(r['년도']   ||r['year']  ||r['연도']||'').trim() !== bf.year)   return false;
+    if(bf.season && String(r['수양회종류']||r['season']          ||'').trim() !== bf.season) return false;
+    if(bf.event  && String(r['행사명'] ||r['event']            ||'').trim() !== bf.event)  return false;
+    return true;
+  });
+}
+
 // ── parish 역추출 헬퍼 ────────────────────────────────
 // team.name("1교구 11구역") → {parish:"1교구", district:"11구역"}
 // 기존 오염 데이터(parish 공란, district에 full name) 복원에도 사용
@@ -3478,8 +3585,9 @@ function busTab(name){
           .finally(function(){
             done2++;
             if(done2<sheetNames2.length) return;
-            var arr=_busRowsToBuses(res2['버스배정_참석요약']);
-            var lv=_busRowsToBuses(res2['버스배정_귀가요약']);
+            // 년도·수양회종류·행사명 필터 적용 후 파싱
+            var arr=_busRowsToBuses(_busFilterRows(res2['버스배정_참석요약']));
+            var lv=_busRowsToBuses(_busFilterRows(res2['버스배정_귀가요약']));
             // 시트에 데이터 있는 타입만 덮어씀 (로컬 배정 결과 보호)
             if(arr.buses.length){ busArriveBuses=arr.buses; if(arr.teams.length) busArriveTeams=arr.teams; _ls.set('bus_arrive_buses',JSON.stringify(busArriveBuses)); }
             if(lv.buses.length) { busLeaveBuses=lv.buses;  if(lv.teams.length)  busLeaveTeams=lv.teams;  _ls.set('bus_leave_buses', JSON.stringify(busLeaveBuses)); }
@@ -3504,8 +3612,9 @@ function busTab(name){
           .finally(function(){
             done3++;
             if(done3<sheetNames3.length) return;
-            var arr=_busRowsToBuses(res3['버스배정_참석요약']);
-            var lv=_busRowsToBuses(res3['버스배정_귀가요약']);
+            // 년도·수양회종류·행사명 필터 적용 후 파싱
+            var arr=_busRowsToBuses(_busFilterRows(res3['버스배정_참석요약']));
+            var lv=_busRowsToBuses(_busFilterRows(res3['버스배정_귀가요약']));
             // 시트에 데이터 있는 타입만 덮어씀 (로컬 배정 결과 보호)
             if(arr.buses.length){ busArriveBuses=arr.buses; if(arr.teams.length) busArriveTeams=arr.teams; _ls.set('bus_arrive_buses',JSON.stringify(busArriveBuses)); }
             if(lv.buses.length) { busLeaveBuses=lv.buses;  if(lv.teams.length)  busLeaveTeams=lv.teams;  _ls.set('bus_leave_buses', JSON.stringify(busLeaveBuses)); }
@@ -3567,6 +3676,9 @@ function busAssignSubTab(type){
     apiCall({action:'getAll', sheetName:sn})
       .then(function(res){
         var rows = (res&&res.success)?(res.data||res.rows||[]):[];
+        if(!rows.length) return;
+        // 년도·수양회종류·행사명 필터 적용
+        rows = _busFilterRows(rows);
         if(!rows.length) return;
         var parsed = rows.map(function(r,i){
           var parish   = String(r['교구']||r['parish']||'');
@@ -3709,14 +3821,17 @@ function busLeaderSave(){
   var metaLvAlight  = ($id('bus-leave-alight') ||{value:''}).value;
   var defBoard  = type==='leave' ? metaLvBoard   : metaArrBoard;
   var defAlight = type==='leave' ? metaLvAlight  : metaArrAlight;
-  var summaryHdr = ['버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
+  var summaryHdr = ['년도','수양회종류','행사명','버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
+  // ── 수정A: 요약시트 저장 시 년도·수양회종류·행사명 앞 3컬럼 포함 ──
+  var _lsBf = _busGetFilter();
   var rows = buses.map(function(bus){
     var load = busLoad2(bus);
     var teamNames = bus.slots.map(function(sl){
       var t=teams.find(function(x){ return x.id===sl.teamId; });
       return t?(t.name+' '+sl.count+'명'):'';
     }).join(' | ');
-    return [bus.name, bus.boardLoc||defBoard||'', bus.alightLoc||defAlight||'',
+    return [_lsBf.year, _lsBf.season, _lsBf.event,
+            bus.name, bus.boardLoc||defBoard||'', bus.alightLoc||defAlight||'',
             bus.slots.length, load, cap, teamNames, bus.leaderId||''];
   });
   showLoading(true);
@@ -3767,6 +3882,17 @@ function _busImportBuildUI(rows){
   var type = busTeamsSub || 'arrive';
   var isLeave = (type === 'leave');
   var transportKey = isLeave ? 'leaveTransport' : 'arriveTransport';
+
+  // ── 필터 콤보값으로 사전 필터링 (년도·수양회종류·행사명) ──
+  var bf = _busGetFilter();
+  if(bf.year||bf.season||bf.event){
+    rows = rows.filter(function(r){
+      if(bf.year   && String(r.year||r['연도']||'').trim()   !== bf.year)   return false;
+      if(bf.season && String(r.season||r['수양회종류']||'').trim() !== bf.season) return false;
+      if(bf.event  && String(r.event||r['행사명']||'').trim()  !== bf.event)  return false;
+      return true;
+    });
+  }
 
   // 집계
   var busMap = {};
@@ -4178,7 +4304,7 @@ function _busUpdateTeamSheetFromBuses(type){
     var sheetName = t==='leave' ? '버스배정_귀가팀내역' : '버스배정_참석팀내역';
     var buses     = t==='leave' ? busLeaveBuses  : busArriveBuses;
     var teams     = t==='leave' ? busLeaveTeams  : busArriveTeams;
-    var teamHdr   = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+    var teamHdr   = ['NO','년도','수양회종류','행사명','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
 
     if(!teams || !teams.length) return; // 팀 없으면 건너뜀
 
@@ -4195,8 +4321,10 @@ function _busUpdateTeamSheetFromBuses(type){
       var _pp = _busParseParish(team.name||'');
       var _parish = (team.parish||'').trim() || _pp.parish;
       var _distNm = _parish ? _pp.district : (team.name||'').trim();
+      var _bf = _busGetFilter();
       return [
         idx+1,
+        _bf.year, _bf.season, _bf.event,
         _parish,
         _distNm,
         team.count   || 0,
@@ -4309,12 +4437,17 @@ function busReduceTeamCount(teamKey, type) {
 // (자료검색 그리드의 "미배정" 표시와 동일한 기준: rosterArriveIndex/rosterLeaveIndex 사용)
 // 행사명='시각선교부'(버스 배정 제외 대상)는 영원히 "미배정"으로 잡히지 않도록 제외
 function calcBusUnassignedCounts(){
-  var arriveCnt = retreat.filter(function(r){
-    return (r.arriveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterArriveIndex[r.receiptId]);
-  }).length;
-  var leaveCnt = retreat.filter(function(r){
-    return (r.leaveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterLeaveIndex[r.receiptId]);
-  }).length;
+  // 팀 자체가 없는 상태(초기화 후·미배정)에서는 재배정 개념이 성립하지 않으므로 0 반환
+  var arriveCnt = (busArriveTeams && busArriveTeams.length > 0)
+    ? retreat.filter(function(r){
+        return (r.arriveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterArriveIndex[r.receiptId]);
+      }).length
+    : 0;
+  var leaveCnt = (busLeaveTeams && busLeaveTeams.length > 0)
+    ? retreat.filter(function(r){
+        return (r.leaveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterLeaveIndex[r.receiptId]);
+      }).length
+    : 0;
   return {arrive: arriveCnt, leave: leaveCnt};
 }
 
@@ -4468,9 +4601,9 @@ function _busTabResetExec(type){
   var teamSheetName    = type==='leave' ? '버스배정_귀가팀내역' : '버스배정_참석팀내역';
   var summarySheetName = type==='leave' ? '버스배정_귀가요약'  : '버스배정_참석요약';
   var rosterSheetName  = type==='leave' ? '탑승자_귀가'        : '탑승자_참석';
-  var summaryHdr = ['버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
-  var rosterHdr  = ['NO','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
-  var teamHdr    = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+  var summaryHdr = ['년도','수양회종류','행사명','버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
+  var rosterHdr  = ['NO','년도','수양회종류','행사명','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
+  var teamHdr    = ['NO','년도','수양회종류','행사명','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
 
   // 요약/탑승자 2개 시트 삭제
   var clearCount=0, errSheets=[];
@@ -4488,6 +4621,11 @@ function _busTabResetExec(type){
         _busResetTeamStatus(type, teamHdr, function(){
           // 팀내역 재조회 → 로컬 팀 목록 복원
           busLoadTeamsFromSheet(type);
+          // rosterIndex 리셋: 시트가 비워졌으므로 in-memory 인덱스도 초기화
+          if(type==='leave') rosterLeaveIndex  = {};
+          else               rosterArriveIndex = {};
+          // 재배정 뱃지 갱신 (팀 없으므로 뱃지 숨김)
+          updateBusUnassignedBadge();
           showLoading(false);
           if(errSheets.length){
             showToast('⚠️ 일부 시트 초기화 실패: '+errSheets.join(', '),'error');
@@ -4543,9 +4681,9 @@ function _busTeamTabReset(type){
   showToast('☁️ '+label+' 구글 시트 초기화 중...','info');
 
   // 헤더 정의
-  var teamHdr    = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
-  var summaryHdr = ['버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
-  var rosterHdr  = ['NO','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
+  var teamHdr    = ['NO','년도','수양회종류','행사명','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+  var summaryHdr = ['년도','수양회종류','행사명','버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
+  var rosterHdr  = ['NO','년도','수양회종류','행사명','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
 
   // ── 3. 해당 타입 3개 시트 모두 rows:[] overwrite → 데이터 완전 삭제 ──
   var sheets = isLeave
@@ -4622,9 +4760,9 @@ function busResetAll(){
   showLoading(true);
   showToast('☁️ 구글 시트 초기화 중...','info');
 
-  var summaryHdr = ['버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
-  var rosterHdr  = ['NO','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
-  var teamHdr    = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+  var summaryHdr = ['년도','수양회종류','행사명','버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
+  var rosterHdr  = ['NO','년도','수양회종류','행사명','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
+  var teamHdr    = ['NO','년도','수양회종류','행사명','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
 
   // Step 3-A. 버스배정 요약 / 탑승자 4개 시트 → 헤더만 남기고 완전 삭제
   var summaryEmpty = summaryHdr.map(function(){ return ''; });
@@ -4650,6 +4788,11 @@ function busResetAll(){
 
             // Step 3-C. 완료 후 팀내역 시트 재조회 → 팀 패널 즉시 갱신
             busLoadTeamsFromSheet('both');
+            // rosterIndex 리셋: 시트가 비워졌으므로 in-memory 인덱스도 초기화
+            rosterArriveIndex = {};
+            rosterLeaveIndex  = {};
+            // 재배정 뱃지 갱신 (팀 없으므로 뱃지 숨김)
+            updateBusUnassignedBadge();
             showLoading(false);
 
             if(errSheets.length){
@@ -4736,7 +4879,8 @@ function busReAssignFromSheet() {
       // 3단계: 팀 배열 직접 재구성 (busImportFromRetreat는 UI 표시만이므로 직접 처리)
       function rebuildTeams(transportField) {
         var map = {};
-        retreat.filter(function(r){
+        var _rfRows = _busFilterRows(retreat); // 년도·수양회종류·행사명 필터 적용
+        _rfRows.filter(function(r){
           return (r[transportField]||'').trim() === '버스' && !isBusExcluded(r);
         }).forEach(function(r){
           var key, isJH = isJuniorHighBus(r);
@@ -4827,6 +4971,8 @@ function _busLoadOneTeamSheet(type, cb){
   apiCall({action:'getAll', sheetName:sheetName})
     .then(function(res){
       var rows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      // 년도·수양회종류·행사명 필터 적용
+      rows = _busFilterRows(rows);
       if(rows.length){
         var existingTeams = type==='leave' ? busLeaveTeams : busArriveTeams;
         var rebuilt = rows.map(function(r,i){
@@ -5404,6 +5550,15 @@ function _bvwCalcSheetStats(type, summaryRows, rosterRows){
     fromSheet: summaryRows.length > 0
   };
 }
+// 버스배정현황 필터 콤보값 읽기 헬퍼
+function _busviewGetFilter(){
+  return {
+    year:   (($id('busview-sel-year')   ||{}).value||'').trim(),
+    season: (($id('busview-sel-season') ||{}).value||'').trim(),
+    event:  (($id('busview-sel-event')  ||{}).value||'').trim()
+  };
+}
+
 function busviewReload(){
   var btn = $id('btn-busview-reload');
   if(btn){ btn.disabled=true; btn.textContent='로딩 중...'; }
@@ -5447,8 +5602,24 @@ function busviewReload(){
         showLoading(false);
         if(btn){ btn.disabled=false; btn.textContent='🔍 조회'; }
 
-        var arrived = _busRowsToBuses(results['버스배정_참석요약']);
-        var leaved  = _busRowsToBuses(results['버스배정_귀가요약']);
+        // ── 필터 적용: 선택한 년도·수양회종류·행사명으로 4개 시트 결과 필터링 ──
+        var bf = _busviewGetFilter();
+        function filterRows(rows){
+          if(!bf.year && !bf.season && !bf.event) return rows;
+          return rows.filter(function(r){
+            if(bf.year   && String(r['년도']||r['year']||'').trim()       !== bf.year)   return false;
+            if(bf.season && String(r['수양회종류']||r['season']||'').trim() !== bf.season) return false;
+            if(bf.event  && String(r['행사명']||r['event']||'').trim()     !== bf.event)  return false;
+            return true;
+          });
+        }
+        var filteredArrSum  = filterRows(results['버스배정_참석요약'] || []);
+        var filteredLvSum   = filterRows(results['버스배정_귀가요약'] || []);
+        var filteredArrRst  = filterRows(results['탑승자_참석']       || []);
+        var filteredLvRst   = filterRows(results['탑승자_귀가']       || []);
+
+        var arrived = _busRowsToBuses(filteredArrSum);
+        var leaved  = _busRowsToBuses(filteredLvSum);
 
         if(arrived.buses.length || leaved.buses.length){
           busArriveTeams = arrived.teams;
@@ -5462,18 +5633,12 @@ function busviewReload(){
           showToast('✅ 구글 시트에서 버스 배정 현황 로드 완료','success');
         } else {
           _busRestoreLocal();
-          showToast('구글 시트에 버스 배정 데이터가 없습니다. 로컬 캐시 표시','info');
+          showToast('선택한 조건의 버스 배정 데이터가 없습니다.','info');
         }
 
-        // ── 시트 기반 통계 집계 ──
-        // 참석: 버스배정_참석요약(버스/팀) + 탑승자_참석(탑승자)
-        _bvwCalcSheetStats('arrive',
-          results['버스배정_참석요약'] || [],
-          results['탑승자_참석']       || []);
-        // 귀가: 버스배정_귀가요약(버스/팀) + 탑승자_귀가(탑승자)
-        _bvwCalcSheetStats('leave',
-          results['버스배정_귀가요약'] || [],
-          results['탑승자_귀가']       || []);
+        // ── 시트 기반 통계 집계 (필터된 데이터 기준) ──
+        _bvwCalcSheetStats('arrive', filteredArrSum, filteredArrRst);
+        _bvwCalcSheetStats('leave',  filteredLvSum,  filteredLvRst);
 
         busRenderView();
       });
@@ -5620,7 +5785,21 @@ function bvwExportBusSchedule(typeOverride){
       .then(function(res){ return (res && res.success) ? (res.data||res.rows||[]) : []; })
       .catch(function(){ return []; });
   })).then(function(results){
-    var summary=results[0], roster=results[1];
+    // ── 수정B: 배차표 다운로드 시 년도·수양회종류·행사명 필터 적용 ──
+    // typeOverride 있으면 관리자 배정현황 탭 → _busGetFilter()
+    // typeOverride 없으면 배정현황조회(busview) 탭 → _busviewGetFilter()
+    var _expBf = typeOverride ? _busGetFilter() : _busviewGetFilter();
+    function _exportFilter(rows){
+      if(!_expBf.year && !_expBf.season && !_expBf.event) return rows;
+      return rows.filter(function(r){
+        if(_expBf.year   && String(r['년도']   ||'').trim() !== _expBf.year)   return false;
+        if(_expBf.season && String(r['수양회종류']||'').trim() !== _expBf.season) return false;
+        if(_expBf.event  && String(r['행사명'] ||'').trim() !== _expBf.event)  return false;
+        return true;
+      });
+    }
+    var summary = _exportFilter(results[0]);
+    var roster  = _exportFilter(results[1]);
     var meta = _bvwBuildBusMetaMap(summary);
     var groups = _bvwGroupRoster(roster);
     var busNames = Object.keys(meta).sort(function(a,b){ return _bvwSortKey(a)-_bvwSortKey(b); });
@@ -5681,10 +5860,12 @@ function bvwSetMode(mode){
 function getBusPaxByTeam(team, busType){
   var name = (team.name||'').trim();
   var field = busType==='leave' ? 'leaveTransport' : 'arriveTransport';
+  // ── 년도·수양회종류·행사명 필터 적용: 선택한 수양회 인원만 대상 ──
+  var _src = _busFilterRows(retreat);
 
   // 중고등부 통합팀: 구역 무관하게 isJuniorHighBus 조건으로 조회
   if(name === '중고등부'){
-    return retreat.filter(function(r){
+    return _src.filter(function(r){
       return (r[field]||'').trim()==='버스' && isJuniorHighBus(r) && !isBusExcluded(r);
     });
   }
@@ -5713,7 +5894,7 @@ function getBusPaxByTeam(team, busType){
     return false;
   }
 
-  return retreat.filter(matches);
+  return _src.filter(matches);
 }
 
 // ── 버스별 탑승자 명단 빌드 ──────────────────────────
@@ -6005,7 +6186,7 @@ function busSaveTeamsToSheet() {
     return;
   }
 
-  var teamHdr = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+  var teamHdr = ['NO','년도','수양회종류','행사명','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
 
   // 로컬 팀 → 행 변환 헬퍼 (parish 역추출 포함)
   function teamToRow(t, no){
@@ -6019,7 +6200,8 @@ function busSaveTeamsToSheet() {
     var _pp = _busParseParish(t.name||'');
     var parish = (t.parish||'').trim() || _pp.parish;
     var distNm = parish ? _pp.district : (t.name||'').trim();
-    return [no, parish, distNm, t.count||0, assigned?'배정':'미배정', busName, isSplit?'분산배정':'', t.isJH?'중고등부':''];
+    var bf = _busGetFilter();
+    return [no, bf.year, bf.season, bf.event, parish, distNm, t.count||0, assigned?'배정':'미배정', busName, isSplit?'분산배정':'', t.isJH?'중고등부':''];
   }
 
   showLoading(true);
@@ -6041,6 +6223,7 @@ function busSaveTeamsToSheet() {
 
       var nextNo = sheetRows.length + 1;
       var newRows = [];
+      var bf2 = _busGetFilter();
       teams.forEach(function(t){
         var _pp2 = _busParseParish(t.name||'');
         var parish = (t.parish||'').trim() || _pp2.parish;
@@ -6130,31 +6313,33 @@ function busSaveToSheet(typeOnly){
       }).join(' | ');
       var boardLoc  = bus.boardLoc  || defBoard  || '';
       var alightLoc = bus.alightLoc || defAlight || '';
-      return [bus.name, boardLoc, alightLoc, bus.slots.length, load, cap, teamNames, bus.leaderId||''];
+      var bf = _busGetFilter();
+      return [bf.year, bf.season, bf.event, bus.name, boardLoc, alightLoc, bus.slots.length, load, cap, teamNames, bus.leaderId||''];
     });
   }
   function makeRosterRows(roster, dateField, isLeave){
     var defBoard  = isLeave ? metaLvBoard   : metaArrBoard;
     var defAlight = isLeave ? metaLvAlight  : metaArrAlight;
+    var bf = _busGetFilter();
     var rows=[];
     var no=1;
     roster.forEach(function(item){
       var boardLoc  = item.bus.boardLoc  || defBoard  || '';
       var alightLoc = item.bus.alightLoc || defAlight || '';
       if(!item.passengers.length){
-        rows.push([no++, '', item.bus.name, boardLoc, alightLoc,'','','(명단 미연동)','','',item.bus.name,'']);
+        rows.push([no++, bf.year, bf.season, bf.event, '', item.bus.name, boardLoc, alightLoc,'','','(명단 미연동)','','',item.bus.name,'']);
         return;
       }
       item.passengers.forEach(function(p){
-        rows.push([no++, p.receiptId||'', item.bus.name, boardLoc, alightLoc,
+        rows.push([no++, bf.year, bf.season, bf.event, p.receiptId||'', item.bus.name, boardLoc, alightLoc,
           p.parish,p.district,maskName(p.name),p.group||'',p[dateField]||'',item.bus.name,p.gender||'']);
       });
     });
     return rows;
   }
 
-  var summaryHdr=['버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
-  var rosterHdr =['NO','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
+  var summaryHdr=['년도','수양회종류','행사명','버스명','상차위치','하차위치','배정팀수','탑승인원','정원','팀 목록','선탑자ID'];
+  var rosterHdr =['NO','년도','수양회종류','행사명','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
 
   var payloads=[];
   var arrSummary=[], lvSummary=[], arrRoster=[], lvRoster=[];
@@ -6248,7 +6433,7 @@ function _busUpdateTeamStatus(type, status, assignedKeys, cb){
     .then(function(res){
       var rows = (res&&res.success) ? (res.data||res.rows||[]) : [];
       if(!rows.length) return;
-      var teamHdr = ['NO','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+      var teamHdr = ['NO','년도','수양회종류','행사명','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
       var updated = rows.map(function(r){
         var parish   = String(r['교구']||r['parish']||'').trim();
         var district = String(r['구역/팀명']||r['district']||'').trim();
@@ -6381,7 +6566,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v89_hide_register';
+var CACHE_VERSION = 'v96_leader_export_filter';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -7042,6 +7227,18 @@ function switchPanel(name, skipRender) {
       if(USE_SHEET()){ loadData(); } else { renderHome(); }
     }
     if(name==='bus'){
+      // 년도 콤보 동적 생성 (당해년도 ~ +5), 최초 1회
+      var busYrSel = $id('bus-sel-year');
+      if(busYrSel && !busYrSel.options.length){
+        var busYr = new Date().getFullYear();
+        for(var bi=0; bi<=5; bi++){
+          var bOpt=document.createElement('option');
+          bOpt.value = String(busYr+bi);
+          bOpt.textContent = String(busYr+bi)+'년';
+          if(bi===0) bOpt.selected=true;
+          busYrSel.appendChild(bOpt);
+        }
+      }
       if(currentUser&&currentUser.role==='admin'){
         // 배지 계산은 rosterArriveIndex/rosterLeaveIndex(탑승자_참석/귀가 시트 기반)에 의존하는데,
         // 자료검색 패널을 거치지 않고 바로 버스배정에 들어오면 이 인덱스가 비어있거나(또는 stale)
@@ -7054,7 +7251,21 @@ function switchPanel(name, skipRender) {
         _busRestoreFromSheet();
       }
     }
-    if(name==='busview')  { busviewReload(); }
+    if(name==='busview'){
+      // 년도 콤보 동적 생성 (당해년도 ~ +5), 최초 1회
+      var bvYrSel = $id('busview-sel-year');
+      if(bvYrSel && !bvYrSel.options.length){
+        var bvYr = new Date().getFullYear();
+        for(var bvi=0; bvi<=5; bvi++){
+          var bvOpt = document.createElement('option');
+          bvOpt.value = String(bvYr+bvi);
+          bvOpt.textContent = String(bvYr+bvi)+'년';
+          if(bvi===0) bvOpt.selected=true;
+          bvYrSel.appendChild(bvOpt);
+        }
+      }
+      busviewReload();
+    }
     if(name==='roomview') {
       // 년도 콤보 동적 생성 (당해년도 ~ +5), 첫 진입 1회만
       var rvYrSel = $id('roomview-sel-year');
@@ -7304,7 +7515,9 @@ function renderHome(filter) {
 
   // ── 달성율 계산용: 선택 연도와 일치하는 교회목표 행 매칭 ──
   // 목표 데이터가 없는 연도(또는 미로딩)는 goalRow가 undefined → goalTotal 0 처리되어 calcRate()가 0% 반환
-  var goalRow = _goalRows.find(function(r){ return r.year===String(year); });
+  // 교회목표: 해당 연도의 첫 번째 행 (행사명 1차 우선, 없으면 첫 행)
+  var goalRow = _goalRows.filter(function(r){ return r.year===String(year); })
+    .sort(function(a,b){ return (a.eventName||'').localeCompare(b.eventName||'','ko'); })[0] || null;
   var districtsCount = goalRow ? (parseFloat(goalRow.districts)||0) : 0;
   var rateCfg1 = { goalTotal: goalRow ? (parseFloat(goalRow.retreat)||0) : 0, districtsCount: districtsCount };
   var rateCfg2 = { goalTotal: goalRow ? (parseFloat(goalRow.evangel)||0) : 0, districtsCount: districtsCount };
@@ -9108,7 +9321,7 @@ function loadAccountsFromSheet(){
 }
 
 // ── 교회 목표 관리 ───────────────────────────────────
-var _goalRows = [];        // 시트에서 로드한 전체 행 [{연도, 수양회목표, 성도접수목표, 전도목표, 구역수, 등록일, 등록자}]
+var _goalRows = [];        // 시트에서 로드한 전체 행 [{year, eventName, retreat, regist, evangel, districts, regDate, regBy}]
 var _goalLoaded = false;
 var _goalLoading = false;  // 중복 fetch 방지 플래그
 
@@ -9131,13 +9344,14 @@ function _goalFetchFromSheet(callback, opts){
       if(res && res.success){
         _goalRows = (res.data || res.rows || []).map(function(r){
           return {
-            year:      String(r['연도']||'').trim(),
-            retreat:   String(r['수양회목표']||'').trim(),
-            regist:    String(r['성도접수목표']||'').trim(),
-            evangel:   String(r['전도목표']||'').trim(),
-            districts: String(r['구역수']||'').trim(),
-            regDate:   String(r['등록일']||'').trim(),
-            regBy:     String(r['등록자']||'').trim()
+            year:       String(r['연도']||'').trim(),
+            eventName:  String(r['행사명']||'').trim(),
+            retreat:    String(r['수양회목표']||'').trim(),
+            regist:     String(r['성도접수목표']||'').trim(),
+            evangel:    String(r['전도목표']||'').trim(),
+            districts:  String(r['구역수']||'').trim(),
+            regDate:    String(r['등록일']||'').trim(),
+            regBy:      String(r['등록자']||'').trim()
           };
         }).filter(function(r){ return r.year; });
       } else {
@@ -9171,14 +9385,13 @@ function goalOpenModal(){
 function goalRenderYearOptions(){
   var sel = $id('goal-year-sel'); if(!sel) return;
   var years = _goalRows.map(function(r){ return r.year; });
-  // 현재 연도가 목록에 없으면 맨 위에 추가 (신규 입력 편의)
   var curYear = String(new Date().getFullYear());
   if(years.indexOf(curYear) < 0) years.push(curYear);
-  years = years.filter(function(y,i){ return years.indexOf(y)===i; }); // dedup
-  years.sort(function(a,b){ return Number(b)-Number(a); }); // 최신연도 위
+  years = years.filter(function(y,i){ return years.indexOf(y)===i; });
+  years.sort(function(a,b){ return Number(b)-Number(a); });
   sel.innerHTML = years.map(function(y){ return '<option value="'+esc(y)+'">'+esc(y)+'년</option>'; }).join('');
   if(sel.options.length) sel.value = years[0];
-  goalYearChange();
+  goalKeyChange();
 }
 
 function goalAddNewYear(){
@@ -9192,19 +9405,21 @@ function goalAddNewYear(){
     var opt = document.createElement('option');
     opt.value = y; opt.textContent = y+'년';
     sel.appendChild(opt);
-    // 연도 내림차순 재정렬
     var opts = Array.from(sel.options).sort(function(a,b){ return Number(b.value)-Number(a.value); });
     sel.innerHTML='';
     opts.forEach(function(o){ sel.appendChild(o); });
   }
   sel.value = y;
-  goalYearChange();
+  goalKeyChange();
 }
 
-function goalYearChange(){
-  var sel = $id('goal-year-sel'); if(!sel) return;
-  var y = sel.value;
-  var row = _goalRows.find(function(r){ return r.year===y; });
+// 연도 또는 행사명 콤보 변경 시 — 복합키(연도+행사명)로 해당 행 탐색 후 입력칸 채움
+function goalKeyChange(){
+  var ySel = $id('goal-year-sel');   if(!ySel) return;
+  var eSel = $id('goal-event-sel');  if(!eSel) return;
+  var y = ySel.value;
+  var ev = eSel.value;
+  var row = _goalRows.find(function(r){ return r.year===y && r.eventName===ev; });
   $set('goal-retreat',   row ? row.retreat   : '');
   $set('goal-regist',    row ? row.regist    : '');
   $set('goal-evangel',   row ? row.evangel   : '');
@@ -9229,8 +9444,10 @@ function goalCalcPreview(){
 }
 
 function goalSave(){
-  var sel = $id('goal-year-sel'); if(!sel || !sel.value){ showToast('연도를 선택해 주세요.','error'); return; }
-  var y = sel.value;
+  var ySel = $id('goal-year-sel');  if(!ySel || !ySel.value){ showToast('연도를 선택해 주세요.','error'); return; }
+  var eSel = $id('goal-event-sel'); if(!eSel || !eSel.value){ showToast('강서교회회차를 선택해 주세요.','error'); return; }
+  var y  = ySel.value;
+  var ev = eSel.value;
   var retreat   = ($id('goal-retreat')||{value:''}).value.trim();
   var regist    = ($id('goal-regist')||{value:''}).value.trim();
   var evangel   = ($id('goal-evangel')||{value:''}).value.trim();
@@ -9241,37 +9458,38 @@ function goalSave(){
   if(!USE_SHEET()){
     showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return;
   }
-  var existing = _goalRows.find(function(r){ return r.year===y; });
+  var existing = _goalRows.find(function(r){ return r.year===y && r.eventName===ev; });
   var newRow = {
-    year: y, retreat: retreat, regist: regist, evangel: evangel, districts: districts,
+    year: y, eventName: ev,
+    retreat: retreat, regist: regist, evangel: evangel, districts: districts,
     regDate: existing ? existing.regDate : today(),
     regBy: (currentUser && currentUser.name) || 'admin'
   };
-  // upsert
-  var idx = _goalRows.findIndex(function(r){ return r.year===y; });
+  var idx = _goalRows.findIndex(function(r){ return r.year===y && r.eventName===ev; });
   if(idx>=0) _goalRows[idx] = newRow; else _goalRows.push(newRow);
-
   _goalSyncToSheet();
 }
 
 function goalDelete(){
-  var sel = $id('goal-year-sel'); if(!sel || !sel.value) return;
-  var y = sel.value;
-  if(!confirm(y+'년 목표 데이터를 삭제하시겠습니까?')) return;
-  _goalRows = _goalRows.filter(function(r){ return r.year!==y; });
+  var ySel = $id('goal-year-sel');  if(!ySel || !ySel.value) return;
+  var eSel = $id('goal-event-sel'); if(!eSel || !eSel.value) return;
+  var y  = ySel.value;
+  var ev = eSel.value;
+  if(!confirm(y+'년 '+ev+' 목표 데이터를 삭제하시겠습니까?')) return;
+  _goalRows = _goalRows.filter(function(r){ return !(r.year===y && r.eventName===ev); });
   _goalSyncToSheet(function(){
-    var sel2 = $id('goal-year-sel');
-    // 삭제 후 목록에서도 제거 (현재연도 fallback은 goalRenderYearOptions가 처리)
-    var opt = sel2 && Array.from(sel2.options).find(function(o){ return o.value===y; });
-    if(opt) opt.remove();
-    goalYearChange();
+    goalKeyChange();
   });
 }
 
 function _goalSyncToSheet(onSuccess){
-  var hdr = ['연도','수양회목표','성도접수목표','전도목표','구역수','등록일','등록자'];
-  var rows = _goalRows.slice().sort(function(a,b){ return Number(a.year)-Number(b.year); })
-    .map(function(r){ return [r.year, r.retreat, r.regist, r.evangel, r.districts, r.regDate, r.regBy]; });
+  var hdr = ['연도','행사명','수양회목표','성도접수목표','전도목표','구역수','등록일','등록자'];
+  var rows = _goalRows.slice()
+    .sort(function(a,b){
+      if(a.year !== b.year) return Number(a.year)-Number(b.year);
+      return (a.eventName||'').localeCompare(b.eventName||'','ko');
+    })
+    .map(function(r){ return [r.year, r.eventName||'', r.retreat, r.regist, r.evangel, r.districts, r.regDate, r.regBy]; });
   showLoading(true);
   fetch(API_URL,{method:'POST',headers:_gasHeaders({'Content-Type':'text/plain'}),
     body:JSON.stringify({sheetName:'교회목표', mode:'overwrite', headers:hdr, rows:rows}),
@@ -10094,7 +10312,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'busDeleteBus','busResetAll','busResetConfirm','_busTeamTabReset','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew',
     'busSaveMeta','busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSetLocation','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh',
     'busSaveToSheet','busExportCSV','busRestore',
-    'bvwSetMode','bvwSetType','busviewReload','bvwExportBusSchedule','busSummaryExportCSV',
+    'bvwSetMode','bvwSetType','busviewReload','_busviewGetFilter','bvwExportBusSchedule','busSummaryExportCSV',
     'busSelectAll','busImportAddSelected',
     'busTeamsSubTab','busAssignSubTab','busSummarySubTab',
     'busLeaderSubTab','busLeaderRender','busLeaderSave',
@@ -10111,7 +10329,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'busRosterOpen','busRosterClose','busRosterFilter',
     '_bvwCalcSheetStats','_bvwFetchSheetStats','_bvwRenderStatsOnly',
     'accGenId','accAutoGenId',
-    'goalOpenModal','goalRenderYearOptions','goalAddNewYear','goalYearChange','goalCalcPreview','goalSave','goalDelete'
+    'goalOpenModal','goalRenderYearOptions','goalAddNewYear','goalKeyChange','goalCalcPreview','goalSave','goalDelete'
   ];
   var _self = {
     doLogin:doLogin, doLogout:doLogout, switchPanel:switchPanel,
@@ -10153,7 +10371,7 @@ document.addEventListener('DOMContentLoaded', function() {
     busSaveMeta:busSaveMeta, busImportFromRetreat:busImportFromRetreat, busLoadTeamsFromSheet:busLoadTeamsFromSheet, _busLoadOneTeamSheet:_busLoadOneTeamSheet, busSaveTeamsToSheet:busSaveTeamsToSheet, _busUpdateTeamStatus:_busUpdateTeamStatus, _busUpdateTeamStatusAndRefresh:_busUpdateTeamStatusAndRefresh,
     busSetLocation:busSetLocation, busSaveToSheet:busSaveToSheet, busExportCSV:busExportCSV,
     busRestore:busRestore,
-    bvwSetMode:bvwSetMode, bvwSetType:bvwSetType, busviewReload:busviewReload, bvwExportBusSchedule:bvwExportBusSchedule, busSummaryExportCSV:busSummaryExportCSV,
+    bvwSetMode:bvwSetMode, bvwSetType:bvwSetType, busviewReload:busviewReload, _busviewGetFilter:_busviewGetFilter, bvwExportBusSchedule:bvwExportBusSchedule, busSummaryExportCSV:busSummaryExportCSV,
     busSelectAll:busSelectAll, busImportAddSelected:busImportAddSelected,
     busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderSave:busLeaderSave,
@@ -10176,7 +10394,7 @@ document.addEventListener('DOMContentLoaded', function() {
     _bvwCalcSheetStats:_bvwCalcSheetStats, _bvwFetchSheetStats:_bvwFetchSheetStats, _bvwRenderStatsOnly:_bvwRenderStatsOnly,
     accGenId:accGenId, accAutoGenId:accAutoGenId,
     goalOpenModal:goalOpenModal, goalRenderYearOptions:goalRenderYearOptions, goalAddNewYear:goalAddNewYear,
-    goalYearChange:goalYearChange, goalCalcPreview:goalCalcPreview, goalSave:goalSave, goalDelete:goalDelete
+    goalKeyChange:goalKeyChange, goalCalcPreview:goalCalcPreview, goalSave:goalSave, goalDelete:goalDelete
   };
   _expose.forEach(function(name){
     try { window[name] = _self[name]; } catch(e) {}
