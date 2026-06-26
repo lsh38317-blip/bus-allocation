@@ -2166,14 +2166,13 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <button class="modal-close" onclick="closeModal('goal-modal')">✕</button>
     </div>
 
-    <!-- 연도 + 강서교회회차(행사명) 선택 -->
-    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;">
-      <div class="form-group" style="margin:0;flex:1;min-width:90px;">
+    <!-- 연도 + 강서교회회차 + 수양회종류 (1행 3등분) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div class="form-group" style="margin:0;">
         <label>연도</label>
         <select id="goal-year-sel" onchange="goalKeyChange()"></select>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="goalAddNewYear()" style="margin-bottom:1px;white-space:nowrap;">+ 신규</button>
-      <div class="form-group" style="margin:0;flex:1;min-width:120px;">
+      <div class="form-group" style="margin:0;">
         <label>강서교회회차</label>
         <select id="goal-event-sel" onchange="goalKeyChange()"
           style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
@@ -2184,6 +2183,16 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <option value="5차">5차</option>
           <option value="6차">6차</option>
           <option value="7차">7차</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>수양회종류</label>
+        <select id="goal-season-sel" onchange="goalKeyChange()"
+          style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
+          <option value="춘계">춘계</option>
+          <option value="하계" selected>하계</option>
+          <option value="추계">추계</option>
+          <option value="동계">동계</option>
         </select>
       </div>
     </div>
@@ -6760,7 +6769,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v122_search_manual_trigger';
+var CACHE_VERSION = 'v123_goal_season';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -9634,14 +9643,15 @@ function _goalFetchFromSheet(callback, opts){
       if(res && res.success){
         _goalRows = (res.data || res.rows || []).map(function(r){
           return {
-            year:       String(r['연도']||'').trim(),
-            eventName:  String(r['행사명']||'').trim(),
-            retreat:    String(r['수양회목표']||'').trim(),
-            regist:     String(r['성도접수목표']||'').trim(),
-            evangel:    String(r['전도목표']||'').trim(),
-            districts:  String(r['구역수']||'').trim(),
-            regDate:    String(r['등록일']||'').trim(),
-            regBy:      String(r['등록자']||'').trim()
+            year:        String(r['연도']||'').trim(),
+            eventName:   String(r['행사명']||'').trim(),
+            retreatType: String(r['수양회종류']||'').trim(),
+            retreat:     String(r['수양회목표']||'').trim(),
+            regist:      String(r['성도접수목표']||'').trim(),
+            evangel:     String(r['전도목표']||'').trim(),
+            districts:   String(r['구역수']||'').trim(),
+            regDate:     String(r['등록일']||'').trim(),
+            regBy:       String(r['등록자']||'').trim()
           };
         }).filter(function(r){ return r.year; });
       } else {
@@ -9680,13 +9690,12 @@ function goalOpenModal(){
 
 function goalRenderYearOptions(){
   var sel = $id('goal-year-sel'); if(!sel) return;
-  var years = _goalRows.map(function(r){ return r.year; });
-  var curYear = String(new Date().getFullYear());
-  if(years.indexOf(curYear) < 0) years.push(curYear);
-  years = years.filter(function(y,i){ return years.indexOf(y)===i; });
-  years.sort(function(a,b){ return Number(b)-Number(a); });
+  // 현재년도 ~ +5년 고정 생성
+  var curYear = new Date().getFullYear();
+  var years = [];
+  for(var yi=0; yi<=5; yi++) years.push(String(curYear+yi));
   sel.innerHTML = years.map(function(y){ return '<option value="'+esc(y)+'">'+esc(y)+'년</option>'; }).join('');
-  if(sel.options.length) sel.value = years[0];
+  sel.value = String(curYear);
   goalKeyChange();
 }
 
@@ -9711,11 +9720,16 @@ function goalAddNewYear(){
 
 // 연도 또는 행사명 콤보 변경 시 — 복합키(연도+행사명)로 해당 행 탐색 후 입력칸 채움
 function goalKeyChange(){
-  var ySel = $id('goal-year-sel');   if(!ySel) return;
-  var eSel = $id('goal-event-sel');  if(!eSel) return;
-  var y = ySel.value;
+  var ySel  = $id('goal-year-sel');   if(!ySel)  return;
+  var eSel  = $id('goal-event-sel');  if(!eSel)  return;
+  var ssSel = $id('goal-season-sel'); if(!ssSel) return;
+  var y  = ySel.value;
   var ev = eSel.value;
-  var row = _goalRows.find(function(r){ return r.year===y && r.eventName===ev; });
+  var ss = ssSel.value;
+  // 3키(연도+회차+수양회종류) 기준 조회
+  var row = _goalRows.find(function(r){
+    return r.year===y && r.eventName===ev && r.retreatType===ss;
+  });
   $set('goal-retreat',   row ? row.retreat   : '');
   $set('goal-regist',    row ? row.regist    : '');
   $set('goal-evangel',   row ? row.evangel   : '');
@@ -9740,10 +9754,12 @@ function goalCalcPreview(){
 }
 
 function goalSave(){
-  var ySel = $id('goal-year-sel');  if(!ySel || !ySel.value){ showToast('연도를 선택해 주세요.','error'); return; }
-  var eSel = $id('goal-event-sel'); if(!eSel || !eSel.value){ showToast('강서교회회차를 선택해 주세요.','error'); return; }
+  var ySel  = $id('goal-year-sel');   if(!ySel  || !ySel.value)  { showToast('연도를 선택해 주세요.','error'); return; }
+  var eSel  = $id('goal-event-sel');  if(!eSel  || !eSel.value)  { showToast('강서교회회차를 선택해 주세요.','error'); return; }
+  var ssSel = $id('goal-season-sel'); if(!ssSel || !ssSel.value) { showToast('수양회종류를 선택해 주세요.','error'); return; }
   var y  = ySel.value;
   var ev = eSel.value;
+  var ss = ssSel.value;
   var retreatVal = ($id('goal-retreat')||{value:''}).value.trim();
   var regist     = ($id('goal-regist')||{value:''}).value.trim();
   var evangel    = ($id('goal-evangel')||{value:''}).value.trim();
@@ -9754,10 +9770,11 @@ function goalSave(){
   if(!USE_SHEET()){
     showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return;
   }
-  var existing = _goalRows.find(function(r){ return r.year===y && r.eventName===ev; });
+  var existing = _goalRows.find(function(r){ return r.year===y && r.eventName===ev && r.retreatType===ss; });
   var now = today();
   var data = {
     '연도':      y,
+    '수양회종류': ss,
     '행사명':    ev,
     '수양회목표': retreatVal,
     '성도접수목표': regist,
@@ -9766,38 +9783,74 @@ function goalSave(){
     '등록일':    existing ? existing.regDate : now,
     '등록자':    (currentUser && currentUser.name) || 'admin'
   };
-  // ── 구글시트 upsert: 연도+행사명 복합키로 해당 행 있으면 update, 없으면 insert ──
+  // ── 구글시트 저장: getAll → 3키(연도+행사명+수양회종류) 기준 upsert → overwrite ──
+  var hdr = ['연도','행사명','수양회종류','수양회목표','성도접수목표','전도목표','구역수','등록일','등록자'];
   showLoading(true);
-  apiCall({
-    action:    'upsert',
-    sheetName: '교회목표',
-    keys:      ['연도','행사명'],
-    data:      data
-  })
+  apiCall({action:'getAll', sheetName:'교회목표'})
   .then(function(res){
-    if(!res || !res.success) throw new Error(res&&res.error||'저장 실패');
-    var actionLabel = res.action === 'update' ? '수정' : '등록';
-    showToast('✅ 교회 목표 '+actionLabel+' 완료 ('+y+'년 '+ev+')', 'success');
-    // 인메모리 _goalRows도 동기화
-    var newRow = {
-      year: y, eventName: ev,
-      retreat: retreatVal, regist: regist, evangel: evangel, districts: districts,
-      regDate: data['등록일'], regBy: data['등록자']
-    };
-    var idx = _goalRows.findIndex(function(r){ return r.year===y && r.eventName===ev; });
-    if(idx>=0) _goalRows[idx] = newRow; else _goalRows.push(newRow);
-    goalKeyChange();
+    var sheetRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+    var found = false;
+    var newRows = sheetRows.map(function(r){
+      var rY  = String(r['연도']||'').trim();
+      var rEv = String(r['행사명']||'').trim();
+      var rSs = String(r['수양회종류']||'').trim();
+      if(rY===y && rEv===ev && rSs===ss){
+        found = true;
+        // 기존 행 update
+        return [y, ev, ss, retreatVal, regist, evangel, districts, existing?existing.regDate:now,
+                (currentUser&&currentUser.name)||'admin'];
+      }
+      return [r['연도']||'', r['행사명']||'', r['수양회종류']||'',
+              r['수양회목표']||'', r['성도접수목표']||'', r['전도목표']||'',
+              r['구역수']||'', r['등록일']||'', r['등록자']||''];
+    });
+    if(!found){
+      // 신규 행 append
+      newRows.push([y, ev, ss, retreatVal, regist, evangel, districts, now,
+                    (currentUser&&currentUser.name)||'admin']);
+    }
+    var actionLabel = found ? '수정' : '등록';
+    // apiCall은 headers/rows를 data{}로 묶어 전송하므로
+    // GAS body.headers/rows 직접 접근 가능하도록 raw fetch 사용
+    var overwriteBody = JSON.stringify({
+      action: 'overwrite',
+      sheetName: '교회목표',
+      headers: hdr,
+      rows: newRows
+    });
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: _gasHeaders({'Content-Type': 'text/plain'}),
+      body: overwriteBody,
+      redirect: 'follow'
+    })
+    .then(function(res){ return res.json(); })
+    .then(function(res2){
+      if(!res2||!res2.success) throw new Error(res2&&res2.error||'저장 실패');
+      showToast('✅ 교회 목표 '+actionLabel+' 완료 ('+y+'년 '+ss+' '+ev+')', 'success');
+      // 인메모리 _goalRows 동기화
+      var newRow = {
+        year:y, eventName:ev, retreatType:ss,
+        retreat:retreatVal, regist:regist, evangel:evangel, districts:districts,
+        regDate: existing?existing.regDate:now, regBy:(currentUser&&currentUser.name)||'admin'
+      };
+      var ri = _goalRows.findIndex(function(r){ return r.year===y && r.eventName===ev && r.retreatType===ss; });
+      if(ri>=0) _goalRows[ri] = newRow; else _goalRows.push(newRow);
+      goalKeyChange();
+    });
   })
   .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
   .finally(function(){ showLoading(false); });
 }
 
 function goalDelete(){
-  var ySel = $id('goal-year-sel');  if(!ySel || !ySel.value) return;
-  var eSel = $id('goal-event-sel'); if(!eSel || !eSel.value) return;
+  var ySel  = $id('goal-year-sel');   if(!ySel  || !ySel.value)  return;
+  var eSel  = $id('goal-event-sel');  if(!eSel  || !eSel.value)  return;
+  var ssSel = $id('goal-season-sel'); if(!ssSel || !ssSel.value) return;
   var y  = ySel.value;
   var ev = eSel.value;
-  if(!confirm(y+'년 '+ev+' 목표 데이터를 삭제하시겠습니까?')) return;
+  var ss = ssSel.value;
+  if(!confirm(y+'년 '+ss+' '+ev+' 목표 데이터를 삭제하시겠습니까?')) return;
   if(!USE_SHEET()){
     showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return;
   }
@@ -9807,20 +9860,26 @@ function goalDelete(){
   apiCall({action:'getAll', sheetName:'교회목표'})
   .then(function(res){
     var sheetRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
-    var hdr = ['연도','행사명','수양회목표','성도접수목표','전도목표','구역수','등록일','등록자'];
+    var hdr = ['연도','행사명','수양회종류','수양회목표','성도접수목표','전도목표','구역수','등록일','등록자'];
     var remaining = sheetRows.filter(function(r){
-      return !(String(r['연도']||'').trim()===y && String(r['행사명']||'').trim()===ev);
+      return !(String(r['연도']||'').trim()===y && String(r['행사명']||'').trim()===ev && String(r['수양회종류']||'').trim()===ss);
     }).map(function(r){
-      return [r['연도']||'', r['행사명']||'', r['수양회목표']||'', r['성도접수목표']||'',
+      return [r['연도']||'', r['행사명']||'', r['수양회종류']||'', r['수양회목표']||'', r['성도접수목표']||'',
               r['전도목표']||'', r['구역수']||'', r['등록일']||'', r['등록자']||''];
     });
-    return apiCall({action:'overwrite', sheetName:'교회목표', headers:hdr, rows:remaining});
+    // apiCall 우회 → headers/rows 직접 전송
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: _gasHeaders({'Content-Type': 'text/plain'}),
+      body: JSON.stringify({action:'overwrite', sheetName:'교회목표', headers:hdr, rows:remaining}),
+      redirect: 'follow'
+    }).then(function(r){ return r.json(); });
   })
   .then(function(res){
     if(!res || !res.success) throw new Error(res&&res.error||'삭제 실패');
-    showToast('🗑 '+y+'년 '+ev+' 목표 삭제 완료','success');
-    // 인메모리 동기화
-    _goalRows = _goalRows.filter(function(r){ return !(r.year===y && r.eventName===ev); });
+    showToast('🗑 '+y+'년 '+ss+' '+ev+' 목표 삭제 완료','success');
+    // 인메모리 동기화 (3키)
+    _goalRows = _goalRows.filter(function(r){ return !(r.year===y && r.eventName===ev && r.retreatType===ss); });
     goalRenderYearOptions();
   })
   .catch(function(e){ showToast('⚠️ 삭제 실패: '+(e&&e.message||e),'error'); })
@@ -9828,7 +9887,7 @@ function goalDelete(){
 }
 
 function _goalSyncToSheet(onSuccess){
-  var hdr = ['연도','행사명','수양회목표','성도접수목표','전도목표','구역수','등록일','등록자'];
+  var hdr = ['연도','행사명','수양회종류','수양회목표','성도접수목표','전도목표','구역수','등록일','등록자'];
   var rows = _goalRows.slice()
     .sort(function(a,b){
       if(a.year !== b.year) return Number(a.year)-Number(b.year);
