@@ -1336,19 +1336,22 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <button class="btn btn-sm" id="btn-reload-sheet"
                   onclick="reloadFromSheet()"
                   style="background:#1a6b45;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:.78rem;cursor:pointer;"
-                  title="구글 시트에서 최신 데이터 다시 불러오기">
+                  title="선택한 조건으로 구글 시트 데이터 조회">
                   🔍 조회
                 </button>
               </div>
             </div>
-            <div class="search-row">
-              <div class="form-group"><label>연도</label>
-                <select id="s-year" onchange="doSearch()">
+            <!-- 1줄: 수양회 조건 -->
+            <div class="search-row" style="margin-bottom:8px;">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">연도</label>
+                <select id="s-year" style="flex:1;">
                   <option value="">전체</option>
                 </select>
               </div>
-              <div class="form-group"><label>수양회 종류</label>
-                <select id="s-retreat-type" onchange="doSearch()">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">수양회종류</label>
+                <select id="s-retreat-type" style="flex:1;">
                   <option value="">전체</option>
                   <option value="춘계">춘계</option>
                   <option value="하계">하계</option>
@@ -1356,19 +1359,38 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <option value="동계">동계</option>
                 </select>
               </div>
-              <div class="form-group"><label>교구</label>
-                <select id="s-parish" onchange="searchParishChange()">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">회차</label>
+                <select id="s-event" style="flex:1;">
+                  <option value="">전체</option>
+                  <option value="1차">1차</option>
+                  <option value="2차">2차</option>
+                  <option value="3차">3차</option>
+                  <option value="4차">4차</option>
+                  <option value="5차">5차</option>
+                  <option value="6차">6차</option>
+                  <option value="7차">7차</option>
+                </select>
+              </div>
+            </div>
+            <!-- 2줄: 인원 조건 -->
+            <div class="search-row">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">교구</label>
+                <select id="s-parish" onchange="searchParishChange()" style="flex:1;">
                   <option value="">전체</option>
                   <!-- 옵션은 initApp()의 populateParishSelect()가 PARISH_LIST 기준으로 채움 -->
                 </select>
               </div>
-              <div class="form-group"><label>구역</label>
-                <select id="s-district" onchange="doSearch()">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">구역</label>
+                <select id="s-district" style="flex:1;">
                   <option value="">전체</option>
                 </select>
               </div>
-              <div class="form-group"><label>이름</label>
-                <input type="text" id="s-name" placeholder="이름 검색" oninput="doSearch()">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">이름</label>
+                <input type="text" id="s-name" placeholder="이름 검색" style="flex:1;">
               </div>
             </div>
           </div>
@@ -6738,7 +6760,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v120_busview_empty_clear';
+var CACHE_VERSION = 'v122_search_manual_trigger';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -7387,7 +7409,8 @@ function switchPanel(name, skipRender) {
         // ── 로컬 캐시 화면 노출 방지: 시트 응답 전까지 그리드를 빈 상태로 초기화 ──
         retreat = []; filtered = []; renderTable();
         loadData().finally(function(){
-          searchParishChange(); // 구역 옵션 생성 + doSearch 포함
+          searchParishChange(); // 구역 옵션 생성
+          doSearch();           // 조회 버튼 클릭과 동일한 조회 실행
           loadRosterIndex();    // 탑승자 인덱스 로드 (버스배정 컬럼)
         });
       } else {
@@ -8100,7 +8123,7 @@ function searchParishChange(){
   } else {
     dsel.disabled = false; dsel.style.opacity = '';
   }
-  doSearch();
+  // doSearch()는 조회 버튼 클릭 시에만 실행 (자동 조회 제거)
 }
 
 function doSearch() {
@@ -8109,6 +8132,7 @@ function doSearch() {
   var isParish  = currentUser&&currentUser.role==='parish';
   var sYear  = $val('s-year').trim();
   var sRType = $val('s-retreat-type');
+  var sEvent = $val('s-event').trim();  // 회차 (구글시트 행사명 매핑)
   var sName  = $val('s-name').trim();
   var parish = isAdmin || isParish ? $val('s-parish').trim()
              : (currentUser&&currentUser.parish ? currentUser.parish : '');
@@ -8118,6 +8142,7 @@ function doSearch() {
   filtered=retreat.filter(function(r){
     return (!sYear    || r.year === sYear)&&
            (!sRType   || r.retreatType===sRType)&&
+           (!sEvent   || (r.event||'').trim()===sEvent)&&
            (!parish   || r.parish===parish)&&
            (!district || r.district===district)&&
            (!sName    || (r.name||'').indexOf(sName) >= 0);
@@ -8130,6 +8155,7 @@ function clearSearch() {
   var isParish  = currentUser&&currentUser.role==='parish';
   $set('s-year','');
   $set('s-retreat-type','');
+  $set('s-event','');  // 회차 초기화
   $set('s-name','');
   if(isAdmin){
     $set('s-parish','');
