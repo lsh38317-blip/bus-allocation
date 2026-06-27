@@ -2736,8 +2736,41 @@ function busRosterOpen(teamId, teamName, busName, busType){
   var team = curTeams.find(function(t){ return t.id===teamId; });
   if(!team){ showToast('팀 정보를 찾을 수 없습니다.','error'); return; }
 
-  // getBusPaxByTeam 이용
+  // 팀 전체 인원 조회
   var pax = getBusPaxByTeam(team, busType);
+
+  // ── busName 기준 필터: 해당 버스에 실제 배정된 인원만 표시 ──
+  // 방법 A: rosterIndex(탑승자 시트 기반) 로드됐으면 배정호차 일치 인원만 필터
+  // 방법 B: rosterIndex 미로드 시 → 해당 버스 slot.count 슬라이스 (fallback)
+  var rosterIdx = busType==='leave' ? rosterLeaveIndex : rosterArriveIndex;
+  var rIdxLoaded = Object.keys(rosterIdx).length > 0;
+
+  if(rIdxLoaded && busName){
+    // 방법 A: rosterIndex[receiptId] === busName 인 인원만
+    pax = pax.filter(function(r){
+      var rid = r.receiptId||'';
+      if(!rid) return false;
+      return (rosterIdx[rid]||'').trim() === busName.trim();
+    });
+  } else if(busName && curBuses.length){
+    // 방법 B: slot.count 슬라이스 fallback
+    // 해당 버스에서 이 팀의 슬롯 찾기
+    var targetBus = curBuses.find(function(b){ return b.name===busName; });
+    if(targetBus){
+      var slot = targetBus.slots.find(function(s){ return s.teamId===teamId; });
+      if(slot){
+        // 분산배정 시 이 버스 이전 버스들에 배정된 누적 인원 계산
+        var offset = 0;
+        for(var bi=0; bi<curBuses.length; bi++){
+          var b = curBuses[bi];
+          if(b.name === busName) break;
+          var s = b.slots.find(function(s2){ return s2.teamId===teamId; });
+          if(s) offset += s.count;
+        }
+        pax = pax.slice(offset, offset + slot.count);
+      }
+    }
+  }
 
   // 정렬: 교구 > 구역 > 성명
   pax = pax.slice().sort(function(a,b){
@@ -8502,11 +8535,19 @@ function saveInlineEdit(id){
     leaveDate:   ($id('ile-leave-date-'+id)||{value:r.leaveDate}).value,
     leaveTransport:  ($id('ile-leave-t-'+id)||{value:r.leaveTransport}).value,
   };
-  // ── 참석/귀가 버스배정 "호차 수동 선택" 드롭다운 (UI만 존재) — 교통수단 변경에 따른 시트 반영은 아래에서 처리되지만,
-  //     이 드롭다운으로 특정 호차를 직접 골라 변경하는 기능은 아직 미구현 (보류) ──
-  // var newArriveBus = ($id('ile-arrive-bus-'+id)||{value:''}).value;
-  // var newLeaveBus  = ($id('ile-leave-bus-'+id)||{value:''}).value;
-  // TODO: 호차 직접 선택 시 탑승자_참석/탑승자_귀가 시트 해당 접수ID 행의 배정호차만 갱신 (보류)
+  // ── 참석/귀가 버스 배정호차 드롭다운 (구역장만 수정 가능) ──
+  var newArriveBus = changes.arriveTransport==='버스'
+    ? (($id('ile-arrive-bus-'+id)||{value:''}).value||'').trim()
+    : '';  // 교통수단이 버스가 아니면 빈값
+  var newLeaveBus  = changes.leaveTransport==='버스'
+    ? (($id('ile-leave-bus-'+id) ||{value:''}).value||'').trim()
+    : '';
+  // 기존 배정호차 (rosterIndex 기준)
+  var rid = r.receiptId||'';
+  var prevArriveBus = rid ? (rosterArriveIndex[rid]||'') : '';
+  var prevLeaveBus  = rid ? (rosterLeaveIndex[rid] ||'') : '';
+  var needUpdateArriveBus = rid && !isAdmin && (newArriveBus !== prevArriveBus);
+  var needUpdateLeaveBus  = rid && !isAdmin && (newLeaveBus  !== prevLeaveBus);
 
   // 관리자 전용 필드
   if(isAdmin){
@@ -8596,6 +8637,15 @@ function saveInlineEdit(id){
       var delJobs = [];
       if (needDeleteArrive && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_참석', id:r.receiptId}));
       if (needDeleteLeave  && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_귀가', id:r.receiptId}));
+      // ── 버스 배정호차 변경분: 탑승자_참석/귀가에서 접수ID 행의 배정호차·버스명 컬럼 update ──
+      if (needUpdateArriveBus) delJobs.push(
+        _updateRosterBusAssign(rid, newArriveBus, '탑승자_참석')
+          .then(function(){ rosterArriveIndex[rid] = newArriveBus||''; })
+      );
+      if (needUpdateLeaveBus) delJobs.push(
+        _updateRosterBusAssign(rid, newLeaveBus, '탑승자_귀가')
+          .then(function(){ rosterLeaveIndex[rid]  = newLeaveBus||''; })
+      );
       return Promise.all(delJobs).then(function(){
         doSearch();
         showToast('✅ '+maskName(r.name)+' 수정 완료 (Sheets 반영)','success');
@@ -8604,6 +8654,30 @@ function saveInlineEdit(id){
     .catch(function(e){ showToast('서버 오류: '+e.message,'error'); })
     .finally(function(){ showLoading(false); });
 }
+// ── 탑승자 시트 배정호차·버스명 단건 update ──────────────────────────────
+// 구역장의 버스 배정호차 직접 변경 시 탑승자_참석/귀가 시트 반영
+// receiptId: 접수ID (행 탐색 키)
+// busName  : 새 배정호차 (빈값이면 미배정)
+// sheetName: '탑승자_참석' | '탑승자_귀가'
+function _updateRosterBusAssign(receiptId, busName, sheetName){
+  if(!USE_SHEET() || !receiptId) return Promise.resolve();
+  // GAS actionUpdate: 접수ID 기준으로 행 탐색 후 지정 컬럼만 덮어씀
+  // 나머지 컬럼은 GAS에서 기존값 유지 (data[h] ?? allRows[found][i])
+  return apiCall({
+    action:    'update',
+    sheetName: sheetName,
+    '접수ID':  receiptId,
+    '배정호차': busName||'',
+    '버스명':   busName||''
+  }).then(function(res){
+    if(res && res.success === false){
+      showToast('⚠️ '+sheetName+' 배정호차 반영 실패: '+(res.error||'알 수 없는 오류'),'error');
+    }
+  }).catch(function(e){
+    showToast('⚠️ '+sheetName+' 배정호차 오류: '+(e&&e.message||e),'error');
+  });
+}
+
 function renderPagination(pages) {
   var el=$id('pagination'); if(!el) return;
   if(pages<=1){ el.innerHTML=''; return; }
