@@ -2037,16 +2037,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           </select>
         </div>
         <div class="form-group">
-          <label>이름</label>
+          <label>성명</label>
           <input type="text" id="e-name" placeholder="홍길동">
-        </div>
-        <div class="form-group">
-          <label>숙소1</label>
-          <input type="text" id="e-room1" placeholder="예: 믿음관">
-        </div>
-        <div class="form-group">
-          <label>숙소2</label>
-          <input type="text" id="e-room2" placeholder="예: 101호">
         </div>
         <div class="form-group">
           <label>참석 일자</label>
@@ -4629,12 +4621,15 @@ function busReduceTeamCount(teamKey, type) {
 // ── 버스 미배정 인원 집계 — 교통수단=버스인데 실제 어느 버스에도 배정 안 된 인원 수 ──
 // (자료검색 그리드의 "미배정" 표시와 동일한 기준: rosterArriveIndex/rosterLeaveIndex 사용)
 // 행사명='시각선교부'(버스 배정 제외 대상)는 영원히 "미배정"으로 잡히지 않도록 제외
-function calcBusUnassignedCounts(){
+function calcBusUnassignedCounts(filterOverride){
   // 조건 1: 팀이 없는 상태(초기화 후·미배정) → 재배정 개념 성립 안됨 → 0
   // 조건 2: 버스 슬롯이 없는 상태(배정 전) → 탑승자 명단 자체가 없어야 정상 → 0
   //         (패널 재진입 시 Race Condition: 팀복원↔rosterIndex 초기화 순서 차이로 오탐 방지)
   // 조건 3: 화면 필터(년도·수양회종류·행사명) 적용 → 해당 수양회 인원만 대상
-  var _src = _busFilterRows(retreat);  // 필터 적용된 retreat 서브셋
+  // filterOverride: 홈 배지 경로에서 전달된 필터 {year,season,event} — 콤보 DOM 무관
+  var _src = filterOverride
+    ? _busFilterRowsWithFilter(retreat, filterOverride)
+    : _busFilterRows(retreat);  // 필터 적용된 retreat 서브셋
   var arriveCnt = (busArriveTeams && busArriveTeams.length > 0
                    && busArriveBuses && busArriveBuses.length > 0)
     ? _src.filter(function(r){
@@ -4650,11 +4645,27 @@ function calcBusUnassignedCounts(){
   return {arrive: arriveCnt, leave: leaveCnt};
 }
 
+// ── filterOverride {year,season,event} 로 retreat 직접 필터링 ──
+// calcBusUnassignedCounts(filterOverride) 전용 — _busGetFilter() DOM 읽기 없이 값 지정
+function _busFilterRowsWithFilter(rows, f){
+  return rows.filter(function(r){
+    if(f.year   && String(r.year       ||r['년도']   ||'').trim() !== f.year)   return false;
+    if(f.season && String(r.retreatType||r['수양회종류']||'').trim() !== f.season) return false;
+    if(f.event  && String(r.event      ||r['행사명'] ||'').trim() !== f.event)  return false;
+    return true;
+  });
+}
+
 // ── 재배정알림 표시 — 홈 화면 배지 + 버스배정 페이지(참석/귀가 탭별) 배지 ──
 // 관리자 로그인/홈 진입/버스배정 페이지 진입 시 호출되어 항상 최신 in-memory 상태 기준으로 갱신
 function updateBusUnassignedBadge(){
   var isAdmin = currentUser && currentUser.role === 'admin';
-  var counts  = isAdmin ? calcBusUnassignedCounts() : {arrive:0, leave:0};
+  // 홈 배지 경로: _homeBadgeFilter 세팅 여부로 판별
+  // — 세팅되어 있으면 해당 필터 기준으로 집계 (버스배정 콤보 DOM 무관)
+  // — 없으면 기존 _busGetFilter() 기준 (버스배정 패널 내부 배지 등)
+  var counts = isAdmin
+    ? calcBusUnassignedCounts(_homeBadgeFilter || undefined)
+    : {arrive:0, leave:0};
 
   var badge = $id('bus-unassigned-home-badge');
   if (badge) {
@@ -7096,6 +7107,34 @@ function sheetRowToObj(r) {
     gender:         g('gender','성별'),
   };
 }
+// ── JS 객체(영문키) → 구글시트 한글 컬럼명 객체 변환 ──────────────────────
+// GAS actionUpdate는 SHEET_HEADERS의 한글키로 data[h] 매칭하므로
+// apiCall update 호출 전 반드시 이 함수로 변환 후 전달해야 함
+function toSheetObj(r){
+  return {
+    'NO':         r.id        || '',
+    '접수ID':     r.receiptId || '',
+    '성명':       r.name      || '',
+    '연도':       r.year      || '',
+    '수양회종류': r.retreatType|| '',
+    '행사명':     r.event     || '',
+    '교구':       r.parish    || '',
+    '구역':       r.district  || '',
+    '회별':       r.group     || '',
+    '봉사코드':   r.svcCode   || '',
+    '봉사명':     r.svcName   || '',
+    '숙소코드':   r.roomCode  || '',
+    '숙소1':      r.room1     || '',
+    '숙소2':      r.room2     || '',
+    '참석일자':   r.arriveDate    || '',
+    '참석교통수단': r.arriveTransport || '',
+    '귀가일자':   r.leaveDate     || '',
+    '귀가교통수단': r.leaveTransport  || '',
+    '전참여부':   r.prevAttend || '',
+    '구원여부':   r.salvCode   || '',
+    '성별':       r.gender     || '',
+  };
+}
 function loadData() {
   if(!USE_SHEET()){
     try{ retreat=JSON.parse(_ls.get('retreat_data')||'[]'); }catch(e){ retreat=[]; }
@@ -7452,9 +7491,40 @@ function switchPanel(name, skipRender) {
       }
     }
     if(name==='home'){
-      if(USE_SHEET()){ loadData(); } else { renderHome(); }
+      // ── 홈 배지 필터 확정 ──────────────────────────────────────────────
+      // 경로 B: 버스배정 패널 방문 후 홈 진입 → 버스배정 콤보값 그대로 사용
+      // 경로 A: 그 외(로그인 직후·자료검색 등) → 교회목표 당해 최신값 사용
+      if(currentUser && currentUser.role === 'admin'){
+        if(_busPanelVisited){
+          // 경로 B — 버스배정 패널 콤보값으로 확정
+          _homeBadgeFilter = _busGetFilter();
+          _busPanelVisited = false;  // 플래그 리셋
+        } else {
+          // 경로 A — 교회목표 당해 최신값으로 확정
+          if(_goalLoaded){
+            _homeBadgeFilter = _getHomeBadgeFilter();
+          } else if(USE_SHEET() && !_goalLoading){
+            // 교회목표 미로드 시 fetch 완료 후 확정 → renderHome 재호출
+            _goalFetchFromSheet(function(){
+              _homeBadgeFilter = _getHomeBadgeFilter();
+              renderHome();
+            });
+          }
+        }
+      }
+      // ── 참석인원명단 로드 + 탑승자 인덱스 재로드 ────────────────────────
+      if(USE_SHEET()){
+        loadData().finally(function(){
+          if(currentUser && currentUser.role === 'admin' && _homeBadgeFilter){
+            loadRosterIndex(false, _homeBadgeFilter);
+          }
+        });
+      } else {
+        renderHome();
+      }
     }
     if(name==='bus'){
+      _busPanelVisited = true;  // 홈 복귀 시 경로 B 판별용
       // 년도 콤보 동적 생성 (당해년도 ~ +5), 최초 1회
       var busYrSel = $id('bus-sel-year');
       if(busYrSel && !busYrSel.options.length){
@@ -8492,7 +8562,7 @@ function saveInlineEdit(id){
   // ── Sheets update action (접수ID 기준 매칭) ──
   var maskedInline = Object.assign({}, updated, {name: maskName(updated.name||'')});
   showLoading(true);
-  apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, maskedInline))
+  apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedInline)))
     .then(function(res){
       if(!(res&&res.success)){
         showToast('⚠️ Sheets 반영 실패: '+(res&&res.error||res&&res.message||'알 수 없는 오류'),'error');
@@ -8523,7 +8593,7 @@ function goPage(p){ currentPage=p; renderTable(); }
 // ── 탑승자 인덱스 로드 (자료검색 버스배정 컬럼용) ─────────────────────
 // 탑승자_참석/귀가 시트에서 접수ID→배정호차 매핑 인덱스를 빌드
 // switchPanel('search') 진입 시 1회 호출, 이후 메모리 캐시 사용
-function loadRosterIndex(useFilter){
+function loadRosterIndex(useFilter, overrideFilter){
   useFilter = (useFilter === true); // 기본값 false (자료검색용 = 필터 없음)
   if(!USE_SHEET()) return;   // 시트 미연동 시 스킵
   var sheetNames = ['탑승자_참석','탑승자_귀가'];
@@ -8554,7 +8624,12 @@ function loadRosterIndex(useFilter){
         // 다른 수양회 탑승자 ID가 섞이면 calcBusUnassignedCounts 오탐 발생
         // useFilter=true(버스배정 패널용): 콤보 기준 필터 적용
         // useFilter=false(자료검색용): 필터 없이 전체 읽기 (버스배정 컬럼 표시용)
-        var _riBf = useFilter ? _busGetFilter() : {year:'',season:'',event:''};
+        // overrideFilter: 홈 배지 경로에서 직접 전달된 필터 (콤보 DOM 무관)
+        // useFilter=true: 버스배정 패널 콤보 기준
+        // useFilter=false && overrideFilter 없음: 전체 탑승자 (자료검색용)
+        var _riBf = overrideFilter
+          ? { year: overrideFilter.year||'', season: overrideFilter.season||'', event: overrideFilter.event||'' }
+          : (useFilter ? _busGetFilter() : {year:'',season:'',event:''});
         rows.forEach(function(r){
           if(_riBf.year   && String(r['년도']   ||'').trim() !== _riBf.year)   return;
           if(_riBf.season && String(r['수양회종류']||'').trim() !== _riBf.season) return;
@@ -8569,8 +8644,8 @@ function loadRosterIndex(useFilter){
           failedSheets.push(sn+'(데이터 '+rows.length+'행 있으나 접수ID/배정호차 매칭 0건 — 헤더명 확인 필요)');
         }
         console.log('[loadRosterIndex]', sn, '행수:', rows.length, '인덱스건수:', Object.keys(idx).length);
-        if(useFilter){
-          // 버스배정 패널용: 콤보 필터 적용된 인덱스
+        if(useFilter || overrideFilter){
+          // 버스배정 패널용 or 홈 배지용(overrideFilter): 필터 적용된 인덱스만 저장
           if(sn==='탑승자_참석') rosterArriveIndex = idx;
           else                   rosterLeaveIndex  = idx;
         } else {
@@ -8671,7 +8746,6 @@ function openEditMode(id) {
   $id('e-parish').value=r.parish||'';
   populateDistrictSelect('e-district', r.parish, '선택', r.district); // 구역 select: 현재 교구 기준으로 옵션 채운 뒤 현재 구역값 선택
   $id('e-group').value=r.group||''; $id('e-name').value=r.name||'';
-  $id('e-room1').value=r.room1||''; $id('e-room2').value=r.room2||'';
   $id('e-arrive-date').value=r.arriveDate||''; $id('e-arrive-transport').value=r.arriveTransport||'';
   $id('e-leave-date').value=r.leaveDate||''; $id('e-leave-transport').value=r.leaveTransport||'';
   $id('e-prev-attend').value=r.prevAttend||'아니요';
@@ -8707,7 +8781,7 @@ function openEditMode(id) {
   };
 
   // ── 그리드 인라인수정에 없는 필드: role 무관 항상 잠금(읽기 전용 표시) ──
-  var alwaysLockFields = ['e-event','e-group','e-room1','e-room2'];
+  var alwaysLockFields = ['e-event','e-group'];
   alwaysLockFields.forEach(function(fid){
     var el=$id(fid); if(!el) return;
     el.disabled = true;
@@ -8810,7 +8884,7 @@ function saveEdit() {
   // Sheets 저장 시 name 마스킹 (접수ID 기준 매칭)
   var maskedUpdated = Object.assign({}, updated, {name: maskName(updated.name||'')});
   showLoading(true);
-  apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, maskedUpdated))
+  apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedUpdated)))
     .then(function(res){
       if(!(res&&res.success)){
         showToast('⚠️ Sheets 반영 실패: '+(res&&res.error||res&&res.message||'알 수 없는 오류'),'error');
@@ -9626,8 +9700,32 @@ var _goalLoading = false;  // 중복 fetch 방지 플래그
 var _goalCallbackQueue = [];  // _goalFetchFromSheet 로딩 중 등록된 콜백 대기 큐
 var _rosterFullArr = {};  // 자료검색 전용 탑승자_참석 인덱스 (필터 없음) {접수ID: 배정호차}
 var _rosterFullLv  = {};  // 자료검색 전용 탑승자_귀가  인덱스 (필터 없음) {접수ID: 배정호차}
+var _homeBadgeFilter  = null;  // 홈 배지용 필터 {year,season,event} — 경로별 확정값
+var _busPanelVisited  = false; // 버스배정 패널 방문 플래그 (홈 진입 시 경로 판별용)
 
 // 교회목표 시트 로드 공통 함수 (모달용/홈 화면 백그라운드용 겸용)
+// ── 홈 배지용 필터 확정 헬퍼 ─────────────────────────────────────────────
+// 교회목표(_goalRows)에서 당해년도 + 등록일 내림차순 첫 번째 행을 읽어
+// { year, season, event } 형태로 반환.
+// 해당 행 없으면 { year:당해년도, season:'', event:'' } 반환 (필터 없음 = 전체)
+function _getHomeBadgeFilter(){
+  var curYear = String(new Date().getFullYear());
+  var candidates = _goalRows
+    .filter(function(r){ return String(r.year||'').trim() === curYear && r.eventName; })
+    .sort(function(a,b){
+      return String(b.regDate||'').localeCompare(String(a.regDate||''));
+    });
+  if(!candidates.length){
+    return { year:curYear, season:'', event:'' };
+  }
+  var top = candidates[0];
+  return {
+    year:   curYear,
+    season: String(top.retreatType||'').trim(),
+    event:  String(top.eventName||'').trim()
+  };
+}
+
 // opts.showSpinner: 로딩 오버레이 표시 여부, opts.notify: 결과 토스트 표시 여부
 // ── 교회목표 행사명 → 버스배정 콤보 자동 적용 ─────────────────────────
 // selId    : 행사명 select 요소 ID ('bus-sel-event' | 'busview-sel-event')
