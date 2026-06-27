@@ -3446,7 +3446,7 @@ function _busRestoreFromSheet(){
         // ── 참석/귀가 각각 독립 복원 ──────────────────────────────────────
         // 참석: 요약 있으면 요약 기준, 없으면(또는 팀 없으면) 팀내역 기준
         if(arrived.buses.length){
-          var _arrTeams = enrichTeamsWithSheetStatus(arrived.teams, results['버스배정_참석팀내역']);
+          var _arrTeams = enrichTeamsWithSheetStatus(arrived.teams, _busFilterRows(results['버스배정_참석팀내역']||[], true));
           // 요약에서 팀 파싱 실패 시 팀내역에서 보강 (팀목록 컬럼이 비어있는 경우)
           if(!_arrTeams.length) _arrTeams = getTeamRowsFallback('버스배정_참석팀내역');
           busArriveTeams = _arrTeams;
@@ -3467,7 +3467,7 @@ function _busRestoreFromSheet(){
         }
         // 귀가: 요약 있으면 요약 기준, 없으면(또는 팀 없으면) 팀내역 기준
         if(leaved.buses.length){
-          var _lvTeams = enrichTeamsWithSheetStatus(leaved.teams, results['버스배정_귀가팀내역']);
+          var _lvTeams = enrichTeamsWithSheetStatus(leaved.teams, _busFilterRows(results['버스배정_귀가팀내역']||[], true));
           // 요약에서 팀 파싱 실패 시 팀내역에서 보강
           if(!_lvTeams.length) _lvTeams = getTeamRowsFallback('버스배정_귀가팀내역');
           busLeaveTeams = _lvTeams;
@@ -3626,9 +3626,28 @@ function _busFilteredClear(sheetName, headers, bf, cb){
     var rows = keep.length
       ? keep.map(function(r){ return headers.map(function(h){ return r[h]!=null?r[h]:''; }); })
       : [headers.map(function(){ return ''; })];  // 빈 행 1개: GAS frozen rows 우회
-    return apiCall({action:'overwrite', sheetName:sheetName, headers:headers, rows:rows});
+    // ── overwrite: fetch 직접 호출 (apiCall 재포장 우회) ──
+    // apiCall({action:'overwrite',...}) 사용 시 headers·rows가 data{}로 재포장되어
+    // GAS 수신에 성공하더라도 success 체크 누락으로 오류를 감지하지 못하는 문제 방지
+    return fetch(API_URL, {
+      method:  'POST',
+      headers: _gasHeaders({'Content-Type':'text/plain'}),
+      body:    JSON.stringify({sheetName:sheetName, mode:'overwrite', headers:headers, rows:rows}),
+      redirect:'follow'
+    }).then(function(r){ return r.text(); })
+      .then(function(txt){
+        try{ return JSON.parse(txt); }
+        catch(e){ return {success:false, error:'응답 파싱 오류: '+String(txt).slice(0,80)}; }
+      });
   })
-  .then(function(){ if(cb) cb(null); })
+  .then(function(res){
+    // overwrite 응답 success 체크 — 실패 시 에러 콜백
+    if(res && res.success === false){
+      if(cb) cb(new Error(res.error||'overwrite 실패'));
+      return;
+    }
+    if(cb) cb(null);
+  })
   .catch(function(e){ if(cb) cb(e); });
 }
 
@@ -4502,6 +4521,10 @@ function _busUpdateTeamSheetFromBuses(type){
         var sl = b.slots.find(function(s){ return s.teamId===team.id; });
         return b.name + (assignedBuses.length>1 ? '('+sl.count+'명)' : '');
       }).join(', ');
+      // 버스 슬롯이 없고 기존 sheetBus 값이 있으면 기존값 유지 (귀가버스 미배정 시 덮어쓰기 방지)
+      var finalBusName   = (assignedBuses.length>0) ? busNames : (team.sheetBus||'');
+      var finalStatus    = (assignedBuses.length>0) ? '배정'
+                         : (team.sheetBus||team.sheetStatus==='배정') ? '배정' : '미배정';
       // 구역/팀명: team.name에서 parish 접두어 제거 (예: "1교구 11구역" → "11구역")
       var _pp = _busParseParish(team.name||'');
       var _parish = (team.parish||'').trim() || _pp.parish;
@@ -4513,8 +4536,8 @@ function _busUpdateTeamSheetFromBuses(type){
         _parish,
         _distNm,
         team.count   || 0,
-        assignedBuses.length>0 ? '배정' : '미배정',
-        busNames,
+        finalStatus,
+        finalBusName,
         assignedBuses.length>=2 ? '분산배정' : '',
         team.isJH ? '중고등부' : ''
       ];
@@ -5253,7 +5276,8 @@ function busRenderTeams(type){
     var isSplit=buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }).length>=2;
     var isFull=assigned>=team.count&&assigned>0;
     // 시트 배정상태 배지 (버스배정_참석팀내역/귀가팀내역 기준)
-    var sheetAssigned = (team.sheetStatus==='배정');
+    // in-memory 버스 슬롯 배정 여부를 우선 반영 — sheetStatus 매칭 실패/미갱신 시에도 정확히 표시
+    var sheetAssigned = isFull || isSplit || (team.sheetStatus==='배정');
     var sheetBusName  = team.sheetBus||'';
     var badge='';
     if(isSplit){
