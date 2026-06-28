@@ -6866,7 +6866,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v130_rosterIndex_fix';
+var CACHE_VERSION = 'v131_updateRosterBus_action';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8701,24 +8701,36 @@ function saveInlineEdit(id){
 // sheetName: '탑승자_참석' | '탑승자_귀가'
 function _updateRosterBusAssign(receiptId, busName, sheetName){
   if(!USE_SHEET() || !receiptId) return Promise.resolve();
-  // 디버그: 실제 전달값 확인 (브라우저 콘솔에서 확인 후 제거)
   console.log('[_updateRosterBusAssign]', sheetName,
     '접수ID:', receiptId, '(type:', typeof receiptId+')',
     '배정호차:', busName);
-  return apiCall({
-    action:    'update',
+  // [v131] apiCall(action:'update') 경유 시 GAS actionUpdate의 SHEET_HEADERS 의존 문제로
+  // "접수ID N 행 없음" 오류 반복 발생 → GAS 전용 action 'updateRosterBus'로 직접 fetch
+  var body = {
+    action:    'updateRosterBus',
     sheetName: sheetName,
-    '접수ID':  String(receiptId), // 명시적 문자열 변환
-    '배정호차': busName||'',
-    '버스명':   busName||''
-  }).then(function(res){
+    receiptId: String(receiptId),
+    busName:   busName || ''
+  };
+  return fetch(API_URL, {
+    method:   'POST',
+    headers:  _gasHeaders({'Content-Type':'text/plain'}),
+    body:     JSON.stringify(body),
+    redirect: 'follow'
+  })
+  .then(function(r){ return r.text(); })
+  .then(function(txt){
+    var res;
+    try { res = JSON.parse(txt); } catch(e){ res = { success:false, error:'응답 파싱 오류:'+txt.slice(0,80) }; }
     console.log('[_updateRosterBusAssign] GAS 응답:', JSON.stringify(res));
     if(res && res.success === false){
       var msg = res.error||'알 수 없는 오류';
       showToast('⚠️ '+sheetName+' 배정호차 반영 실패: '+msg,'error');
       return Promise.reject(new Error(msg));
     }
-  }).catch(function(e){
+    return res;
+  })
+  .catch(function(e){
     showToast('⚠️ '+sheetName+' 배정호차 오류: '+(e&&e.message||e),'error');
     return Promise.reject(e);
   });
