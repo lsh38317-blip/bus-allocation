@@ -6626,7 +6626,10 @@ function busSaveToSheet(typeOnly, onComplete){
   }
   if(doLeave){
     lvSummary  = makeSummaryRows(busLeaveBuses,  busLeaveTeams,  true);
-    lvRoster   = makeRosterRows(buildBusRoster('','leave'),  'leaveDate',  true);
+    // [v133] passenger 객체의 날짜 필드는 항상 arriveDate에 저장됨
+    // (buildBusRoster 6215행: arriveDate: busType==='leave' ? r.leaveDate : r.arriveDate)
+    // 귀가도 'arriveDate'로 접근해야 귀가일자가 정상 저장됨
+    lvRoster   = makeRosterRows(buildBusRoster('','leave'),  'arriveDate',  true);
     payloads.push({sheetName:'버스배정_귀가요약', mode:'overwrite', headers:summaryHdr, rows:lvSummary});
     payloads.push({sheetName:'탑승자_귀가',       mode:'overwrite', headers:rosterHdr,  rows:lvRoster});
   }
@@ -6866,7 +6869,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v132_new_gas_url';
+var CACHE_VERSION = 'v133_leaveDate_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
