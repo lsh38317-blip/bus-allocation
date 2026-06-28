@@ -6542,9 +6542,14 @@ function busSaveTeamsToSheet() {
 // busSaveToSheet() 저장 성공 직후, 시트 재조회(loadRosterIndex) 없이도
 // 방금 저장한 결과를 즉시 로컬 인덱스에 반영해 재배정 배지 오탐을 방지한다.
 function rosterRowsToIndex(rows){
+  // [v130] rosterHdr 컬럼 순서 기준 인덱스 수정
+  // ['NO','년도','수양회종류','행사명','접수ID','버스명',...,'배정호차','성별']
+  //   [0]   [1]    [2]        [3]     [4]                    [13]
+  // 구버전(년도/수양회종류/행사명 없던 시절) 인덱스 row[1]/row[10]을 사용하던 버그 수정
   var idx = {};
   (rows||[]).forEach(function(row){
-    var rid = row[1], hocha = row[10]; // rosterHdr 기준: 1=접수ID, 10=배정호차
+    var rid   = String(row[4]||'').trim();  // index 4 = 접수ID
+    var hocha = String(row[13]||row[5]||'').trim(); // index 13 = 배정호차, fallback: index 5 = 버스명
     if(rid && hocha) idx[rid] = hocha;
   });
   return idx;
@@ -6861,7 +6866,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v124_home_badge_fix';
+var CACHE_VERSION = 'v130_rosterIndex_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8410,24 +8415,47 @@ function renderTable() {
 // ── 버스배정 드롭다운 옵션 생성 (그리드 인라인수정 + 상세모달 공통) ──
 // type: 'arrive' | 'leave', curVal: 현재 배정값(버스명 또는 미배정), r: 참석자 객체(소속 팀 산출용)
 // 옵션 범위: r이 속한 팀(busGetTeamKey)이 실제 배정된 버스만 (분산배정 시 해당 버스들 전부)
-function busAssignOptionsHtml(type, curVal, r){
-  var buses = type==='leave' ? busLeaveBuses : busArriveBuses;
-  var teams = type==='leave' ? busLeaveTeams  : busArriveTeams;
+function busAssignOptionsHtml(type, curVal, r, context){
   var cur = (curVal||'').trim();
+  var names = [];
 
-  var teamKey = r ? busGetTeamKey(r) : '';
-  var team = teamKey ? teams.find(function(t){ return t.name===teamKey; }) : null;
-  var allowedBuses = team
-    ? (buses||[]).filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); })
-    : [];
-  var names = allowedBuses.map(function(b){ return b.name; });
-
-  // ── 데이터 정합성 보장: 현재 배정값이 허용 목록에 없으면(분산배정 변경/로딩 타이밍 등) 옵션에 강제 포함 ──
-  var curMissing = cur && cur!=='미배정' && names.indexOf(cur)<0;
-  var html = '<option value=""'+(!cur||cur==='미배정'?' selected':'')+'>미배정</option>';
-  if(curMissing){
-    html += '<option value="'+esc(cur)+'" selected>'+esc(cur)+' (현재값)</option>';
+  if(context === 'search'){
+    // [v129] 자료검색 맥락: busArriveBuses/LeaveBuses(버스배정 패널 의존) 대신
+    // _rosterFullArr/Lv(탑승자 시트 로드 인덱스)에서 해당 구역원 배정호차 distinct 추출
+    // → busRestore 미완료/미진입 상태에서도 드롭다운 옵션이 정상 생성됨
+    var fullIdx = type === 'leave' ? _rosterFullLv : _rosterFullArr;
+    // 해당 구역 구역원 접수ID 목록 (retreat 배열 기준)
+    var memberIds = r ? (retreat||[]).filter(function(m){
+      return String(m.parish||'').trim()   === String(r.parish||'').trim()
+          && String(m.district||'').trim() === String(r.district||'').trim();
+    }).map(function(m){ return String(m.receiptId||'').trim(); }).filter(Boolean) : [];
+    // 구역원 접수ID → 배정호차 distinct 추출
+    var nameSet = {};
+    memberIds.forEach(function(rid){
+      var v = (fullIdx[rid]||'').trim();
+      if(v && v !== '미배정') nameSet[v] = true;
+    });
+    // 현재 배정값도 누락되지 않도록 강제 포함
+    if(cur && cur !== '미배정') nameSet[cur] = true;
+    names = Object.keys(nameSet).sort(function(a,b){
+      return _bvwSortKey(a) - _bvwSortKey(b);
+    });
+  } else {
+    // 버스배정 패널 맥락: 기존 busArriveBuses/LeaveBuses 슬롯 기반
+    var buses = type==='leave' ? busLeaveBuses : busArriveBuses;
+    var teams = type==='leave' ? busLeaveTeams  : busArriveTeams;
+    var teamKey = r ? busGetTeamKey(r) : '';
+    var team = teamKey ? teams.find(function(t){ return t.name===teamKey; }) : null;
+    var allowedBuses = team
+      ? (buses||[]).filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); })
+      : [];
+    names = allowedBuses.map(function(b){ return b.name; });
+    // 현재 배정값이 허용 목록에 없으면(분산배정 변경/로딩 타이밍 등) 옵션에 강제 포함
+    var curMissingBus = cur && cur!=='미배정' && names.indexOf(cur)<0;
+    if(curMissingBus) names = [cur].concat(names);
   }
+
+  var html = '<option value=""'+(!cur||cur==='미배정'?' selected':'')+'>미배정</option>';
   names.forEach(function(n){
     html += '<option value="'+esc(n)+'"'+(cur===n?' selected':'')+'>'+esc(n)+'</option>';
   });
@@ -8487,7 +8515,7 @@ function openInlineEdit(id){
 
   '<div style="display:flex;flex-direction:column;gap:3px;"><label style="font-size:.68rem;color:var(--muted);font-weight:600;">참석 버스배정</label>'+
   '<select id="ile-arrive-bus-'+id+'" style="'+selStyle+((isAdmin||r.arriveTransport!=='버스')?'opacity:.5;':'')+'"'+((isAdmin||r.arriveTransport!=='버스')?' disabled':'')+'>'+
-  busAssignOptionsHtml('arrive', (r.receiptId&&rosterArriveIndex[r.receiptId])||'', r)+
+  busAssignOptionsHtml('arrive', (r.receiptId&&rosterArriveIndex[r.receiptId])||'', r, 'search')+
   '</select></div>'+
 
   '<div style="display:flex;flex-direction:column;gap:3px;"><label style="font-size:.68rem;color:var(--muted);font-weight:600;">귀가 일자</label>'+
@@ -8501,7 +8529,7 @@ function openInlineEdit(id){
 
   '<div style="display:flex;flex-direction:column;gap:3px;"><label style="font-size:.68rem;color:var(--muted);font-weight:600;">귀가 버스배정</label>'+
   '<select id="ile-leave-bus-'+id+'" style="'+selStyle+((isAdmin||r.leaveTransport!=='버스')?'opacity:.5;':'')+'"'+((isAdmin||r.leaveTransport!=='버스')?' disabled':'')+'>'+
-  busAssignOptionsHtml('leave', (r.receiptId&&rosterLeaveIndex[r.receiptId])||'', r)+
+  busAssignOptionsHtml('leave', (r.receiptId&&rosterLeaveIndex[r.receiptId])||'', r, 'search')+
   '</select></div>'+
 
   // ── 전참 (관리자만) ──
@@ -8547,8 +8575,13 @@ function saveInlineEdit(id){
   var rid = r.receiptId||'';
   var prevArriveBus = rid ? (_rosterFullArr[rid]||rosterArriveIndex[rid]||'') : '';
   var prevLeaveBus  = rid ? (_rosterFullLv[rid] ||rosterLeaveIndex[rid] ||'') : '';
-  var needUpdateArriveBus = rid && !isAdmin && (newArriveBus !== prevArriveBus);
-  var needUpdateLeaveBus  = rid && !isAdmin && (newLeaveBus  !== prevLeaveBus);
+  // [v128] Q1-C: 교통수단이 '버스'인 경우에만 탑승자 시트 업데이트 (아니면 스킵)
+  var needUpdateArriveBus = rid && !isAdmin
+    && (changes.arriveTransport||'').trim() === '버스'
+    && (newArriveBus !== prevArriveBus);
+  var needUpdateLeaveBus  = rid && !isAdmin
+    && (changes.leaveTransport||'').trim() === '버스'
+    && (newLeaveBus  !== prevLeaveBus);
 
   // 관리자 전용 필드
   if(isAdmin){
@@ -8638,16 +8671,22 @@ function saveInlineEdit(id){
       var delJobs = [];
       if (needDeleteArrive && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_참석', id:r.receiptId}));
       if (needDeleteLeave  && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_귀가', id:r.receiptId}));
-      // ── 버스 배정호차 변경분: 탑승자_참석/귀가에서 접수ID 행의 배정호차·버스명 컬럼 update ──
-      if (needUpdateArriveBus) delJobs.push(
-        _updateRosterBusAssign(rid, newArriveBus, '탑승자_참석')
-          .then(function(){ rosterArriveIndex[rid] = newArriveBus||''; })
-      );
-      if (needUpdateLeaveBus) delJobs.push(
-        _updateRosterBusAssign(rid, newLeaveBus, '탑승자_귀가')
-          .then(function(){ rosterLeaveIndex[rid]  = newLeaveBus||''; })
-      );
-      return Promise.all(delJobs).then(function(){
+      // ── 버스 배정호차 변경분: 참석/귀가 독립 Promise (Q2-C) ──
+      // 교통수단=버스인 경우만 시트 update, 아니면 스킵 (Q1-C)
+      // 한 쪽 실패가 다른 쪽에 전파되지 않도록 각각 .catch() 보호
+      var arriveJob = needUpdateArriveBus
+        ? _updateRosterBusAssign(rid, newArriveBus, '탑승자_참석')
+            .then(function(){ rosterArriveIndex[rid] = newArriveBus||''; })
+            .catch(function(e){ console.warn('[탑승자_참석 버스 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+      var leaveJob = needUpdateLeaveBus
+        ? _updateRosterBusAssign(rid, newLeaveBus, '탑승자_귀가')
+            .then(function(){ rosterLeaveIndex[rid]  = newLeaveBus||''; })
+            .catch(function(e){ console.warn('[탑승자_귀가 버스 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+      // delete 작업(버스→비버스 전환) + 버스 배정호차 변경 전체를 allSettled로 합산
+      var allJobs = delJobs.concat([arriveJob, leaveJob]);
+      return Promise.allSettled(allJobs).then(function(){
         doSearch();
         showToast('✅ '+maskName(r.name)+' 수정 완료 (Sheets 반영)','success');
       });
@@ -8857,13 +8896,13 @@ function openEditMode(id) {
   // 참석/귀가 버스배정 — 구역장만 수정 가능, 본인 구역이 배정된 버스 범위 내에서만 선택 (UI만, 시트 반영은 추후 처리)
   var eArrBus=$id('e-arrive-bus');
   if(eArrBus){
-    eArrBus.innerHTML=busAssignOptionsHtml('arrive', (r.receiptId&&rosterArriveIndex[r.receiptId])||'', r);
+    eArrBus.innerHTML=busAssignOptionsHtml('arrive', (r.receiptId&&rosterArriveIndex[r.receiptId])||'', r, 'search');
     eArrBus.disabled = isAdmin || r.arriveTransport!=='버스';
     eArrBus.style.opacity = eArrBus.disabled ? '.5' : '';
   }
   var eLvBus=$id('e-leave-bus');
   if(eLvBus){
-    eLvBus.innerHTML=busAssignOptionsHtml('leave', (r.receiptId&&rosterLeaveIndex[r.receiptId])||'', r);
+    eLvBus.innerHTML=busAssignOptionsHtml('leave', (r.receiptId&&rosterLeaveIndex[r.receiptId])||'', r, 'search');
     eLvBus.disabled = isAdmin || r.leaveTransport!=='버스';
     eLvBus.style.opacity = eLvBus.disabled ? '.5' : '';
   }
