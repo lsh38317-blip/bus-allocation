@@ -7540,7 +7540,7 @@ function switchPanel(name, skipRender) {
         loadData().finally(function(){
           searchParishChange(); // 구역 옵션 생성
           doSearch();           // 조회 버튼 클릭과 동일한 조회 실행
-          loadRosterIndex();    // 탑승자 인덱스 로드 (버스배정 컬럼)
+          loadRosterIndex();    // useFilter=false: 전체 탑승자 인덱스 로드 (_rosterFullArr·Lv — 자료검색 버스배정 컬럼 표시용)
         });
       } else {
         searchParishChange();
@@ -8542,10 +8542,11 @@ function saveInlineEdit(id){
   var newLeaveBus  = changes.leaveTransport==='버스'
     ? (($id('ile-leave-bus-'+id) ||{value:''}).value||'').trim()
     : '';
-  // 기존 배정호차 (rosterIndex 기준)
+  // 기존 배정호차 — 자료검색 전용 전체 인덱스(_rosterFullArr·Lv) 기준
+  // (rosterArriveIndex는 버스배정 패널 콤보 필터 적용본이라 자료검색 맥락과 불일치 가능)
   var rid = r.receiptId||'';
-  var prevArriveBus = rid ? (rosterArriveIndex[rid]||'') : '';
-  var prevLeaveBus  = rid ? (rosterLeaveIndex[rid] ||'') : '';
+  var prevArriveBus = rid ? (_rosterFullArr[rid]||rosterArriveIndex[rid]||'') : '';
+  var prevLeaveBus  = rid ? (_rosterFullLv[rid] ||rosterLeaveIndex[rid] ||'') : '';
   var needUpdateArriveBus = rid && !isAdmin && (newArriveBus !== prevArriveBus);
   var needUpdateLeaveBus  = rid && !isAdmin && (newLeaveBus  !== prevLeaveBus);
 
@@ -8661,20 +8662,26 @@ function saveInlineEdit(id){
 // sheetName: '탑승자_참석' | '탑승자_귀가'
 function _updateRosterBusAssign(receiptId, busName, sheetName){
   if(!USE_SHEET() || !receiptId) return Promise.resolve();
-  // GAS actionUpdate: 접수ID 기준으로 행 탐색 후 지정 컬럼만 덮어씀
-  // 나머지 컬럼은 GAS에서 기존값 유지 (data[h] ?? allRows[found][i])
+  // 디버그: 실제 전달값 확인 (브라우저 콘솔에서 확인 후 제거)
+  console.log('[_updateRosterBusAssign]', sheetName,
+    '접수ID:', receiptId, '(type:', typeof receiptId+')',
+    '배정호차:', busName);
   return apiCall({
     action:    'update',
     sheetName: sheetName,
-    '접수ID':  receiptId,
+    '접수ID':  String(receiptId), // 명시적 문자열 변환
     '배정호차': busName||'',
     '버스명':   busName||''
   }).then(function(res){
+    console.log('[_updateRosterBusAssign] GAS 응답:', JSON.stringify(res));
     if(res && res.success === false){
-      showToast('⚠️ '+sheetName+' 배정호차 반영 실패: '+(res.error||'알 수 없는 오류'),'error');
+      var msg = res.error||'알 수 없는 오류';
+      showToast('⚠️ '+sheetName+' 배정호차 반영 실패: '+msg,'error');
+      return Promise.reject(new Error(msg));
     }
   }).catch(function(e){
     showToast('⚠️ '+sheetName+' 배정호차 오류: '+(e&&e.message||e),'error');
+    return Promise.reject(e);
   });
 }
 
