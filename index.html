@@ -6852,7 +6852,7 @@ var homeFilter  = 'today';
 // 최종 폴백. 엑셀관리 페이지에서 URL을 변경/저장하면 이 값도 같이 갱신되지만(saveApiUrl()),
 // 그건 "이번 세션 안에서"만이고 코드 파일 자체가 바뀌는 건 아니므로, 실제 배포된 다른 기기까지
 // 전부 새 URL을 쓰게 하려면 이 값을 코드에서 직접 갱신하고 재배포해야 한다.
-var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwUZ_eFv7mDMtLvVNGuZ-6fNnNWg_n8OXeh4pwrE7vHO9ihnfikrALgAHyXn5EDKzmx/exec';
+var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyQGgfpdJ9Kj82pQ6HZAxjOu75fmB244gHXEj3lowVcjRtvuLoPv6kZD-Nq2x1_pdiX/exec';
 var DEFAULT_API_URL_ORIGINAL = DEFAULT_API_URL; // 페이지 로드 시점의 원본값(이후 저장 시 비교용)
 
 var API_URL     = (function(){
@@ -6866,7 +6866,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v131_updateRosterBus_action';
+var CACHE_VERSION = 'v132_new_gas_url';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
