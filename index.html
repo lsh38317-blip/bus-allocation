@@ -6882,7 +6882,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v136_saveEdit_rerender';
+var CACHE_VERSION = 'v137_busSummary_update';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8692,16 +8692,35 @@ function saveInlineEdit(id){
       // 한 쪽 실패가 다른 쪽에 전파되지 않도록 각각 .catch() 보호
       var arriveJob = needUpdateArriveBus
         ? _updateRosterBusAssign(rid, newArriveBus, '탑승자_참석')
-            .then(function(){ rosterArriveIndex[rid] = newArriveBus||''; })
+            .then(function(){
+              rosterArriveIndex[rid] = newArriveBus||'';
+              _rosterFullArr[rid]    = newArriveBus||''; // [v137] 상세 뷰 재렌더용 인덱스 갱신
+            })
             .catch(function(e){ console.warn('[탑승자_참석 버스 업데이트 실패]', e&&e.message||e); })
         : Promise.resolve();
       var leaveJob = needUpdateLeaveBus
         ? _updateRosterBusAssign(rid, newLeaveBus, '탑승자_귀가')
-            .then(function(){ rosterLeaveIndex[rid]  = newLeaveBus||''; })
+            .then(function(){
+              rosterLeaveIndex[rid] = newLeaveBus||'';
+              _rosterFullLv[rid]    = newLeaveBus||''; // [v137] 상세 뷰 재렌더용 인덱스 갱신
+            })
             .catch(function(e){ console.warn('[탑승자_귀가 버스 업데이트 실패]', e&&e.message||e); })
         : Promise.resolve();
-      // delete 작업(버스→비버스 전환) + 버스 배정호차 변경 전체를 allSettled로 합산
-      var allJobs = delJobs.concat([arriveJob, leaveJob]);
+
+      // ── [단계4] 버스배정 요약/팀내역 시트 인원수·팀목록 갱신 (Q1-B/Q2-B/Q3-B) ──
+      // GAS updateBusSummary action — 시트 직접 읽기, 메모리 의존 없음
+      var teamKey = busGetTeamKey(r);
+      var arrSummaryJob = needUpdateArriveBus
+        ? _updateBusSummarySheet('arrive', teamKey, prevArriveBus, newArriveBus)
+            .catch(function(e){ console.warn('[참석 요약/팀내역 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+      var lvSummaryJob = needUpdateLeaveBus
+        ? _updateBusSummarySheet('leave', teamKey, prevLeaveBus, newLeaveBus)
+            .catch(function(e){ console.warn('[귀가 요약/팀내역 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+
+      // delete 작업(버스→비버스 전환) + 탑승자 호차 변경 + 요약/팀내역 갱신 전체를 allSettled로 합산
+      var allJobs = delJobs.concat([arriveJob, leaveJob, arrSummaryJob, lvSummaryJob]);
       return Promise.allSettled(allJobs).then(function(){
         doSearch();
         showToast('✅ '+maskName(r.name)+' 수정 완료 (Sheets 반영)','success');
@@ -8710,7 +8729,45 @@ function saveInlineEdit(id){
     .catch(function(e){ showToast('서버 오류: '+e.message,'error'); })
     .finally(function(){ showLoading(false); });
 }
-// ── 탑승자 시트 배정호차·버스명 단건 update ──────────────────────────────
+// ── 버스배정 요약/팀내역 시트 인원수·팀목록 단건 업데이트 ─────────────────
+// 개인 배정호차 변경(fromBus→toBus) 시 요약/팀내역 시트 직접 수정
+// type     : 'arrive' | 'leave'
+// teamKey  : busGetTeamKey(r) — '3교구 31구역'
+// fromBus  : 변경 전 버스명 — '버스 1호'
+// toBus    : 변경 후 버스명 — '버스 2호'
+function _updateBusSummarySheet(type, teamKey, fromBus, toBus){
+  if(!USE_SHEET() || !teamKey || !fromBus || !toBus || fromBus === toBus) return Promise.resolve();
+  var isLeave = (type === 'leave');
+  var body = {
+    action:       'updateBusSummary',
+    summarySheet: isLeave ? '버스배정_귀가요약'    : '버스배정_참석요약',
+    teamSheet:    isLeave ? '버스배정_귀가팀내역'  : '버스배정_참석팀내역',
+    teamKey:      teamKey,
+    fromBus:      fromBus,
+    toBus:        toBus,
+    filter:       _busGetFilter()   // 년도+수양회종류+행사명 필터 (교회목표 fallback 포함)
+  };
+  console.log('[_updateBusSummarySheet]', type, teamKey, fromBus, '→', toBus);
+  return fetch(API_URL, {
+    method:   'POST',
+    headers:  _gasHeaders({'Content-Type':'text/plain'}),
+    body:     JSON.stringify(body),
+    redirect: 'follow'
+  })
+  .then(function(r){ return r.text(); })
+  .then(function(txt){
+    var res;
+    try { res = JSON.parse(txt); } catch(e){ res = { success:false, error:'응답 파싱 오류:'+txt.slice(0,80) }; }
+    console.log('[_updateBusSummarySheet] GAS 응답:', JSON.stringify(res));
+    if(res && res.success === false){
+      console.warn('[_updateBusSummarySheet] 실패:', res.error);
+    }
+    return res;
+  })
+  .catch(function(e){
+    console.warn('[_updateBusSummarySheet] 오류:', e&&e.message||e);
+  });
+}
 // 구역장의 버스 배정호차 직접 변경 시 탑승자_참석/귀가 시트 반영
 // receiptId: 접수ID (행 탐색 키)
 // busName  : 새 배정호차 (빈값이면 미배정)
