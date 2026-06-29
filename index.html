@@ -6882,7 +6882,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v134_busFilter_goalFallback';
+var CACHE_VERSION = 'v136_saveEdit_rerender';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8934,6 +8934,13 @@ function openEditMode(id) {
     eLvBus.disabled = isAdmin || r.leaveTransport!=='버스';
     eLvBus.style.opacity = eLvBus.disabled ? '.5' : '';
   }
+  // [v135] 버스 배정호차 변경 감지를 위해 모달 열 때 현재값 저장
+  // saveEdit()에서 prevArriveBus/prevLeaveBus와 비교하여 _updateRosterBusAssign 호출 여부 결정
+  var modal = $id('detail-modal');
+  if(modal){
+    modal._prevArriveBus = (r.receiptId && rosterArriveIndex[r.receiptId]) || '';
+    modal._prevLeaveBus  = (r.receiptId && rosterLeaveIndex[r.receiptId])  || '';
+  }
   // 교통수단 변경 시 버스배정 토글 핸들러를 권한 반영하여 재설정 (관리자는 항상 잠금 유지)
   var eArrT=$id('e-arrive-transport');
   if(eArrT) eArrT.onchange=function(){
@@ -9056,17 +9063,62 @@ function saveEdit() {
   // Sheets 저장 시 name 마스킹 (접수ID 기준 매칭)
   var maskedUpdated = Object.assign({}, updated, {name: maskName(updated.name||'')});
   showLoading(true);
+
+  // ── [단계 1] 참석인원명단 update ───────────────────────────────────────
   apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedUpdated)))
     .then(function(res){
       if(!(res&&res.success)){
         showToast('⚠️ Sheets 반영 실패: '+(res&&res.error||res&&res.message||'알 수 없는 오류'),'error');
         return;
       }
-      // ── 버스 → 비버스 전환분: 탑승자_참석/귀가에서 동일 접수ID 행 즉시 삭제 ──
+
+      // ── [단계 2] 버스→비버스 전환: 탑승자 시트에서 해당 행 삭제 ──────────
       var delJobs = [];
       if (needDeleteArrive && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_참석', id:r.receiptId}));
       if (needDeleteLeave  && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_귀가', id:r.receiptId}));
-      return Promise.all(delJobs).then(function(){
+
+      // ── [단계 3] 버스 배정호차 변경: 탑승자_참석/귀가 시트 해당 행 업데이트 ──
+      // [v135] saveEdit(상세모달)에도 saveInlineEdit과 동일한 버스 배정호차 변경 처리 추가
+      // openEditMode에서 저장한 prevArriveBus/prevLeaveBus와 드롭다운 신규값 비교
+      var rid = r.receiptId || '';
+      var modal = $id('detail-modal');
+      var prevArriveBus = (modal && modal._prevArriveBus) || '';
+      var prevLeaveBus  = (modal && modal._prevLeaveBus)  || '';
+      var newArriveBus  = ($id('e-arrive-bus') && $id('e-arrive-bus').value) || '';
+      var newLeaveBus   = ($id('e-leave-bus')  && $id('e-leave-bus').value)  || '';
+
+      // 교통수단=버스이고 호차가 변경된 경우에만 탑승자 시트 업데이트 (Q1-C 원칙)
+      var needUpdateArriveBus = rid && !isAdmin
+        && (changes.arriveTransport||'').trim() === '버스'
+        && newArriveBus !== prevArriveBus;
+      var needUpdateLeaveBus  = rid && !isAdmin
+        && (changes.leaveTransport||'').trim() === '버스'
+        && newLeaveBus  !== prevLeaveBus;
+
+      // 참석 버스 호차 변경 — 독립 Promise (Q2-C: 한 쪽 실패가 다른 쪽에 전파 안됨)
+      var arriveJob = needUpdateArriveBus
+        ? _updateRosterBusAssign(rid, newArriveBus, '탑승자_참석')
+            .then(function(){
+              rosterArriveIndex[rid] = newArriveBus || '';
+              _rosterFullArr[rid]    = newArriveBus || ''; // [v136] 상세 뷰 재렌더용 인덱스도 갱신
+            })
+            .catch(function(e){ console.warn('[탑승자_참석 버스 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+
+      // 귀가 버스 호차 변경 — 독립 Promise
+      var leaveJob  = needUpdateLeaveBus
+        ? _updateRosterBusAssign(rid, newLeaveBus, '탑승자_귀가')
+            .then(function(){
+              rosterLeaveIndex[rid] = newLeaveBus || '';
+              _rosterFullLv[rid]    = newLeaveBus || ''; // [v136] 상세 뷰 재렌더용 인덱스도 갱신
+            })
+            .catch(function(e){ console.warn('[탑승자_귀가 버스 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+
+      // 단계 2(삭제) + 단계 3(호차 변경) 전체 완료 후 상세 뷰 재렌더 → 토스트
+      var allJobs = delJobs.concat([arriveJob, leaveJob]);
+      return Promise.allSettled(allJobs).then(function(){
+        openDetail(id); // [v136] 버스배정 인덱스 갱신 후 상세 뷰 재렌더 → 변경값 즉시 표시
         showToast('✅ 수정 완료 (Sheets 반영)','success');
       });
     })
