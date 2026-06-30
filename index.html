@@ -41,7 +41,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
   background:url('http://church.jbch.org/images/logo.png') center/180px no-repeat;
   opacity:0.04;pointer-events:none;
 }
-.login-wrap{width:100%;max-width:420px;position:relative;z-index:1;}
+.login-wrap{width:100%;max-width:560px;position:relative;z-index:1;}
 .login-brand{text-align:center;margin-bottom:30px;}
 .login-logo{
   width:90px;height:90px;margin:0 auto 16px;
@@ -618,7 +618,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <div><strong>전도인</strong>&nbsp;&nbsp;ID: admin <span style="color:var(--navy2);font-weight:700;">||교구||구역||</span> b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 11구역 → <strong style="color:var(--navy);">admin0111b</strong></span></div>
         <div style="margin-top:2px;"><strong>교구장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||</span> 00b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 → <strong style="color:var(--navy);">user0100b</strong></span></div>
         <div style="margin-top:2px;"><strong>구역장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||구역||</span> b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 11구역 → <strong style="color:var(--navy);">user0111b</strong></span></div>
-        <div style="margin-top:8px;font-size:.71rem;color:var(--text-dim);">※ 초기 비밀번호는 아이디와 동일합니다. 계정은 관리자 메뉴에서 관리합니다.</div>
+        <div style="margin-top:8px;font-size:.71rem;color:var(--text-dim);white-space:nowrap;">※ 초기 비밀번호는 아이디와 동일합니다. 계정은 관리자 메뉴에서 관리합니다.</div>
       </div>
     </div>
   </div>
@@ -6964,7 +6964,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v141_teamCard_editBtn_removed';
+var CACHE_VERSION = 'v142_login_width_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
