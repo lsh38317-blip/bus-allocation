@@ -3530,6 +3530,9 @@ function _busRestoreFromSheet(){
         var hasTeams = busArriveTeams.length||busLeaveTeams.length;
         if(hasAny) showToast('☁️ 구글 시트에서 버스 배정 현황 로드 완료','success');
         else if(hasTeams) showToast('☁️ 구글 시트에서 팀 목록 로드 완료 (배정 없음)','info');
+        // [v140] 시트에서 읽은 참석/귀가 버스 위치값을 상단 input에 반영
+        _busFillLocationInputs('arrive');
+        _busFillLocationInputs('leave');
         // ── 자동배정 직후 억제 플래그: in-memory(최신 배정)를 시트 복원으로 덮어쓰지 않음 ──
         // 억제 중이어도 팀 탭 렌더는 항상 실행 (팀목록 복원 반영 필요)
         if(!_busRestoreSuppressed){
@@ -3605,6 +3608,20 @@ function busSaveMeta(){
     lvBoard:lvBoard,   lvAlight:lvAlight
   }));
   busUpdateCapSummary();
+}
+
+// ── [v140] 시트 조회 결과를 참석/귀가 위치 input에 자동 반영 ──────────────
+// _busRestoreFromSheet 완료 후, busAssignSubTab 탭 전환 시 호출
+// 버스가 여러 대면 첫 번째 버스 기준 (위치저장 버튼으로 일괄 적용했으므로 보통 동일)
+function _busFillLocationInputs(type){
+  var isLeave = (type === 'leave');
+  var buses = isLeave ? busLeaveBuses : busArriveBuses;
+  var boardEl  = $id(isLeave ? 'bus-leave-board'  : 'bus-arrive-board');
+  var alightEl = $id(isLeave ? 'bus-leave-alight' : 'bus-arrive-alight');
+  if(!boardEl || !alightEl) return;
+  var first = buses && buses[0];
+  boardEl.value  = (first && first.boardLoc)  || '';
+  alightEl.value = (first && first.alightLoc) || '';
 }
 
 // ── [v139] 참석/귀가 버스 위치만 단독 저장 ──────────────────────────────
@@ -3970,6 +3987,8 @@ function busAssignSubTab(type){
   var locA=$id('bus-loc-arrive'); var locL=$id('bus-loc-leave');
   if(locA) locA.style.display=type==='arrive'?'':'none';
   if(locL) locL.style.display=type==='leave'?'':'none';
+  // [v140] 탭 전환 시 해당 type 버스의 위치값을 input에 재반영
+  _busFillLocationInputs(type);
   updateBusUnassignedBadge();
   busRenderBuses(type);
   // 배정 정보 없으면 해당 팀내역 시트 자동 조회
@@ -6946,7 +6965,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v139_busLocation_save';
+var CACHE_VERSION = 'v140_busLocation_autofill';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
