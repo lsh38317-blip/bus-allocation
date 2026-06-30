@@ -1115,10 +1115,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 </div>
               </div>
               <!-- 승차/하차 위치 -->
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
-                <!-- 참석버스 위치 -->
-                <div style="background:var(--sky);border:1px solid var(--border2);border-radius:10px;padding:14px;">
-                  <div style="font-size:.8rem;font-weight:700;color:var(--navy);margin-bottom:10px;">🚌 참석버스 위치</div>
+              <!-- [v139] 참석/귀가 탭에 따라 해당 위치 카드만 표시 (busAssignSubTab에서 토글) -->
+              <div>
+                <!-- 참석버스 위치 (참석 탭일 때만 표시) -->
+                <div id="bus-loc-arrive" style="background:var(--sky);border:1px solid var(--border2);border-radius:10px;padding:14px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <span style="font-size:.8rem;font-weight:700;color:var(--navy);">🚌 참석버스 위치</span>
+                    <button class="btn btn-navy btn-sm" onclick="busSaveLocationOnly('arrive')">💾 위치 저장</button>
+                  </div>
                   <div style="display:flex;flex-direction:column;gap:8px;">
                     <div style="display:flex;align-items:center;gap:8px;">
                       <span style="font-size:.76rem;color:var(--green);white-space:nowrap;min-width:52px;font-weight:600;">🟢 승차위치</span>
@@ -1136,9 +1140,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     </div>
                   </div>
                 </div>
-                <!-- 귀가버스 위치 -->
-                <div style="background:#edf7f2;border:1px solid #b8dfc8;border-radius:10px;padding:14px;">
-                  <div style="font-size:.8rem;font-weight:700;color:#2d8a5a;margin-bottom:10px;">🏠 귀가버스 위치</div>
+                <!-- 귀가버스 위치 (귀가 탭일 때만 표시) -->
+                <div id="bus-loc-leave" style="display:none;background:#edf7f2;border:1px solid #b8dfc8;border-radius:10px;padding:14px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <span style="font-size:.8rem;font-weight:700;color:#2d8a5a;">🏠 귀가버스 위치</span>
+                    <button class="btn btn-navy btn-sm" onclick="busSaveLocationOnly('leave')">💾 위치 저장</button>
+                  </div>
                   <div style="display:flex;flex-direction:column;gap:8px;">
                     <div style="display:flex;align-items:center;gap:8px;">
                       <span style="font-size:.76rem;color:var(--green);white-space:nowrap;min-width:52px;font-weight:600;">🟢 승차위치</span>
@@ -3600,6 +3607,59 @@ function busSaveMeta(){
   busUpdateCapSummary();
 }
 
+// ── [v139] 참석/귀가 버스 위치만 단독 저장 ──────────────────────────────
+// 💾 위치 저장 버튼 — 해당 type(arrive/leave) 버스 전체에 위치값 일괄 적용 (Q1-A)
+// + 버스배정_*요약 + 탑승자_* 시트 동시 update (Q2-A)
+// 자동배정(busAutoAssign)·팀내역저장(busSaveToSheet)은 input 현재값을 그대로 읽으므로 영향 없음
+function busSaveLocationOnly(type){
+  var isLeave = (type === 'leave');
+  var board  = (($id(isLeave?'bus-leave-board':'bus-arrive-board')) ||{value:''}).value.trim();
+  var alight = (($id(isLeave?'bus-leave-alight':'bus-arrive-alight'))||{value:''}).value.trim();
+  if(!board && !alight){ showToast('승차위치 또는 하차위치를 입력해 주세요.','error'); return; }
+
+  // [단계1] localStorage 갱신 (기존 busSaveMeta와 동일 캐시 유지)
+  busSaveMeta();
+
+  // [단계2] 로컬 메모리 — 해당 type 버스 전체 일괄 적용 (Q1-A)
+  var buses = isLeave ? busLeaveBuses : busArriveBuses;
+  buses.forEach(function(b){ b.boardLoc = board; b.alightLoc = alight; });
+  busSave();
+  busRenderBuses(type);
+
+  if(!USE_SHEET()){ showToast('✅ 위치 저장 완료 (로컬)','success'); return; }
+
+  // [단계3] GAS 호출 — updateBusLocation action (Q2-A: 요약+탑승자 동시 반영)
+  showLoading(true);
+  var body = {
+    action:       'updateBusLocation',
+    summarySheet: isLeave ? '버스배정_귀가요약' : '버스배정_참석요약',
+    rosterSheet:  isLeave ? '탑승자_귀가'       : '탑승자_참석',
+    boardLoc:     board,
+    alightLoc:    alight,
+    filter:       _busGetFilter()
+  };
+  fetch(API_URL, {
+    method:   'POST',
+    headers:  _gasHeaders({'Content-Type':'text/plain'}),
+    body:     JSON.stringify(body),
+    redirect: 'follow'
+  })
+  .then(function(r){ return r.text(); })
+  .then(function(txt){
+    var res;
+    try { res = JSON.parse(txt); } catch(e){ res = { success:false, error:'응답 파싱 오류:'+txt.slice(0,80) }; }
+    if(res && res.success === false){
+      showToast('⚠️ 위치 저장 실패: '+(res.error||'알 수 없는 오류'),'error');
+      return;
+    }
+    showToast('✅ '+(isLeave?'귀가버스':'참석버스')+' 위치 저장 완료 (Sheets 반영)','success');
+  })
+  .catch(function(e){
+    showToast('⚠️ 위치 저장 오류: '+(e&&e.message||e),'error');
+  })
+  .finally(function(){ showLoading(false); });
+}
+
 // ── 순수 네트워크 차단 오류 판별 헬퍼 ───────────────────
 // Safari: "Load failed" / Chrome: "Failed to fetch" / Firefox: "NetworkError"
 // CORS 차단·샌드박스 iframe·타임아웃 abort 도 여기에 해당
@@ -3906,6 +3966,10 @@ function busAssignSubTab(type){
   if(la) la.style.display=type==='leave'?'':'none';
   if(at) at.className=type==='arrive'?'btn btn-navy btn-sm':'btn btn-primary btn-sm';
   if(lt) lt.className=type==='leave'?'btn btn-navy btn-sm':'btn btn-primary btn-sm';
+  // [v139] 참석/귀가 위치 카드도 탭에 맞춰 토글
+  var locA=$id('bus-loc-arrive'); var locL=$id('bus-loc-leave');
+  if(locA) locA.style.display=type==='arrive'?'':'none';
+  if(locL) locL.style.display=type==='leave'?'':'none';
   updateBusUnassignedBadge();
   busRenderBuses(type);
   // 배정 정보 없으면 해당 팀내역 시트 자동 조회
@@ -6882,7 +6946,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v138_saveEdit_busSummary';
+var CACHE_VERSION = 'v139_busLocation_save';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -11159,7 +11223,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'busSetCount','busSetCap','busTab','busAddTeam','busDeleteTeam',
     'busEditTeam','busEditSave','busHandleCSV','busAutoAssign','busRemoveSlot',
     'busDeleteBus','busResetAll','busResetConfirm','_busTeamTabReset','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew',
-    'busSaveMeta','busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSetLocation','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh',
+    'busSaveMeta','busSaveLocationOnly','busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSetLocation','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh',
     'busSaveToSheet','busExportCSV','busRestore',
     'bvwSetMode','bvwSetType','busviewReload','_busviewGetFilter','bvwExportBusSchedule','busSummaryExportCSV',
     'busSelectAll','busImportAddSelected',
@@ -11217,7 +11281,7 @@ document.addEventListener('DOMContentLoaded', function() {
     busRemoveSlot:busRemoveSlot, busDeleteBus:busDeleteBus,
     busResetAll:busResetAll, busResetConfirm:busResetConfirm, _busTeamTabReset:_busTeamTabReset, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear,
     busDrop:busDrop, busMoveSlot:busMoveSlot, busDragOverEnter:busDragOverEnter, busDragOverLeave:busDragOverLeave, busRenderView:busRenderView, busSetDrag:busSetDrag, busSetDragNew:busSetDragNew,
-    busSaveMeta:busSaveMeta, busImportFromRetreat:busImportFromRetreat, busLoadTeamsFromSheet:busLoadTeamsFromSheet, _busLoadOneTeamSheet:_busLoadOneTeamSheet, busSaveTeamsToSheet:busSaveTeamsToSheet, _busUpdateTeamStatus:_busUpdateTeamStatus, _busUpdateTeamStatusAndRefresh:_busUpdateTeamStatusAndRefresh,
+    busSaveMeta:busSaveMeta, busSaveLocationOnly:busSaveLocationOnly, busImportFromRetreat:busImportFromRetreat, busLoadTeamsFromSheet:busLoadTeamsFromSheet, _busLoadOneTeamSheet:_busLoadOneTeamSheet, busSaveTeamsToSheet:busSaveTeamsToSheet, _busUpdateTeamStatus:_busUpdateTeamStatus, _busUpdateTeamStatusAndRefresh:_busUpdateTeamStatusAndRefresh,
     busSetLocation:busSetLocation, busSaveToSheet:busSaveToSheet, busExportCSV:busExportCSV,
     busRestore:busRestore,
     bvwSetMode:bvwSetMode, bvwSetType:bvwSetType, busviewReload:busviewReload, _busviewGetFilter:_busviewGetFilter, bvwExportBusSchedule:bvwExportBusSchedule, busSummaryExportCSV:busSummaryExportCSV,
