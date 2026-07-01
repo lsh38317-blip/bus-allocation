@@ -4492,15 +4492,11 @@ function busDeleteTeamConfirm(id, type){
   var busNames = (type==='leave'?busLeaveBuses:busArriveBuses)
     .filter(function(b){ return b.slots.some(function(s){ return s.teamId===id; }); })
     .map(function(b){ return b.name; }).join(', ');
-  var labelSuffix = type==='leave' ? '귀가' : '참석';
   var msg = '<strong>'+esc(team.name)+'</strong> · '+team.count+'명<br>';
   if(assigned){
     msg += '<span style="color:#d94040;font-weight:700;">✅ 배정 상태'+(busNames?(' — '+esc(busNames)):'')+'</span><br><br>'+
-      '이 팀을 삭제하면 아래 항목이 함께 삭제됩니다:<br>'+
-      '· 탑승자_'+labelSuffix+' 명단<br>'+
-      '· 버스배정_'+labelSuffix+'요약 (해당 버스 재계산)<br>'+
-      '· 버스배정_'+labelSuffix+'팀내역 행<br><br>'+
-      '<small style="color:var(--muted);">삭제 후 팀 재배정과 버스배정처리를 진행해 주세요.</small>';
+      '이 팀을 삭제하면 팀의 버스배정내역도 함께 삭제됩니다.<br>'+
+      '삭제 이후 팀배정과 버스배정을 진행해 주십시요.';
   } else {
     msg += '<span style="color:#888;">미배정 상태</span><br><br>'+
       '탑승자 명단은 없으며, 팀내역 시트에 저장된 행이 있다면 함께 삭제됩니다.<br><br>'+
