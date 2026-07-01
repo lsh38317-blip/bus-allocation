@@ -2826,6 +2826,41 @@ function busRosterClose(){
   var dr=$id('bus-roster-drawer');  if(dr) dr.classList.remove('open');
 }
 
+// 버스 단위 전체 탑승자 조회 — buildBusRoster()로 해당 버스에 배정된 모든 팀의
+// 승객을 분산배정까지 정확히 반영해 취합한 뒤 드로어에 표시 (busRosterOpen과 UI 공유)
+function busRosterOpenForBus(busId, type){
+  type = type || bvwType || 'arrive';
+  var curBuses = type==='leave' ? busLeaveBuses : busArriveBuses;
+  var bus = curBuses.find(function(b){ return b.id===busId; });
+  if(!bus){ showToast('버스 정보를 찾을 수 없습니다.','error'); return; }
+
+  var built = buildBusRoster(busId, type);
+  var pax = (built[0] && built[0].passengers) || [];
+
+  // 정렬: 교구 > 구역 > 성명
+  pax = pax.slice().sort(function(a,b){
+    var ap=(a.parish||''), bp=(b.parish||'');
+    if(ap!==bp) return ap.localeCompare(bp,'ko');
+    var ad=(a.district||''), bd=(b.district||'');
+    if(ad!==bd) return ad.localeCompare(bd,'ko');
+    return (a.name||'').localeCompare(b.name||'','ko');
+  });
+  _brdrRows = pax;
+
+  var teamCount = bus.slots.length;
+  var typeLabel = type==='leave' ? '귀가 탑승자' : '참석 탑승자';
+  var sheetLabel = type==='leave' ? '탑승자_귀가' : '탑승자_참석';
+  var t=$id('brdr-title'); if(t) t.textContent=esc(bus.name);
+  var s=$id('brdr-sub');
+  if(s) s.textContent='전체 '+typeLabel+' · '+teamCount+'팀 '+pax.length+'명 ('+sheetLabel+' 시트)';
+
+  var inp=$id('brdr-search'); if(inp) inp.value='';
+  busRosterRender(pax);
+
+  var ov=$id('bus-roster-overlay'); if(ov) ov.classList.add('show');
+  var dr=$id('bus-roster-drawer');  if(dr) dr.classList.add('open');
+}
+
 function busRosterFilter(q){
   if(!q){ busRosterRender(_brdrRows); return; }
   var lq=q.toLowerCase();
@@ -5805,7 +5840,10 @@ function busRenderSummary(type){
       '<span style="font-size:.76rem;color:var(--text2);">하차위치: <strong style="color:var(--text);">'+esc(bus.alightLoc||'-')+'</strong></span>'+
       '<span style="font-size:.76rem;color:var(--text2);">선탑자: <strong style="color:var(--text);">'+esc(leaderName2||'미지정')+'</strong></span>'+
       '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'+
+      '<button onclick="busRosterOpenForBus(\''+bus.id+'\',\''+type+'\')" style="background:var(--sky);border:1px solid var(--border2);color:var(--navy);border-radius:20px;padding:3px 12px;font-size:.78rem;font-weight:700;cursor:pointer;">👥 탑승자내역</button>'+
       '<span style="background:'+(over?'#fff0f0':'#edf7f2')+';color:'+(over?'#d94040':'#2d8a5a')+';border:1px solid '+(over?'#f5c0c0':'#b8dfc8')+';border-radius:20px;padding:3px 13px;font-weight:700;font-size:.83rem;">'+load+' / '+cap+'명</span>'+
+      '</div>'+
       '</div>'+
       '<div style="background:var(--border2);border-radius:4px;height:5px;margin-bottom:10px;overflow:hidden;">'+
       '<div style="height:100%;border-radius:4px;width:'+Math.min(100,(load/cap)*100)+'%;background:'+(over?'#d94040':'linear-gradient(90deg,#4a7fc1,#2d8a5a)')+';transition:width .5s;"></div></div>'+
@@ -7096,7 +7134,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v145_fix_zero_falsy_bug';
+var CACHE_VERSION = 'v146_bus_roster_by_bus';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -11396,7 +11434,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'roomviewSearch',
     'rvOpenRoster','rvRosterRender','rvRosterFilter','rvRosterClose',
     'roomRosterOpen','roomRosterClose','roomRosterFilter',
-    'busRosterOpen','busRosterClose','busRosterFilter',
+    'busRosterOpen','busRosterOpenForBus','busRosterClose','busRosterFilter',
     '_bvwCalcSheetStats','_bvwFetchSheetStats','_bvwRenderStatsOnly',
     'accGenId','accAutoGenId',
     'goalOpenModal','goalRenderYearOptions','goalAddNewYear','goalKeyChange','goalCalcPreview','goalSave','goalDelete'
@@ -11460,7 +11498,7 @@ document.addEventListener('DOMContentLoaded', function() {
     roomviewSearch:roomviewSearch,
     rvOpenRoster:rvOpenRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose,
     roomRosterOpen:roomRosterOpen, roomRosterClose:roomRosterClose, roomRosterFilter:roomRosterFilter,
-    busRosterOpen:busRosterOpen, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
+    busRosterOpen:busRosterOpen, busRosterOpenForBus:busRosterOpenForBus, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
     _bvwCalcSheetStats:_bvwCalcSheetStats, _bvwFetchSheetStats:_bvwFetchSheetStats, _bvwRenderStatsOnly:_bvwRenderStatsOnly,
     accGenId:accGenId, accAutoGenId:accAutoGenId,
     goalOpenModal:goalOpenModal, goalRenderYearOptions:goalRenderYearOptions, goalAddNewYear:goalAddNewYear,
