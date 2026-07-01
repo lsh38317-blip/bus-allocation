@@ -7096,7 +7096,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v143_bus_team_delete_sync_hotfix1';
+var CACHE_VERSION = 'v145_fix_zero_falsy_bug';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -7318,7 +7318,10 @@ function sheetRowToObj(r) {
   function g(engKey, korKey){
     var v = r[engKey];
     if(v===undefined||v===null||v==='') v = r[korKey];
-    return String(v||'');
+    // [v145 hotfix] v||'' 는 숫자 0을 falsy로 취급해 빈 문자열로 지워버림
+    // (예: 숙소코드=0 → '' 로 손실 → 저장 시 시트의 0이 공란으로 덮어써짐)
+    // undefined/null 만 빈 문자열 처리하고, 0을 포함한 모든 실값은 그대로 보존
+    return (v===undefined||v===null) ? '' : String(v);
   }
   // 구형 캐시 키 안전 읽기 (hocha→이전 회차값, busNum→이전 호차값)
   function gLegacy(newKey, korKey) {
@@ -7326,7 +7329,11 @@ function sheetRowToObj(r) {
     return v;
   }
   return {
-    id:             String(r['id']||(Date.now()+Math.random())),
+    // [v144 hotfix] NO(시트 원본 순번)를 최우선으로 사용 — 기존엔 r['id']를 찾았으나
+    // 시트에서 불러온 행에는 'id' 영문 키가 존재하지 않아(한글 헤더 키만 존재) 항상
+    // Date.now() 랜덤값으로 대체되고, 저장 시 toSheetObj()가 그 값을 NO 컬럼에 그대로
+    // 덮어써 원본 NO가 매번 타임스탬프로 오염되던 버그 수정.
+    id:             String(r['NO']||r['no']||r['id']||(Date.now()+Math.random())),
     receiptId:      g('receiptId',      '접수ID'),
     name:           g('name',           '성명'),
     // 연도: year 키 우선, 없으면 한글 '연도', 구형 캐시에서 retreatType에 연도값 들어간 경우 복구
