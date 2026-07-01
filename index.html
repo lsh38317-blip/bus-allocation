@@ -1703,19 +1703,32 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <span style="font-size:.73rem;color:var(--muted);">CSV 형식: 교구,구역,직분,이름 (신규·자동생성) 또는 아이디,비밀번호,이름,직분,권한,교구,구역 (기존)</span>
             </div>
 
-            <!-- 업로드 영역 -->
-            <div id="acc-upload-zone"
-              style="border:2px dashed var(--border);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:all .2s;background:var(--sky);margin-bottom:12px;"
-              onclick="document.getElementById('acc-csv-input').click()"
-              ondragover="event.preventDefault();this.style.borderColor='var(--navy2)';this.style.background='#dce8f5';"
-              ondragleave="this.style.borderColor='';this.style.background='var(--sky)';"
-              ondrop="event.preventDefault();this.style.borderColor='';this.style.background='var(--sky)';accHandleCSV(event.dataTransfer.files[0]);">
-              <input type="file" id="acc-csv-input" accept=".csv,.txt" style="display:none;"
-                onchange="accHandleCSV(this.files[0]);this.value='';">
-              <div style="font-size:1.4rem;margin-bottom:6px;">📋</div>
-              <div style="font-size:.84rem;font-weight:700;color:var(--navy);margin-bottom:3px;">CSV 파일을 드래그하거나 클릭해서 업로드</div>
-              <div style="font-size:.74rem;color:var(--muted);">신규: 교구, 구역, 직분(교구장/구역장/전도인/관리자), 이름 — 아이디·비밀번호 자동생성<br>기존: 아이디, 비밀번호, 이름, 직분, 권한(admin/district/parish), 교구, 구역</div>
+            <!-- 숨김 파일 입력 (파일 업로드 버튼에서 트리거) -->
+            <input type="file" id="acc-csv-input" accept=".csv,.txt" style="display:none;"
+              onchange="accHandleCSV(this.files[0]);this.value='';">
+
+            <!-- 액션 버튼 행 -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px;">
+              <button class="btn btn-primary btn-sm" onclick="accDownloadTemplate()">📄 CSV 양식 다운로드</button>
+              <button class="btn btn-green btn-sm"   onclick="accExportCSV()">⬇️ 현재 계정 CSV 내보내기</button>
+              <button class="btn btn-sm" style="background:#eef2f7;color:var(--navy);border:1px solid var(--border2);" onclick="document.getElementById('acc-csv-input').click()">📁 파일 업로드</button>
+              <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+                <span style="font-size:.74rem;color:var(--muted);">구글 시트:</span>
+                <button class="btn btn-sm" id="acc-sheet-btn"
+                  style="background:#1a6b45;color:#fff;border:none;"
+                  onclick="accSaveToSheet()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+                  계정 → 구글 시트
+                </button>
+                <button class="btn btn-sm"
+                  style="background:#1a3a6b;color:#fff;border:none;"
+                  onclick="loadAccountsFromSheet()"
+                  title="구글 시트에서 최신 계정 목록 불러오기">
+                  🔄 시트→계정 재조회
+                </button>
+              </div>
             </div>
+            <div style="font-size:.74rem;color:var(--muted);margin-bottom:12px;">신규: 교구, 구역, 직분(교구장/구역장/전도인/관리자), 이름 — 아이디·비밀번호 자동생성</div>
 
             <!-- 업로드 결과 배너 -->
             <div id="acc-upload-banner" style="display:none;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.8rem;line-height:1.7;"></div>
@@ -1745,27 +1758,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
             </div>
 
-            <!-- 액션 버튼 행 -->
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <button class="btn btn-primary btn-sm" onclick="accDownloadTemplate()">📄 CSV 양식 다운로드</button>
-              <button class="btn btn-sm" style="background:#eef2f7;color:var(--navy);border:1px solid var(--border2);" onclick="accDownloadTemplateLegacy()">📄 기존 형식 양식</button>
-              <button class="btn btn-green btn-sm"   onclick="accExportCSV()">⬇️ 현재 계정 CSV 내보내기</button>
-              <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
-                <span style="font-size:.74rem;color:var(--muted);">구글 시트:</span>
-                <button class="btn btn-sm" id="acc-sheet-btn"
-                  style="background:#1a6b45;color:#fff;border:none;"
-                  onclick="accSaveToSheet()">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
-                  계정 → 구글 시트
-                </button>
-                <button class="btn btn-sm"
-                  style="background:#1a3a6b;color:#fff;border:none;"
-                  onclick="loadAccountsFromSheet()"
-                  title="구글 시트에서 최신 계정 목록 불러오기">
-                  🔄 시트→계정 재조회
-                </button>
-              </div>
-            </div>
           </div>
 
           <!-- 계정 목록 카드 -->
@@ -7130,7 +7122,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v146_bus_roster_by_bus';
+var CACHE_VERSION = 'v146_csv_upload_button';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -10085,23 +10077,6 @@ function accDownloadTemplate(){
 }
 
 // ── 계정 CSV 양식 다운로드 (기존 포맷 — 아이디·비밀번호 직접 지정용) ──
-function accDownloadTemplateLegacy(){
-  var sample = [
-    ACC_CSV_HEADERS,
-    ['user01','pass1234','홍길동','집사','district','1교구','3구역'],
-    ['user02','pass1234','김영희','권사','district','2교구','1구역'],
-    ['parish1','pass1234','이교구','장로','parish','3교구',''],
-  ];
-  var csv = '\uFEFF' + sample.map(function(r){
-    return r.map(function(v){ return /[,"]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(',');
-  }).join('\r\n');
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download='계정_업로드_양식_기존형식.csv';
-  a.click();
-  showToast('📄 기존 형식 양식 다운로드 완료!','success');
-}
-
 // ── 계정 CSV 내보내기 ────────────────────────────────
 function accExportCSV(){
   if(!ACCOUNTS.length){ showToast('내보낼 계정이 없습니다.','error'); return; }
@@ -11401,7 +11376,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'openAccDetail','openAccEditMode','cancelAccEdit','saveAccEdit','renderAccounts',
     'accRoleChange','accParishChange','confirmDeleteAccount',
     'accHandleCSV','accConfirmUpload','accCancelUpload',
-    'accDownloadTemplate','accDownloadTemplateLegacy','accExportCSV','accSaveToSheet',
+    'accDownloadTemplate','accExportCSV','accSaveToSheet',
     'exportExcel','downloadTemplate','vwConfirmUpload','vwCancelUpload',
     'saveApiUrl','copyApiUrlForDeploy','testApiUrl','closeModal','apiUrlEditMode','apiUrlRefreshUI',
     'saveGasApiKey','clearGasApiKey',
@@ -11454,7 +11429,7 @@ document.addEventListener('DOMContentLoaded', function() {
     accRoleChange:accRoleChange, accParishChange:accParishChange,
     confirmDeleteAccount:confirmDeleteAccount,
     accHandleCSV:accHandleCSV, accConfirmUpload:accConfirmUpload, accCancelUpload:accCancelUpload,
-    accDownloadTemplate:accDownloadTemplate, accDownloadTemplateLegacy:accDownloadTemplateLegacy, accExportCSV:accExportCSV, accSaveToSheet:accSaveToSheet,
+    accDownloadTemplate:accDownloadTemplate, accExportCSV:accExportCSV, accSaveToSheet:accSaveToSheet,
     exportExcel:exportExcel,
     downloadTemplate:downloadTemplate, vwConfirmUpload:vwConfirmUpload, vwCancelUpload:vwCancelUpload,
     saveApiUrl:saveApiUrl, copyApiUrlForDeploy:copyApiUrlForDeploy, testApiUrl:testApiUrl, closeModal:closeModal,
