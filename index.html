@@ -743,6 +743,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div class="card-title" style="margin:4px 0 10px;font-size:1.05rem;">수양회접수현황집계</div>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
             <select id="home-year-select" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
+            <select id="home-parish-select" onchange="homeAggParishChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
+            <select id="home-district-select" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
             <button class="btn btn-primary btn-sm" onclick="homeAggQuery()">🔍 조회</button>
             <button class="btn btn-sm" onclick="homeAggExportCSV()" style="border:1px solid var(--border2);background:#fff;">📥 엑셀다운</button>
           </div>
@@ -7122,7 +7124,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v146_csv_upload_button';
+var CACHE_VERSION = 'v146_rate_hidden_all_roles';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -7964,54 +7966,10 @@ function updateStats() {
       return (uP ? r.parish === uP : true) && (uD ? r.district === uD : true);
     });
 
-    var setCard = function(num, topColor, numColor, lbl, val) {
-      var card  = $id('home-card-' + num);
-      var numEl = $id('ws-' + num);
-      var lblEl = $id('ws-' + num + '-lbl');
-      if (card)  card.style.borderTopColor = topColor;
-      if (numEl) { numEl.textContent = val; numEl.style.color = numColor; }
-      if (lblEl) lblEl.textContent = lbl;
-    };
-
-    // 카드1: 전체 등록
-    var label1 = isAdmin ? '전체 등록 인원'
-               : (role==='parish' ? uP+' 등록 인원' : uD+' 등록 인원');
-    setCard(1, 'var(--navy)', 'var(--navy)', label1, scope.length);
-
-    // ── 카드2: 버스 배정 (참석/귀가 분리) ──
-    // 참석 = count(참석인원명단.참석교통수단 = 버스)
-    // 귀가 = count(참석인원명단.귀가교통수단 = 버스)
-    // 관리자: 전체 retreat 기준 / 교구장·구역장: scope(교구/구역 필터) 기준
-    var busArrCount   = scope.filter(function(r){ return (r.arriveTransport||'').trim()==='버스'; }).length;
-    var busLeaveCount = scope.filter(function(r){ return (r.leaveTransport||'').trim()==='버스'; }).length;
-    // ws-2a(참석), ws-2b(귀가) 업데이트
-    var ws2a=$id('ws-2a'); if(ws2a) ws2a.textContent = busArrCount;
-    var ws2b=$id('ws-2b'); if(ws2b) ws2b.textContent = busLeaveCount;
-    // 카드 테두리/라벨만 setCard로 (숫자는 위에서 처리)
-    var label2 = isAdmin ? '버스 배정 인원'
-               : role==='parish' ? uP+' 버스 배정'
-               : uD+' 교통수단';
-    var card2=$id('home-card-2'); if(card2) card2.style.borderTopColor='var(--blue)';
-    var lbl2=$id('ws-2-lbl'); if(lbl2) lbl2.textContent=label2;
-
-    // ── 카드3: 숙소 배정 ──
-    // 전 역할 공통: scope 기준 room1(숙소1) 필드가 채워진 인원
-    // 관리자: 전체 retreat / 교구장: 교구 필터 / 구역장: 교구+구역 필터
-    var roomCount = scope.filter(function(r){
-      return (r.room1||'').trim() !== '';
-    }).length;
-    var label3 = isAdmin ? '숙소 배정 인원'
-               : role==='parish' ? uP + ' 숙소 배정'
-               : uD + ' 숙소 배정';
-    setCard(3, '#7b5ea7', '#7b5ea7', label3, roomCount);
-
-    // topbar 호환
+    // topbar 요약 pill (전체 / 전참자) — 홈 화면에서 실제 표시되는 유일한 값
     var stTotal=$id('st-total'); if(stTotal) stTotal.textContent=scope.length;
     var stPrev=$id('st-prev');
     if(stPrev) stPrev.textContent=scope.filter(function(r){return r.prevAttend==='예';}).length;
-
-    var lbl=$id('today-date-label');
-    if(lbl){ var d=new Date(); lbl.textContent=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+' 기준'; }
   } catch(e) { if(typeof showToast==='function') showToast('통계 오류: '+(e&&e.message||e),'error'); }
 }
 
@@ -8026,6 +7984,8 @@ var GROUP_DISPLAY = {
 
 // 홈 집계 화면 상태
 var homeAggYear = null;            // 선택된 연도 (문자열)
+var homeAggParish = null;          // 선택된 교구 ('전체'|'1교구'|'2교구'|'3교구'|'4교구'|'기타교구')
+var homeAggDistrict = null;        // 선택된 구역 ('전체' 또는 실제 구역명)
 var homeAggCurrent = null;         // 최근 집계 결과 캐시 (엑셀다운용)
 
 // ── 연도 콤보 옵션 생성 (현재년도 ± 5) ──────────────
@@ -8039,6 +7999,62 @@ function initHomeYearSelect(){
     html += '<option value="'+y+'"'+(String(y)===homeAggYear?' selected':'')+'>'+y+'년</option>';
   }
   sel.innerHTML = html;
+}
+
+// ── 교구 콤보 옵션 생성 (역할별 분기) ──────────────
+// 관리자: 전체,1~4교구,기타교구 / 비관리자: 1~4교구,기타교구('전체' 제외, 기본값 1교구 고정)
+function initHomeParishSelect(){
+  var sel = $id('home-parish-select');
+  if(!sel) return;
+  var isAdmin = !!(currentUser && currentUser.role==='admin');
+  var opts = isAdmin
+    ? ['전체','1교구','2교구','3교구','4교구','기타교구']
+    : ['1교구','2교구','3교구','4교구','기타교구'];
+  if(!homeAggParish || opts.indexOf(homeAggParish)===-1){
+    homeAggParish = isAdmin ? '전체' : '1교구';
+  }
+  sel.innerHTML = opts.map(function(p){
+    return '<option value="'+p+'"'+(p===homeAggParish?' selected':'')+'>'+p+'</option>';
+  }).join('');
+}
+
+// ── 구역 콤보 옵션 생성 (선택된 교구에 종속) ──────────────
+// 교구='전체' → 구역 구분 없이 비활성화 / 교구='기타교구' → 선택 연도 데이터에서 실제 구역값 동적 수집 / 그 외 → PARISH_DISTRICTS 고정목록
+function initHomeDistrictSelect(){
+  var sel = $id('home-district-select');
+  if(!sel) return;
+  var list;
+  if(homeAggParish==='전체'){
+    list = [];
+  } else if(homeAggParish==='기타교구'){
+    var year = homeAggYear;
+    var seen = {}; list = [];
+    retreat.forEach(function(r){
+      if(String(r.year||'').trim()!==String(year)) return;
+      var p = (r.parish||'').trim();
+      if(PARISH_DISTRICTS.hasOwnProperty(p)) return;
+      var d = (r.district||'').trim() || '미분류';
+      if(!seen[d]){ seen[d]=true; list.push(d); }
+    });
+  } else {
+    list = PARISH_DISTRICTS[homeAggParish] || [];
+  }
+  if(!homeAggDistrict || (list.indexOf(homeAggDistrict)===-1 && homeAggDistrict!=='전체')){
+    homeAggDistrict = '전체';
+  }
+  var opts = ['전체'].concat(list);
+  sel.innerHTML = opts.map(function(d){
+    return '<option value="'+d+'"'+(d===homeAggDistrict?' selected':'')+'>'+d+'</option>';
+  }).join('');
+  sel.disabled = (homeAggParish==='전체');
+}
+
+// ── 교구 콤보 변경 시: 구역 콤보만 즉시 갱신 (실제 재조회는 [조회] 버튼에서) ──────────────
+function homeAggParishChange(){
+  var sel = $id('home-parish-select');
+  if(sel) homeAggParish = sel.value;
+  homeAggDistrict = '전체'; // 교구가 바뀌면 구역 선택은 항상 전체로 리셋
+  initHomeDistrictSelect();
 }
 
 // ── 교구/구역/회별 집계 빌더 ─────────────────────────
@@ -8069,6 +8085,31 @@ function buildAggregateTable(rows, parishList, includeGrandTotal){
     result.parishes.push({ parish:p, districts:districtRows, total:parishTotal, counts:parishCounts });
   });
 
+  // ── 기타교구: parishList(1~4교구)에 속하지 않는 교구값을 가진 행들을 구역별로 묶어 별도 집계 ──
+  // 교구 칸은 화면에 '기타교구'로 통일 표시(원본 교구값은 숨김), 구역 실값 기준으로만 그룹핑
+  // 구역값이 비어있으면 '미분류'로 표시. 그랜드토탈에도 합산(실제 전체 인원과 일치시키기 위함).
+  var otherByDistrict = {}; // district(or 미분류) -> {total, counts}
+  var otherOrder = [];
+  rows.forEach(function(r){
+    var p = (r.parish||'').trim();
+    if(parishList.indexOf(p)!==-1) return; // 정상 1~4교구는 위에서 이미 처리됨
+    var d = (r.district||'').trim() || '미분류';
+    if(!otherByDistrict[d]){
+      otherByDistrict[d] = { total:0, counts:{} };
+      GROUP_KEYS.forEach(function(g){ otherByDistrict[d].counts[g]=0; });
+      otherOrder.push(d);
+    }
+    var g = (r.group||'').trim();
+    if(otherByDistrict[d].counts.hasOwnProperty(g)){ otherByDistrict[d].counts[g]++; grandCounts[g]++; }
+    otherByDistrict[d].total++; grandTotal++;
+  });
+  if(otherOrder.length){
+    var otherDistrictRows = otherOrder.map(function(d){ return { district:d, total:otherByDistrict[d].total, counts:otherByDistrict[d].counts }; });
+    var otherTotal = otherDistrictRows.reduce(function(s,x){ return s+x.total; },0);
+    var otherCounts = {}; GROUP_KEYS.forEach(function(g){ otherCounts[g] = otherDistrictRows.reduce(function(s,x){ return s+x.counts[g]; },0); });
+    result.other = { parish:'기타교구', districts:otherDistrictRows, total:otherTotal, counts:otherCounts };
+  }
+
   if(includeGrandTotal){
     result.grand = { total:grandTotal, counts:grandCounts };
   }
@@ -8096,9 +8137,11 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
   var districtsCount = parseFloat(rateCfg.districtsCount) || 0;
   var perDistrictTarget = districtsCount>0 ? (goalTotal/districtsCount) : 0;
   var perParishTarget   = goalTotal>0 ? (goalTotal/4) : 0;
+  // [요청 반영] 달성율 컬럼은 전체 역할(관리자 포함) 공통으로 숨김 처리
+  var showRate = false;
 
   var thGroups = GROUP_KEYS.map(function(g){ return '<th>'+GROUP_DISPLAY[g]+'</th>'; }).join('');
-  var html = '<table><thead><tr><th>교구</th><th>구역</th><th>달성율</th><th>합계</th>'+thGroups+'</tr></thead><tbody>';
+  var html = '<table><thead><tr><th>교구</th><th>구역</th>'+(showRate?'<th>달성율</th>':'')+'<th>합계</th>'+thGroups+'</tr></thead><tbody>';
 
   table.parishes.forEach(function(p){
     p.districts.forEach(function(d){
@@ -8106,7 +8149,7 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
       html += '<tr>'
         + '<td>'+esc(p.parish)+'</td>'
         + '<td>'+esc(d.district)+'</td>'
-        + '<td>'+fmtRate(dRate)+'</td>'
+        + (showRate?'<td>'+fmtRate(dRate)+'</td>':'')
         + '<td><strong>'+d.total+'</strong></td>'
         + GROUP_KEYS.map(function(g){ return '<td>'+d.counts[g]+'</td>'; }).join('')
         + '</tr>';
@@ -8114,17 +8157,36 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
     var pRate = calcRate(p.total, perParishTarget);
     html += '<tr style="background:#f5f5f7;font-weight:700;">'
       + '<td colspan="2">'+esc(p.parish)+' 합계</td>'
-      + '<td>'+fmtRate(pRate)+'</td>'
+      + (showRate?'<td>'+fmtRate(pRate)+'</td>':'')
       + '<td>'+p.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+p.counts[g]+'</td>'; }).join('')
       + '</tr>';
   });
 
+  // ── 기타교구 렌더 (1~4교구 합계 뒤, 총계 앞) — 달성율은 목표값이 없으므로 '-'로 고정 표시 ──
+  if(table.other){
+    table.other.districts.forEach(function(d){
+      html += '<tr>'
+        + '<td>'+esc(table.other.parish)+'</td>'
+        + '<td>'+esc(d.district)+'</td>'
+        + (showRate?'<td>-</td>':'')
+        + '<td><strong>'+d.total+'</strong></td>'
+        + GROUP_KEYS.map(function(g){ return '<td>'+d.counts[g]+'</td>'; }).join('')
+        + '</tr>';
+    });
+    html += '<tr style="background:#f5f5f7;font-weight:700;">'
+      + '<td colspan="2">'+esc(table.other.parish)+' 합계</td>'
+      + (showRate?'<td>-</td>':'')
+      + '<td>'+table.other.total+'</td>'
+      + GROUP_KEYS.map(function(g){ return '<td>'+table.other.counts[g]+'</td>'; }).join('')
+      + '</tr>';
+  }
+
   if(table.grand){
     var gRate = calcRate(table.grand.total, goalTotal);
     html += '<tr style="background:#e8edf5;font-weight:900;">'
       + '<td colspan="2">총계</td>'
-      + '<td>'+fmtRate(gRate)+'</td>'
+      + (showRate?'<td>'+fmtRate(gRate)+'</td>':'')
       + '<td>'+table.grand.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+table.grand.counts[g]+'</td>'; }).join('')
       + '</tr>';
@@ -8155,17 +8217,36 @@ function renderHome(filter) {
   }
 
   initHomeYearSelect();
+  initHomeParishSelect();
+  initHomeDistrictSelect();
 
   var role    = currentUser ? currentUser.role : '';
   var isAdmin = role === 'admin';
-  var uP = (!isAdmin && currentUser && currentUser.parish) ? currentUser.parish : '';
 
   var year = homeAggYear;
   var yearRows = retreat.filter(function(r){ return String(r.year||'').trim()===String(year); });
 
-  // 권한 스코프: 관리자=전체 교구, 교구장/구역장=자기 교구만
-  var scopedRows    = isAdmin ? yearRows : yearRows.filter(function(r){ return (r.parish||'').trim()===uP; });
-  var scopeParishes = isAdmin ? Object.keys(PARISH_DISTRICTS) : (uP ? [uP] : []);
+  // ── 조회 범위: 교구/구역 콤보값 기준 (상단 pill의 updateStats()는 기존 uP/uD 권한 스코프 유지, 영향 없음) ──
+  var selParish   = homeAggParish   || (isAdmin ? '전체' : '1교구');
+  var selDistrict = homeAggDistrict || '전체';
+
+  var scopedRows, scopeParishes;
+  if(selParish === '전체'){
+    scopeParishes = Object.keys(PARISH_DISTRICTS);
+    scopedRows = yearRows; // 1~4교구 외 값은 buildAggregateTable이 자동으로 '기타교구'로 묶음
+  } else if(selParish === '기타교구'){
+    scopeParishes = []; // parishList가 비면 buildAggregateTable이 전 대상을 '기타교구'로 집계
+    scopedRows = yearRows.filter(function(r){ return !PARISH_DISTRICTS.hasOwnProperty((r.parish||'').trim()); });
+    if(selDistrict !== '전체'){
+      scopedRows = scopedRows.filter(function(r){ return ((r.district||'').trim()||'미분류') === selDistrict; });
+    }
+  } else {
+    scopeParishes = [selParish];
+    scopedRows = yearRows.filter(function(r){ return (r.parish||'').trim()===selParish; });
+    if(selDistrict !== '전체'){
+      scopedRows = scopedRows.filter(function(r){ return (r.district||'').trim()===selDistrict; });
+    }
+  }
 
   // 표1: 수양회 참석인원 (교구×구역×회별)
   var table1 = buildAggregateTable(scopedRows, scopeParishes, isAdmin);
@@ -8199,10 +8280,11 @@ function renderHome(filter) {
   }
 }
 
-// ── 조회 버튼: 선택 연도로 구글시트 재조회 후 재집계 ──────
+// ── 조회 버튼: 선택 연도/교구/구역으로 구글시트 재조회 후 재집계 ──────
 function homeAggQuery(){
-  var sel = $id('home-year-select');
-  if(sel) homeAggYear = sel.value;
+  var ySel = $id('home-year-select');     if(ySel) homeAggYear     = ySel.value;
+  var pSel = $id('home-parish-select');   if(pSel) homeAggParish   = pSel.value;
+  var dSel = $id('home-district-select'); if(dSel) homeAggDistrict = dSel.value;
   if(USE_SHEET()){ loadData(); } else { renderHome(); }
 }
 
@@ -8211,7 +8293,9 @@ function homeAggQuery(){
 function homeAggExportCSV(){
   if(!homeAggCurrent){ showToast('먼저 조회를 실행해 주세요.','error'); return; }
 
-  var headerRow = ['교구','구역','달성율','합계'].concat(GROUP_KEYS.map(function(g){ return GROUP_DISPLAY[g]; }));
+  // [요청 반영] 달성율은 전체 역할(관리자 포함) 공통으로 CSV에서도 제외
+  var showRate = false;
+  var headerRow = ['교구','구역'].concat(showRate?['달성율']:[]).concat(['합계']).concat(GROUP_KEYS.map(function(g){ return GROUP_DISPLAY[g]; }));
   var W = headerRow.length;
 
   function padArr(arr, len){
@@ -8229,14 +8313,20 @@ function homeAggExportCSV(){
     table.parishes.forEach(function(p){
       p.districts.forEach(function(d){
         var dRate = calcRate(d.total, perDistrictTarget);
-        rows.push([p.parish, d.district, dRate+'%', d.total].concat(GROUP_KEYS.map(function(g){ return d.counts[g]; })));
+        rows.push([p.parish, d.district].concat(showRate?[dRate+'%']:[]).concat([d.total]).concat(GROUP_KEYS.map(function(g){ return d.counts[g]; })));
       });
       var pRate = calcRate(p.total, perParishTarget);
-      rows.push([p.parish+' 합계', '', pRate+'%', p.total].concat(GROUP_KEYS.map(function(g){ return p.counts[g]; })));
+      rows.push([p.parish+' 합계', ''].concat(showRate?[pRate+'%']:[]).concat([p.total]).concat(GROUP_KEYS.map(function(g){ return p.counts[g]; })));
     });
+    if(table.other){
+      table.other.districts.forEach(function(d){
+        rows.push([table.other.parish, d.district].concat(showRate?['-']:[]).concat([d.total]).concat(GROUP_KEYS.map(function(g){ return d.counts[g]; })));
+      });
+      rows.push([table.other.parish+' 합계', ''].concat(showRate?['-']:[]).concat([table.other.total]).concat(GROUP_KEYS.map(function(g){ return table.other.counts[g]; })));
+    }
     if(table.grand){
       var gRate = calcRate(table.grand.total, goalTotal);
-      rows.push(['총계', '', gRate+'%', table.grand.total].concat(GROUP_KEYS.map(function(g){ return table.grand.counts[g]; })));
+      rows.push(['총계', ''].concat(showRate?[gRate+'%']:[]).concat([table.grand.total]).concat(GROUP_KEYS.map(function(g){ return table.grand.counts[g]; })));
     }
     return rows;
   }
@@ -11365,7 +11455,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var _expose = [
     'doLogin','doLogout','switchPanel',
     'renderHome','updateStats','loadData','sheetRowToObj',
-    'initHomeYearSelect','homeAggQuery','homeAggExportCSV',
+    'initHomeYearSelect','initHomeParishSelect','initHomeDistrictSelect','homeAggParishChange','homeAggQuery','homeAggExportCSV',
     'initYearSelect',
     'saveForm','resetForm','doSearch','clearSearch','goPage',
     'searchParishChange','populateDistrictSelect',
@@ -11413,7 +11503,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var _self = {
     doLogin:doLogin, doLogout:doLogout, switchPanel:switchPanel,
     renderHome:renderHome, updateStats:updateStats, loadData:loadData, sheetRowToObj:sheetRowToObj,
-    initHomeYearSelect:initHomeYearSelect, homeAggQuery:homeAggQuery, homeAggExportCSV:homeAggExportCSV,
+    initHomeYearSelect:initHomeYearSelect, initHomeParishSelect:initHomeParishSelect, initHomeDistrictSelect:initHomeDistrictSelect, homeAggParishChange:homeAggParishChange, homeAggQuery:homeAggQuery, homeAggExportCSV:homeAggExportCSV,
     initYearSelect:initYearSelect,
     saveForm:saveForm, resetForm:resetForm,
     doSearch:doSearch, clearSearch:clearSearch, goPage:goPage,
