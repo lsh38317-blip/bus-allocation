@@ -660,7 +660,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <button class="nav-item" id="nav-mypage"   onclick="switchPanel('mypage')"   style="display:none"><span class="icon">🔑</span> 내 계정</button>
         <div class="nav-section" id="admin-section" style="display:none">관리자</div>
         <button class="nav-item"        id="nav-register" onclick="switchPanel('register')" style="display:none"><span class="icon">✏️</span> 자료 등록</button>
-        <button class="nav-item" id="nav-excel"    onclick="switchPanel('excel')"    style="display:none"><span class="icon">📊</span> 엑셀 관리</button>
+        <button class="nav-item" id="nav-excel"    onclick="switchPanel('excel')"    style="display:none"><span class="icon">📊</span> 참석인원관리</button>
         <button class="nav-item" id="nav-accounts" onclick="switchPanel('accounts')" style="display:none"><span class="icon">👥</span> 계정 관리</button>
         <button class="nav-item" id="nav-bus"      onclick="switchPanel('bus')"      style="display:none"><span class="icon">🚌</span> 버스 배정</button>
         <button class="nav-item" id="nav-room"     onclick="switchPanel('room')"     style="display:none"><span class="icon">🏠</span> 숙소 배정</button>
@@ -1564,16 +1564,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
               <div id="gas-api-key-status" style="font-size:.75rem;margin-top:5px;color:var(--muted);"></div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ 등록데이터 CSV</button>
-              <button class="btn btn-primary btn-sm" onclick="downloadTemplate()">📄 입력양식 CSV</button>
-              <button id="vwBtnSheet" class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;"
-                onclick="vwSaveToSheet()">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
-                뷰어 → 구글 시트 저장
-              </button>
-              <button id="btn-goal-modal" class="btn btn-navy btn-sm" onclick="goalOpenModal()" style="display:none;">🎯 교회 목표 관리</button>
-            </div>
           </div>
 
           <!-- ② 뷰어 본체 -->
@@ -1588,7 +1578,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <select class="vw-inp" id="inpSeason" onchange="vwRenderTable()">
                     <option value="">전체</option>
                     <option value="춘계">춘계</option>
-                    <option value="하계">하계</option>
+                    <option value="하계" selected>하계</option>
                     <option value="추계">추계</option>
                     <option value="동계">동계</option>
                   </select>
@@ -1630,19 +1620,28 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <option value="아니요">아니요</option>
                   </select>
                 </div>
+                <div class="vw-sep"></div>
+                <div class="vw-igrp">
+                  <span class="vw-lbl">엑셀업로드시간</span>
+                  <span id="vwLastProcTime" style="color:#fff;font-size:.8rem;font-weight:600;">-</span>
+                </div>
               </div>
 
               <!-- 오른쪽 액션 버튼들 -->
-              <div class="vw-actions">
-                <input type="text" id="vwQ" placeholder="🔍 이름/구역 검색..." class="vw-search"
-                  oninput="vwOnSearch()">
+              <div class="vw-actions" style="margin-left:auto;">
                 <input type="file" id="vwFileInput" accept=".csv,.tsv,.txt"
                   style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
                 <button class="btn btn-navy btn-sm" onclick="document.getElementById('vwFileInput').click()">
                   📂 파일 업로드
                 </button>
-                <button class="btn btn-primary btn-sm" onclick="vwLoadSample()">샘플</button>
-                <button class="btn btn-primary btn-sm" onclick="vwExportCSV()">⬇ CSV</button>
+                <button id="vwBtnSheet" class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;"
+                  onclick="vwSaveToSheet()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+                  처리
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="vwClearAllConfirm()">🗑 등록데이터 초기화</button>
+                <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ 등록데이터 CSV</button>
+                <button id="btn-goal-modal" class="btn btn-navy btn-sm" onclick="goalOpenModal()" style="display:none;">🎯 교회 목표 관리</button>
               </div>
             </div>
 
@@ -1651,7 +1650,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <span>📄</span>
               <span id="vwPillName" style="font-weight:600;color:var(--navy);"></span>
               <span id="vwPillRows" style="color:var(--muted);"></span>
-              <button onclick="vwReset()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;">✕ 초기화</button>
+              <button onclick="vwResetConfirm()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;">✕ 파일업로드내역초기화</button>
             </div>
 
             <!-- ── 업로드 미리보기 배너 (접수ID 중복체크 후 표시) ── -->
@@ -3187,6 +3186,40 @@ function vwReset(){
   vwHideBanner();
   vwCancelUpload();
 }
+// 파일업로드내역초기화 버튼: 확인창 통과 시에만 실제 초기화 실행
+function vwResetConfirm(){
+  if(!confirm('화면에 업로드한 내역만 초기화 됩니다.\n접수내역 초기화를 원하시면 [등록데이터 초기화] 버튼을 이용해주세요.')) return;
+  vwReset();
+}
+// 처리일시 원본값(순수 문자열 또는 GAS가 Date로 인식해 반환하는 ISO 문자열)을
+// 타임존 변환 없이 숫자 그대로 yyyy-mm-dd hh:mm:ss 로 추출 (fmtDate()의 ISO 처리 원칙과 동일)
+function _procTimeToStr(raw){
+  var s = String(raw).trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if(m) return m[1]+'-'+m[2]+'-'+m[3]+' '+m[4]+':'+m[5]+':'+m[6];
+  return null;
+}
+// 엑셀업로드시간: 참석인원명단 시트의 처리일시 컬럼 중 최댓값 조회
+function vwLoadLastProcTime(){
+  var el=document.getElementById('vwLastProcTime');
+  if(!USE_SHEET()){ if(el) el.textContent='-'; return; }
+  apiCall({action:'getAll', sheetName:'참석인원명단'})
+    .then(function(res){
+      if(!(res&&res.success)) return;
+      var rows=res.data||res.rows||[];
+      var maxStr=null;
+      rows.forEach(function(r){
+        var raw=r['처리일시'];
+        if(!raw) return;
+        var s=_procTimeToStr(raw);
+        if(!s) return;
+        // yyyy-mm-dd hh:mm:ss 제로패딩 문자열은 사전식 비교가 곧 시간 비교와 동일
+        if(!maxStr || s>maxStr) maxStr=s;
+      });
+      if(el) el.textContent = maxStr || '-';
+    })
+    .catch(function(){ if(el) el.textContent='-'; });
+}
 
 // ── 참석일자 → 귀가일자 자동 +3일 ──────────────────
 function vwOnArrDateChange(){
@@ -3198,8 +3231,14 @@ function vwOnArrDateChange(){
 
 // ── 구글 시트 저장 (접수ID 기준 중복 제외 + 신규만 등록, 기존 데이터 보존) ──
 var _vwUploadPending = [];
-var _vwBtnLabel = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>뷰어 → 구글 시트 저장';
+var _vwBtnLabel = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>처리';
 
+// yyyy-mm-dd hh:mm:ss 형식 현재시각 문자열 (처리일시 컬럼용)
+function _nowStr(){
+  var d=new Date();
+  function p(n){ return String(n).padStart(2,'0'); }
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
 function vwSaveToSheet(){
   if(!vwAllRows.length){ vwToast('먼저 파일을 업로드해주세요','err'); return; }
   if(!USE_SHEET()){
@@ -3269,7 +3308,17 @@ function _vwRenderUploadPreview(){
   s2('upld-confirm-cnt', newRows.length);
   banner.style.display='flex';
   wrap.style.display='';
-  var preview=_vwUploadPending.slice(0,200);
+  var confirmBtn=document.getElementById('upld-confirm-btn');
+  if(confirmBtn){
+    confirmBtn.disabled = newRows.length===0;
+    confirmBtn.style.opacity = newRows.length===0 ? '.5' : '';
+    confirmBtn.style.cursor  = newRows.length===0 ? 'not-allowed' : 'pointer';
+  }
+  if(newRows.length===0){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:.85rem;padding:24px;">신규처리할 대상이 없습니다.</td></tr>';
+    return;
+  }
+  var preview=newRows.concat(dupRows).slice(0,200);  // 신규 건을 항상 먼저 노출, 남은 자리에 중복 채움
   tbody.innerHTML=preview.map(function(r){
     var isNew=r._status==='new';
     var badge=isNew
@@ -3304,9 +3353,10 @@ function vwConfirmUpload(){
     return;
   }
 
-  var hdrs=['NO'].concat(VW_COLS.map(function(c){ return c.label; }));
+  var hdrs=['NO'].concat(VW_COLS.map(function(c){ return c.label; })).concat(['처리일시']);
+  var procTime=_nowStr();  // 배치(청크) 전체에 동일한 처리 시각 적용
   var rows=newItems.map(function(item, i){
-    return [i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); }));
+    return [i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); })).concat([procTime]);
   });
 
   var btn=document.getElementById('vwBtnSheet'); if(btn){ btn.disabled=true; btn.textContent='전송 중...'; }
@@ -3315,6 +3365,7 @@ function vwConfirmUpload(){
     if(i>=rows.length){
       if(!errored) vwToast('✅ 신규 '+sent.toLocaleString()+'명 등록 완료'+(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
       if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
+      if(!errored) vwLoadLastProcTime();  // 처리 성공 후 엑셀업로드시간 자동 갱신
       return;
     }
     var chunk=rows.slice(i,i+CHUNK);
@@ -5438,6 +5489,64 @@ function busResetConfirm(){
     _busTeamTabReset(t);
   },2000);
 }
+// ── 등록데이터(참석인원명단) 전체 초기화 — 파괴적 작업, 버스배정 내역 존재 시 차단 ──
+function vwClearAllConfirm(){
+  var isAdmin = currentUser && currentUser.role==='admin';
+  if(!isAdmin){ showToast('관리자만 사용할 수 있습니다.','error'); return; }
+
+  if(!USE_SHEET()){
+    if(busArriveBuses.length || busLeaveBuses.length){
+      alert('버스배정 내역이 존재합니다. 버스배정 초기화 후 데이터 초기화를 진행해주세요.');
+      return;
+    }
+    if(!confirm('참석인원명단 전체('+retreat.length+'명)를 삭제합니다.\n이 작업은 되돌릴 수 없습니다.\n계속하시겠습니까?')) return;
+    retreat=[]; _ls.remove('retreat_data');
+    updateStats(); renderHome(); if(typeof doSearch==='function') doSearch();
+    showToast('✅ 등록데이터 전체 삭제 완료 (로컬)','success');
+    return;
+  }
+
+  showLoading(true);
+  Promise.all([
+    apiCall({action:'getAll', sheetName:'버스배정_참석요약'}),
+    apiCall({action:'getAll', sheetName:'버스배정_귀가요약'})
+  ]).then(function(results){
+    showLoading(false);
+    var hasArrive = results[0]&&results[0].success && (results[0].data||results[0].rows||[]).length>0;
+    var hasLeave  = results[1]&&results[1].success && (results[1].data||results[1].rows||[]).length>0;
+    if(hasArrive || hasLeave){
+      alert('버스배정 내역이 존재합니다. 버스배정 초기화 후 데이터 초기화를 진행해주세요.');
+      return;
+    }
+    if(!confirm('참석인원명단 전체('+retreat.length+'명)를 삭제합니다.\n이 작업은 되돌릴 수 없습니다.\n계속하시겠습니까?')) return;
+    _vwClearAllExec();
+  }).catch(function(e){
+    showLoading(false);
+    showToast('확인 중 오류: '+e.message,'error');
+  });
+}
+function _vwClearAllExec(){
+  showLoading(true);
+  var hdrs = ['NO'].concat(VW_COLS.map(function(c){ return c.label; }));
+  fetch(API_URL, {
+    method:'POST',
+    headers:_gasHeaders({'Content-Type':'text/plain'}),
+    body: JSON.stringify({sheetName:'참석인원명단', mode:'overwrite', headers:hdrs, rows:[hdrs.map(function(){return '';})]}),
+    redirect:'follow'
+  }).then(function(r){ return r.text(); })
+    .then(function(txt){
+      var res; try{ res=JSON.parse(txt); }catch(e){ res={success:false}; }
+      showLoading(false);
+      if(res && res.success!==false){
+        retreat=[]; _ls.remove('retreat_data');
+        updateStats(); renderHome(); if(typeof doSearch==='function') doSearch();
+        showToast('✅ 등록데이터 전체 삭제 완료','success');
+      } else {
+        showToast('⚠️ 삭제 실패: '+(res&&res.error||'알 수 없는 오류'),'error');
+      }
+    })
+    .catch(function(e){ showLoading(false); showToast('서버 오류: '+e.message,'error'); });
+}
 // ── 탭별 초기화: 팀 관리 탭의 참석/귀가 전환 기준 ─────────────────────
 // type: 'arrive' | 'leave'
 // 해당 타입의 팀내역·요약·탑승자 시트 데이터 완전 삭제, 로컬 메모리·화면 초기화
@@ -6496,11 +6605,20 @@ function _bvwBuildSheetRows(busName, meta, passengers, titleText){
   if(meta.boardLoc || meta.alightLoc) infoParts.push('상차 '+(meta.boardLoc||'-')+' → 하차 '+(meta.alightLoc||'-'));
   rows.push([infoParts.join(' · ')]);
   rows.push(['No','교구','구역','이름','성별','비고']);
+  // 선탑자를 맨 위로 정렬 (leaderId 미지정 시 원래 순서 유지, stable sort로 나머지 순서 보존)
+  var sortedPax = passengers.slice();
+  if(meta.leaderId){
+    sortedPax.sort(function(a,b){
+      var aLead = (a.receiptId && a.receiptId===meta.leaderId) ? 0 : 1;
+      var bLead = (b.receiptId && b.receiptId===meta.leaderId) ? 0 : 1;
+      return aLead - bLead;
+    });
+  }
   for(var i=0;i<cap;i++){
-    var p = passengers[i];
+    var p = sortedPax[i];
     if(p){
-      var nm = p.name + (p.receiptId && p.receiptId===meta.leaderId ? ' (선탑자)' : '');
-      rows.push([i+1, p.parish||'', p.district||(p.group||''), nm, p.gender||'', '']);
+      var isLeader = p.receiptId && p.receiptId===meta.leaderId;
+      rows.push([i+1, p.parish||'', p.district||(p.group||''), p.name, p.gender||'', isLeader?'선탑자':'']);
     } else {
       rows.push([i+1, '', '', '', '', '']);
     }
@@ -7382,7 +7500,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v161_home_rename_grid_trim';
+var CACHE_VERSION = 'v167_bus_schedule_leader_top';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -7929,7 +8047,7 @@ function closeSidebar(){
 }
 
 // ── 초기화 ──
-var PANEL_TITLES={home:'수양회집계현황',register:'자료 등록',search:'접수인원현황',busview:'버스 배정 현황',bus:'버스 배정',excel:'엑셀 관리',accounts:'계정 관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
+var PANEL_TITLES={home:'수양회집계현황',register:'자료 등록',search:'접수인원현황',busview:'버스 배정 현황',bus:'버스 배정',excel:'참석인원관리',accounts:'계정 관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
 var PANEL_SUBS={
   home:'수양회 참석자 현황을 확인합니다.',
   register:'수양회 참석자 정보를 등록합니다.',
@@ -8055,6 +8173,9 @@ function switchPanel(name, skipRender) {
   var tt=$id('topbar-title'); if(tt) tt.textContent=PANEL_TITLES[name]||'';
   var ts=$id('topbar-sub');   if(ts) ts.textContent=PANEL_SUBS[name]||'';
   if(!skipRender){
+    if(name==='excel'){
+      vwLoadLastProcTime();
+    }
     if(name==='search'){
       initYearSelect();
       // 구역장: 교구 먼저 설정 후 구역 옵션 생성
@@ -12235,7 +12356,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'updateBusUnassignedBadge','busReassignDiff','busReAssignFromSheet','busReAssignFromSheetConfirm',
     'busSetCount','busSetCap','busTab','busAddTeam','busDeleteTeamConfirm','busDeleteTeamExecute','busTeamDeleteModalClose',
     'busEditTeam','busEditSave','busHandleCSV','busAutoAssign','busRemoveSlot',
-    'busDeleteBus','busResetAll','busResetConfirm','_busTeamTabReset','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew',
+    'busDeleteBus','busResetAll','busResetConfirm','vwClearAllConfirm','_busTeamTabReset','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew',
     'busSaveMeta','busSaveLocationOnly','busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSetLocation','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh',
     'busSaveToSheet','busExportCSV','busRestore',
     'bvwSetMode','bvwSetType','busviewReload','_busviewGetFilter','bvwExportBusSchedule','busSummaryExportCSV',
@@ -12245,7 +12366,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'bpOpenDetail','bpOpenInlineEdit','bpSaveInlineEdit','bpDeleteRow','bpCancelEdit','bpSaveEdit',
     'busTeamsSubTab','busAssignSubTab','busSummarySubTab',
     'busLeaderSubTab','busLeaderRender','busLeaderSave',
-    'vwReset','vwFilter','vwOnSearch','vwOnArrDateChange',
+    'vwReset','vwResetConfirm','vwFilter','vwOnSearch','vwOnArrDateChange',
     'vwSortBy','vwExportCSV','vwRenderTable','vwChangePS',
     'vwSaveToSheet','vwLoadSample','vwBindFileInput',
     'onParishChange','onTransportChange','fldCheck','checkDuplicate',
@@ -12295,7 +12416,7 @@ document.addEventListener('DOMContentLoaded', function() {
     busAddTeam:busAddTeam, busDeleteTeamConfirm:busDeleteTeamConfirm, busDeleteTeamExecute:busDeleteTeamExecute, busTeamDeleteModalClose:busTeamDeleteModalClose, busEditTeam:busEditTeam,
     busEditSave:busEditSave, busHandleCSV:busHandleCSV, busAutoAssign:busAutoAssign,
     busRemoveSlot:busRemoveSlot, busDeleteBus:busDeleteBus,
-    busResetAll:busResetAll, busResetConfirm:busResetConfirm, _busTeamTabReset:_busTeamTabReset, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear,
+    busResetAll:busResetAll, busResetConfirm:busResetConfirm, vwClearAllConfirm:vwClearAllConfirm, _busTeamTabReset:_busTeamTabReset, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear,
     busDrop:busDrop, busMoveSlot:busMoveSlot, busDragOverEnter:busDragOverEnter, busDragOverLeave:busDragOverLeave, busRenderView:busRenderView, busSetDrag:busSetDrag, busSetDragNew:busSetDragNew,
     busSaveMeta:busSaveMeta, busSaveLocationOnly:busSaveLocationOnly, busImportFromRetreat:busImportFromRetreat, busLoadTeamsFromSheet:busLoadTeamsFromSheet, _busLoadOneTeamSheet:_busLoadOneTeamSheet, busSaveTeamsToSheet:busSaveTeamsToSheet, _busUpdateTeamStatus:_busUpdateTeamStatus, _busUpdateTeamStatusAndRefresh:_busUpdateTeamStatusAndRefresh,
     busSetLocation:busSetLocation, busSaveToSheet:busSaveToSheet, busExportCSV:busExportCSV,
@@ -12307,7 +12428,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
     busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderSave:busLeaderSave,
-    vwReset:vwReset, vwFilter:vwFilter,
+    vwReset:vwReset, vwResetConfirm:vwResetConfirm, vwFilter:vwFilter,
     vwOnSearch:vwOnSearch, vwOnArrDateChange:vwOnArrDateChange,
     vwSortBy:vwSortBy, vwExportCSV:vwExportCSV, vwRenderTable:vwRenderTable, vwChangePS:vwChangePS,
     vwSaveToSheet:vwSaveToSheet, vwLoadSample:vwLoadSample,
