@@ -979,7 +979,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             </select>
             <!-- 행사명(회차) 콤보 -->
             <select id="bus-sel-event"
-              onchange="_busOnEventChange()"
               style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
                      font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
               <option value="1차" selected>1차</option>
@@ -1098,7 +1097,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <label style="display:block;font-size:.77rem;color:var(--text2);margin-bottom:5px;font-weight:600;">버스 대수</label>
                   <div style="display:flex;align-items:center;gap:6px;">
                     <button onclick="busSetCount(-1)" class="bus-spin-btn">−</button>
-                    <input type="number" id="bus-count-input" min="1" value="5" class="bus-spin-inp" onchange="busSaveMeta()">
+                    <input type="number" id="bus-count-input" min="1" value="5" class="bus-spin-inp" onchange="busSaveMeta()" onblur="busCheckBusCountWarning()">
                     <button onclick="busSetCount(1)"  class="bus-spin-btn">+</button>
                     <span style="font-size:.82rem;color:var(--muted);">대</span>
                   </div>
@@ -1115,6 +1114,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <div style="background:var(--sky);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:.82rem;color:var(--text2);">
                   <span id="bus-cap-summary">5대 × 44명 = 최대 220명</span><br>
                   <span id="bus-assign-info" style="font-size:.72rem;color:var(--muted);">정원 44명 · 초과 시 버스 자동 추가</span>
+                  <div id="bus-count-warning" style="display:none;font-size:.76rem;font-weight:600;margin-top:4px;"></div>
                 </div>
                 <!-- 자동배정 / 버스배정 초기화 (정원요약과 같은 줄, 우측 정렬) -->
                 <div style="display:flex;gap:6px;margin-left:auto;">
@@ -1258,28 +1258,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 </button>
               </div>
             </div>
-            <div class="search-row" style="margin-bottom:8px;">
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">연도</label>
-                <select id="bp-s-year" style="flex:1;"><option value="">전체</option></select>
-              </div>
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">수양회종류</label>
-                <select id="bp-s-retreat-type" style="flex:1;">
-                  <option value="">전체</option>
-                  <option value="춘계">춘계</option><option value="하계">하계</option>
-                  <option value="추계">추계</option><option value="동계">동계</option>
-                </select>
-              </div>
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">회차</label>
-                <select id="bp-s-event" style="flex:1;">
-                  <option value="">전체</option>
-                  <option value="1차">1차</option><option value="2차">2차</option><option value="3차">3차</option>
-                  <option value="4차">4차</option><option value="5차">5차</option><option value="6차">6차</option><option value="7차">7차</option>
-                </select>
-              </div>
-            </div>
             <div class="search-row">
               <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
                 <label style="white-space:nowrap;margin-bottom:0;">교구</label>
@@ -1293,6 +1271,25 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <label style="white-space:nowrap;margin-bottom:0;">이름</label>
                 <input type="text" id="bp-s-name" placeholder="이름 검색" style="flex:1;">
               </div>
+            </div>
+            <div class="search-row" style="margin-top:8px;">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">참석버스배정</label>
+                <select id="bp-s-arrive-status" style="flex:1;">
+                  <option value="">전체</option>
+                  <option value="assigned">배정</option>
+                  <option value="unassigned">미배정</option>
+                </select>
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                <label style="white-space:nowrap;margin-bottom:0;">귀가버스배정</label>
+                <select id="bp-s-leave-status" style="flex:1;">
+                  <option value="">전체</option>
+                  <option value="assigned">배정</option>
+                  <option value="unassigned">미배정</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex:1;"></div>
             </div>
           </div>
           <div class="card">
@@ -4141,6 +4138,27 @@ function busUpdateCapSummary(){
   var info=$id('bus-assign-info');
   if(info) info.textContent='기준 '+cnt+'대 · 정원 '+cap+'명 · 초과 시 버스 자동 추가';
 }
+// [v181] 버스대수 입력칸 blur 시 인라인 경고 — 팀 미등록/대수부족 2가지 상태 안내
+function busCheckBusCountWarning(){
+  var el=$id('bus-count-warning'); if(!el) return;
+  var type = busAssignSub;
+  var requiredInfo = busCalcRequiredBuses(type);
+  if(requiredInfo === null){
+    el.textContent = 'ℹ️ 팀 등록 후 확인 가능합니다.';
+    el.style.color = 'var(--muted)';
+    el.style.display = '';
+    return;
+  }
+  var required = requiredInfo.calculated;
+  var base = busGetCount();
+  if(base < required){
+    el.textContent = '⚠️ 입력한 버스 대수('+base+'대)가 최소 필요 대수('+required+'대)보다 적습니다.';
+    el.style.color = '#d94040';
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
 
 // ── 탭 전환 ─────────────────────────────────────────
 function busTab(name){
@@ -4293,6 +4311,7 @@ function busAssignSubTab(type){
   _busFillLocationInputs(type);
   updateBusUnassignedBadge();
   busRenderBuses(type);
+  busCheckBusCountWarning(); // [v181] 탭 전환 시 현재 탭 기준으로 경고 재계산
   // 배정 정보 없으면 해당 팀내역 시트 자동 조회
   var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
   var buses = type==='leave' ? busLeaveBuses : busArriveBuses;
@@ -4347,9 +4366,7 @@ function busSummaryExportCSV(){
 // ── 버스 배정 진입 시 버스배정인원관리 자동 선택 + 상단 콤보 기준 자동 조회 ──
 function busPeopleAutoQuery(){
   busTab('people');
-  $set('bp-s-year',         $val('bus-sel-year'));
-  $set('bp-s-retreat-type', $val('bus-sel-season'));
-  $set('bp-s-event',        $val('bus-sel-event'));
+  // [v180] bp-s-year 등 필드 삭제로 동기화 불필요 — bpDoSearch가 상단 콤보를 직접 읽음
   bpReloadFromSheet();
 }
 
@@ -4933,11 +4950,28 @@ function busHandleCSV(input){
   input.value='';
 }
 
+// [v181] 최소 필요 버스 대수 계산 공용 함수 — busAutoAssign()과 인라인 경고(busCheckBusCountWarning)가
+// 동일 로직을 공유하도록 단일화 (계산 불일치 재발 방지)
+// 반환: {normalNeeded, jhNeeded, calculated} 객체 또는 null(팀 미등록 상태 = 계산 불가)
+// [v183] 총 대수(calculated)뿐 아니라 세부값(normalNeeded/jhNeeded)도 필요로 하는 busAutoAssign()의
+// 요구에 맞춰 객체로 반환하도록 수정 (숫자만 반환하던 v181~v182 버전에서 ReferenceError 발생 수정)
+function busCalcRequiredBuses(type){
+  var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
+  if(teams.length===0) return null;
+  var cap = busGetCap();
+  var jhTeams     = teams.filter(function(t){ return t.name==='중고등부'; });
+  var normalTeams = teams.filter(function(t){ return t.name!=='중고등부'; });
+  var normalTotal = normalTeams.reduce(function(s,t){ return s+t.count; },0);
+  var jhTotal     = jhTeams.reduce(function(s,t){ return s+t.count; },0);
+  var normalNeeded = Math.max(1, Math.ceil(normalTotal/cap));
+  var jhNeeded     = jhTeams.length>0 ? Math.max(1, Math.ceil(jhTotal/cap)) : 0;
+  return { normalNeeded: normalNeeded, jhNeeded: jhNeeded, calculated: normalNeeded + jhNeeded };
+}
 // ── 자동 배정 ────────────────────────────────────────
 function busAutoAssign(type){
   type = type || busAssignSub;  // 인자 없으면 현재 탭 기준
   var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
-  if(teams.length===0){ showToast(type==='leave'?'귀가버스 팀을 먼저 등록하세요.':'참석버스 팀을 먼저 등록하세요.','error'); return; }
+  if(teams.length===0){ alert(type==='leave'?'귀가버스 팀을 먼저 등록하세요.':'참석버스 팀을 먼저 등록하세요.'); return; }
   var cap=busGetCap(), base=busGetCount();
 
   // ── 재배정 전: 기존 버스의 선탑자(leaderId)를 "소속 팀" 기준으로 백업 ──
@@ -4963,13 +4997,22 @@ function busAutoAssign(type){
   var jhTotal      = jhTeams.reduce(function(s,t){ return s+t.count; },0);
   var total        = normalTotal + jhTotal;
 
-  // 일반 팀 버스 대수 계산
-  var normalNeeded = Math.max(1, Math.ceil(normalTotal/cap));
-  // 중고등부 버스 대수 (별도 버스, 정원 초과 시 추가)
-  var jhNeeded     = jhTeams.length>0 ? Math.max(1, Math.ceil(jhTotal/cap)) : 0;
-  var actual       = normalNeeded + jhNeeded;
-  var isReduced    = (actual < base);
-  var extra        = Math.max(0, actual - base);
+  var requiredInfo = busCalcRequiredBuses(type);   // [v183] 객체 반환 {normalNeeded, jhNeeded, calculated}
+  var calculated   = requiredInfo.calculated;
+  var normalNeeded = requiredInfo.normalNeeded;   // 5078행 부근(중고등부 전용 버스 산출)에서 사용
+  var jhNeeded     = requiredInfo.jhNeeded;
+
+  // ── 사용자 입력 버스 대수(base)를 존중하는 3분기 결정 ──
+  var actual;
+  if(base === calculated){
+    actual = calculated;                        // 그대로 배정 처리
+  } else if(base > calculated){
+    actual = base;                              // 여유 있게 사용자 지정값으로 배정
+  } else {
+    // [v182] base < calculated → alert 팝업으로 안내 후 자동배정 자체를 중단
+    alert('현재 인원으로 최소 필요한 버스는 '+calculated+'대입니다. 입력하신 버스대수를 확인해주세요.');
+    return;
+  }
 
   var nb=[];
   // 설정 카드에서 입력한 위치값 읽기
@@ -4982,16 +5025,18 @@ function busAutoAssign(type){
   for(var i=0; i<actual; i++){
     var buses0   = type==='leave' ? busLeaveBuses : busArriveBuses;
     var existing = buses0[i]||{};
-    nb.push({id:busUid(), name:'버스 '+(i+1)+'호', slots:[], isExtra:i>=base,
+    nb.push({id:busUid(), name:'버스 '+(i+1)+'호', slots:[], isExtra:i>=calculated,
              boardLoc: existing.boardLoc || metaBoard  || '',
              alightLoc:existing.alightLoc|| metaAlight || ''});
   }
 
   // ── 최소 분산 단위: 2명 (1명만 분산되는 경우 방지) ──
   var MIN_SPLIT = 2;
+  // ── 미배정 인원 최종 기록(그룹별 복구 패스까지 거친 뒤에도 진짜 자리가 없는 경우만) ──
+  var unassignedInfo = [];
 
-  // ── 팀 배정 헬퍼: 최소 2명 단위 분산 보장 ──
-  function assignTeamToBuses(team, busArr, loads, busCount) {
+  // ── 팀 배정 헬퍼: 최소 2명 단위 분산 보장 (1차 패스) ──
+  function assignTeamToBuses(team, busArr, loads, busCount, localUnassigned) {
     var rem = team.count;
     var lastBus = busCount - 1;
     for (var i = 0; i < busCount && rem > 0; i++) {
@@ -5002,7 +5047,7 @@ function busAutoAssign(type){
       var afterRem = rem - n;
       // 분산 후 남은 인원이 1명이면 현재 버스 1명 덜 배정 → 다음 버스에 2명
       if (!isLast && afterRem === 1 && n > 1) { n = n - 1; }
-      // 배정할 인원이 1명이고 다음 버스가 있으면 건너뜀
+      // 배정할 인원이 1명이고 다음 버스가 있으면 건너뜀 (1명 고립 방지, 자리는 남겨둠)
       if (!isLast && n === 1 && rem > 1) { continue; }
       if (n > 0) {
         var ex = busArr[i].slots.find(function(s){ return s.teamId===team.id; });
@@ -5010,29 +5055,53 @@ function busAutoAssign(type){
         loads[i] += n; rem -= n;
       }
     }
-    // 남은 인원 → 마지막 버스 강제 배정
+    // 1차 패스에서 못 채운 인원 → 그룹 로컬 미배정 목록에 임시 기록(2차 복구 패스 대상)
     if (rem > 0) {
-      var li = busCount - 1;
-      var ex2 = busArr[li].slots.find(function(s){ return s.teamId===team.id; });
-      if (ex2) ex2.count += rem; else busArr[li].slots.push({teamId:team.id, count:rem});
-      loads[li] += rem;
+      localUnassigned.push({teamId: team.id, teamName: team.name, count: rem});
     }
   }
 
-  // ── 일반 팀 배정 (버스 1호 ~ normalNeeded호) ──────────
-  var normalLoads = nb.slice(0, normalNeeded).map(function(){ return 0; });
-  var normalBuses = nb.slice(0, normalNeeded);
-  sortedNormal.forEach(function(team){
-    assignTeamToBuses(team, normalBuses, normalLoads, normalNeeded);
-  });
-
-  // ── 중고등부 별도 버스 배정 (normalNeeded+1호 ~ 끝) ───
-  if(jhTeams.length>0){
-    var jhLoads = nb.slice(normalNeeded).map(function(){ return 0; });
-    var jhBuses = nb.slice(normalNeeded);
-    jhTeams.forEach(function(team){
-      assignTeamToBuses(team, jhBuses, jhLoads, jhNeeded);
+  // ── 2차 복구 패스: 1차에서 "1명 고립 방지" 규칙 때문에 스킵된 자리까지 전부 훑어
+  //     재시도. 그룹(일반/중고등부) 전체에 실제로 자리가 없을 때만 최종 미배정으로 남긴다 ──
+  function recoverUnassigned(busArr, loads, busCount, localUnassigned){
+    localUnassigned.forEach(function(u){
+      var rem = u.count;
+      for(var i=0; i<busCount && rem>0; i++){
+        var room = cap - loads[i];
+        if(room<=0) continue;
+        var n = Math.min(room, rem);
+        var ex = busArr[i].slots.find(function(s){ return s.teamId===u.teamId; });
+        if(ex) ex.count += n; else busArr[i].slots.push({teamId:u.teamId, count:n});
+        loads[i] += n; rem -= n;
+      }
+      if(rem > 0) unassignedInfo.push({teamName:u.teamName, count:rem}); // 정말 자리가 없는 경우만 최종 미배정
     });
+  }
+
+  // ── 일반/중고등부 버스 개수 실제 분할 ──
+  // 여유분(actual>calculated)은 일반팀에 우선 배정, 부족분(actual<calculated)은 중고등부에서 먼저 줄임
+  var extraBuses    = actual - calculated;               // 양수=여유, 음수=부족
+  var normalBusCount = Math.max(0, normalNeeded + Math.max(0, extraBuses));
+  var jhBusCount     = Math.max(0, actual - normalBusCount);
+
+  // ── 일반 팀 배정 ──────────────────────────────
+  var normalBuses = nb.slice(0, normalBusCount);
+  var normalLoads = normalBuses.map(function(){ return 0; });
+  var normalUnassigned = [];
+  sortedNormal.forEach(function(team){
+    assignTeamToBuses(team, normalBuses, normalLoads, normalBusCount, normalUnassigned);
+  });
+  recoverUnassigned(normalBuses, normalLoads, normalBusCount, normalUnassigned);
+
+  // ── 중고등부 별도 버스 배정 ───
+  if(jhTeams.length>0){
+    var jhBuses = nb.slice(normalBusCount, normalBusCount+jhBusCount);
+    var jhLoads = jhBuses.map(function(){ return 0; });
+    var jhUnassigned = [];
+    jhTeams.forEach(function(team){
+      assignTeamToBuses(team, jhBuses, jhLoads, jhBusCount, jhUnassigned);
+    });
+    recoverUnassigned(jhBuses, jhLoads, jhBusCount, jhUnassigned);
   }
 
   // ── 재배정 후: 백업해둔 선탑자를 실제로 그 팀이 들어간 버스에 재연결 ──
@@ -5065,12 +5134,19 @@ function busAutoAssign(type){
   _busAutoSaveTimer = null;
 
   var msg='';
-  var jhMsg = jhTeams.length>0 ? ' (중고등부 '+jhTotal+'명 → 별도 '+jhNeeded+'대)' : '';
-  if(isReduced) msg='총 '+total+'명 → 버스 '+actual+'대로 배정'+jhMsg;
-  else if(extra>0) msg='총 '+total+'명 → 추가버스 '+extra+'대 자동 생성 (총 '+actual+'대)'+jhMsg;
-  else msg='✅ 자동 배정 완료 ('+actual+'대, 총 '+total+'명)'+jhMsg;
+  var jhMsg = jhTeams.length>0 ? ' (중고등부 '+jhTotal+'명 → 별도 '+jhBusCount+'대)' : '';
+  var unassignedTotal = unassignedInfo.reduce(function(s,u){ return s+u.count; },0);
+  if(unassignedTotal>0){
+    msg='⚠️ 자동 배정 완료 ('+actual+'대, 총 '+total+'명 중 '+unassignedTotal+'명 미배정 — '
+      +unassignedInfo.map(function(u){ return u.teamName+' '+u.count+'명'; }).join(' · ')
+      +') · 최소 필요 '+calculated+'대'+jhMsg;
+  } else if(actual>calculated){
+    msg='✅ 자동 배정 완료 (사용자 지정 '+actual+'대 · 최소 필요 '+calculated+'대보다 여유 있게 배정, 총 '+total+'명)'+jhMsg;
+  } else {
+    msg='✅ 자동 배정 완료 ('+actual+'대, 총 '+total+'명)'+jhMsg;
+  }
   if(leaderAmbiguous.length) msg += ' · ⚠️ 분산배정된 선탑자 재확인 필요: '+leaderAmbiguous.join(', ');
-  showToast(msg, (extra>0||leaderAmbiguous.length)?'error':'success');
+  showToast(msg, (unassignedTotal>0||leaderAmbiguous.length)?'error':'success');
 
   // ── 팀내역 + 요약/탑승자 시트 즉시 저장 ──
   // 수정②: _busUpdateTeamSheetFromBuses 먼저, busSaveToSheet 완료 후 탭 전환
@@ -5193,6 +5269,32 @@ function busSplitAssign(targetBusId,teamId,type){
   if(USE_SHEET()) _busUpdateTeamSheetFromBuses(type);
 }
 
+// ── 재배정 대상(아직 팀 데이터에 없는 인원)을 드래그해서 버스에 놓았을 때 처리 ──
+// 드롭 시점에만 teams 배열에 정식 편입한 뒤, 기존 busSplitAssign() 로직을 그대로 재사용한다.
+// (팀 데이터에 사전 반영하지 않음 — 드래그하지 않으면 "🔄 귀가/참석 재배정" 버튼의
+//  일괄 자동배정 기능이 그대로 유효함)
+function busSplitAssignReassign(busId, reassignId, type){
+  type = type || busAssignSub;
+  var teamKey = reassignId.replace(/^reassign:/, '');
+  var groups  = _busCalcReassignGroups(type); // 드롭 시점 기준으로 재확인(드래그 도중 데이터 변경 대비)
+  var g = groups[teamKey];
+  if(!g){ showToast('재배정 대상 정보를 찾을 수 없습니다. 화면을 새로고침해 주세요.','error'); return; }
+  var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
+  // [v178-fix] 팀 객체의 id는 생성 경로에 따라 랜덤 UID 또는 key 문자열로 일관되지
+  // 않게 부여되지만, name은 항상 busGetTeamKey() 결과(key)와 동일하다.
+  // id 기준으로 찾으면 기존 팀(랜덤 UID)을 못 찾아 매번 별개의 팀이 중복 생성되던 버그 수정.
+  var t = teams.find(function(x){ return x.name===teamKey; });
+  var realId;
+  if(t){ t.count += g.count; realId = t.id; }
+  else {
+    realId = teamKey;
+    teams.push({id:realId, name:teamKey, parish:'', district:'', count:g.count, color: type==='leave' ? '#2d8a5a' : '#4a7fc1'});
+  }
+  if(type==='leave') busLeaveTeams=teams; else busArriveTeams=teams;
+  busSave();
+  busSplitAssign(busId, realId, type); // 기존 팀이면 실제 id로, 신규 팀이면 teamKey로 정확히 전달
+}
+
 // ── 교통수단 변경 시 버스 슬롯 처리 헬퍼 ────────────────
 // 팀 키: '{parish} {district}' 또는 '중고등부'
 function busGetTeamKey(r) {
@@ -5238,6 +5340,78 @@ function busReduceTeamCount(teamKey, type) {
 // ── 버스 미배정 인원 집계 — 교통수단=버스인데 실제 어느 버스에도 배정 안 된 인원 수 ──
 // (자료검색 그리드의 "미배정" 표시와 동일한 기준: rosterArriveIndex/rosterLeaveIndex 사용)
 // 행사명='시각선교부'(버스 배정 제외 대상)는 영원히 "미배정"으로 잡히지 않도록 제외
+// 재배정 대상 인원을 구역별로 그룹화 — 미배정 팀 패널에 드래그 가능한 항목으로 표시하기 위함
+// [v176] rosterLeaveIndex/rosterArriveIndex(시트 저장/조회 타이밍에 의존하는 캐시)에
+// 의존하지 않고, 현재 메모리의 버스 슬롯을 buildBusRoster()로 즉석 계산해 "실제 배정된
+// 접수ID 집합"을 직접 구한다. → 시트 저장 지연·실패와 무관하게 화면 상태와 항상 일치.
+// [v179] _busCalcReassignGroups 전용 판정 함수 — 공용 isJuniorHighBus()/busGetTeamKey()는
+// 선탑자 지정·구역관리·배정현황·탑승자명단 등 다른 화면에서도 공유하므로 그대로 두고,
+// 재배정 계산에서만 쓰는 전용 로직을 별도로 둔다.
+// 봉사코드=27 이어도 교구/구역 정보가 있으면 구역 우선, 구역 정보가 전혀 없을 때만
+// 중고등부로 인정한다. (회별='중고등부'는 구역 유무와 무관하게 항상 중고등부)
+function _busReassignJuniorHigh(r){
+  var grp = (r.group||'').trim();
+  if(grp === '중고등부') return true;
+  var svc = (r.svcCode||'').trim();
+  var hasDistrict = !!((r.parish||'').trim() || (r.district||'').trim());
+  return svc === '27' && !hasDistrict;
+}
+function _busReassignGroupKey(r){
+  return _busReassignJuniorHigh(r) ? '중고등부' : ((r.parish||'미분류')+' '+(r.district||'')).trim();
+}
+function _busCalcReassignGroups(type){
+  var field = type==='leave' ? 'leaveTransport' : 'arriveTransport';
+  var _src = _busFilterRows(retreat);
+  var assignedIds = {};
+  buildBusRoster('', type).forEach(function(item){
+    item.passengers.forEach(function(p){ if(p.receiptId) assignedIds[p.receiptId] = true; });
+  });
+  var groups = {};
+  _src.forEach(function(r){
+    if(!r.receiptId) return;
+    if((r[field]||'').trim()!=='버스') return;
+    if(isBusExcluded(r)) return;
+    if(assignedIds[r.receiptId]) return; // 이미 실제로 어느 버스에 배정됨
+    var key = _busReassignGroupKey(r);
+    if(!groups[key]) groups[key] = {name:key, count:0};
+    groups[key].count++;
+    // [진단용 v177] 실제로 이 사람이 왜 이 키로 묶였는지 콘솔에서 확인 가능하도록 상세 기록
+    if(!groups[key].members) groups[key].members = [];
+    groups[key].members.push({
+      receiptId: r.receiptId, name: r.name,
+      parish: r.parish, district: r.district,
+      group: r.group, svcCode: r.svcCode,
+      isJH: _busReassignJuniorHigh(r)
+    });
+  });
+  // [진단용 v177] "중고등부" 키에 실제로 누가 묶였는지 즉시 콘솔 출력
+  if(groups['중고등부']){
+    console.log('[진단] 중고등부로 묶인 인원 상세('+groups['중고등부'].count+'명):', groups['중고등부'].members);
+  }
+  // ── [v178] 중복 집계 제거 ──────────────────────────────
+  // 위에서 집계된 groups[key].count 는 "원본 데이터 기준 미배정 전체 인원"이다.
+  // 이 중 이미 busArriveTeams/busLeaveTeams 에 정식 팀으로 등록되어
+  // "미배정 팀" 카드에 이미 별도로 표시되고 있는 인원(teamRemain)은 제외하고,
+  // 정식 팀에 아직 반영되지 않은 "순수 신규 인원(델타)"만 남긴다.
+  // (예: 중고등부 정식팀 40명 전원 미배정 + 원본상 봉사코드=27 매칭 54명
+  //      → 델타 14명만 재배정 대상으로 표시/드래그 가능)
+  // 이렇게 해야 busSplitAssignReassign()에서 t.count += g.count 로 더할 때도
+  // 실제 총원과 일치하게 되어 인원 뻥튀기(예: 40+54=94명 오류)가 방지된다.
+  var _reassignTeams = type==='leave' ? busLeaveTeams : busArriveTeams;
+  Object.keys(groups).forEach(function(key){
+    // [v178-fix] 팀 객체의 id는 생성 경로에 따라 랜덤 UID(busUid()) 또는 key 문자열로
+    // 일관되지 않게 부여되지만, name은 어느 경로든 항상 busGetTeamKey() 결과(key)와
+    // 동일하게 설정된다. 따라서 반드시 name 기준으로 매칭해야 한다. (id 기준 매칭 시
+    // busUid() 팀은 영원히 매칭되지 않아 델타 차감이 무효화되는 버그 발생)
+    var t = _reassignTeams.find(function(x){ return x.name===key; });
+    if(t){
+      var teamRemain = Math.max(0, t.count - busTeamAssigned(t.id, type));
+      groups[key].count -= teamRemain;
+      if(groups[key].count <= 0) delete groups[key];
+    }
+  });
+  return groups;
+}
 function calcBusUnassignedCounts(filterOverride){
   // 조건 1: 팀이 없는 상태(초기화 후·미배정) → 재배정 개념 성립 안됨 → 0
   // 조건 2: 버스 슬롯이 없는 상태(배정 전) → 탑승자 명단 자체가 없어야 정상 → 0
@@ -5998,12 +6172,17 @@ function busRenderBuses(type){
       return { team: t, assigned: assigned, remain: t.count - assigned };
     })
     .filter(function(x){ return x.remain > 0; });
+  // 팀 데이터에 아직 없는 재배정 대상도 함께 표시(팀 데이터는 건드리지 않음 — 드래그해서
+  // 배정하는 순간에만 busSplitAssignReassign()이 팀에 정식 편입함)
+  var reassignGroups = _busCalcReassignGroups(type);
+  var reassignExtra = Object.keys(reassignGroups)
+    .map(function(key){ return {key:key, name:reassignGroups[key].name, count:reassignGroups[key].count}; });
   var dragHtml='';
-  if(unassignedInfo.length>0){
-    dragHtml='<div class="card" style="margin-bottom:14px;"><div class="card-title" style="margin-bottom:10px;">미배정 팀 (드래그하여 배정)</div><div style="display:flex;flex-wrap:wrap;gap:8px;">';
-    unassignedInfo.forEach(function(x){
+  if(unassignedInfo.length>0 || reassignExtra.length>0){
+    // [v178] 칩 생성 로직 함수화 — 기존 HTML/스타일은 1:1 동일, 그룹핑 목적의 리팩터링
+    function renderUnassignedChip(x){
       var t = x.team, isPartial = x.assigned > 0;
-      dragHtml += isPartial
+      return isPartial
         // 부분 미배정: 이미 다른 버스에 일부 배정(✂)된 팀의 나머지 — 분산배정과 같은 금색 톤 + 🧩 아이콘으로 구분
         ? '<div draggable="true" ondragstart="busSetDragNew(\''+t.id+'\',\''+type+'\')" style="background:#fdf6e3;border:1px solid #f0dea0;border-left:3px solid #c89b30;border-radius:7px;padding:6px 12px;cursor:grab;font-size:.82rem;font-weight:700;color:var(--text);">'+
           '<span style="font-size:.65rem;">🧩</span> '+esc(t.name)+
@@ -6011,8 +6190,34 @@ function busRenderBuses(type){
           '<span style="font-size:.68rem;color:var(--muted);font-weight:400;"> (전체 '+t.count+'명)</span></div>'
         // 완전 미배정: 기존 스타일 그대로
         : '<div draggable="true" ondragstart="busSetDragNew(\''+t.id+'\',\''+type+'\')" style="background:'+t.color+'18;border:1px solid '+t.color+'44;border-left:3px solid '+t.color+';border-radius:7px;padding:6px 12px;cursor:grab;font-size:.82rem;font-weight:700;color:var(--text);">'+esc(t.name)+' <span style="color:'+t.color+';">'+x.remain+'명</span></div>';
-    });
-    dragHtml+='</div></div>';
+    }
+    function renderReassignChip(x){
+      // 재배정 대상(팀 데이터에 아직 없음): 보라색 톤 + 🔄 아이콘으로 구분
+      return '<div draggable="true" ondragstart="busSetDragNew(\'reassign:'+x.key+'\',\''+type+'\')" style="background:#f3ecfa;border:1px solid #d4a8e8;border-left:3px solid #7b5ea7;border-radius:7px;padding:6px 12px;cursor:grab;font-size:.82rem;font-weight:700;color:var(--text);">'+
+        '🔄 '+esc(x.name)+' <span style="color:#7b5ea7;">'+x.count+'명</span></div>';
+    }
+    // [v178] 중고등부 / 그 외 구역 인원 섹션 분리
+    var jhUnassigned  = unassignedInfo.filter(function(x){ return x.team.name==='중고등부'; });
+    var etcUnassigned = unassignedInfo.filter(function(x){ return x.team.name!=='중고등부'; });
+    var jhReassign  = reassignExtra.filter(function(x){ return x.name==='중고등부'; });
+    var etcReassign = reassignExtra.filter(function(x){ return x.name!=='중고등부'; });
+
+    dragHtml='<div class="card" style="margin-bottom:14px;"><div class="card-title" style="margin-bottom:10px;">미배정 팀 (드래그하여 배정)</div>';
+    if(jhUnassigned.length>0 || jhReassign.length>0){
+      dragHtml += '<div style="font-size:.78rem;font-weight:700;color:#7b5ea7;margin:2px 0 6px;">🎓 중고등부</div>';
+      dragHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">';
+      jhUnassigned.forEach(function(x){ dragHtml += renderUnassignedChip(x); });
+      jhReassign.forEach(function(x){ dragHtml += renderReassignChip(x); });
+      dragHtml += '</div>';
+    }
+    if(etcUnassigned.length>0 || etcReassign.length>0){
+      dragHtml += '<div style="font-size:.78rem;font-weight:700;color:var(--muted);margin:2px 0 6px;">📍 그 외 구역 인원</div>';
+      dragHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+      etcUnassigned.forEach(function(x){ dragHtml += renderUnassignedChip(x); });
+      etcReassign.forEach(function(x){ dragHtml += renderReassignChip(x); });
+      dragHtml += '</div>';
+    }
+    dragHtml+='</div>';
   }
   var html=dragHtml+'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">';
   buses.forEach(function(bus){
@@ -6080,7 +6285,11 @@ function busDrop(busId, el){
   if(fromBusId && fromBusId !== busId){
     busMoveSlot(fromBusId, busId, teamId, dtype);
   } else if(!fromBusId){
-    busSplitAssign(busId, teamId, dtype);
+    if(String(teamId).indexOf('reassign:')===0){
+      busSplitAssignReassign(busId, teamId, dtype);
+    } else {
+      busSplitAssign(busId, teamId, dtype);
+    }
   }
   busDragTeam=null; busDragType=''; busDragFromBus=null;
   _busDragTeamLast=null; _busDragFromBusLast=null; _busDragTypeLast='';
@@ -6813,6 +7022,14 @@ function buildBusRoster(filterBusId, busType){
   // (수정 전: 매 버스마다 pax.slice(0, slot.count)로 항상 0번부터 잘라 앞쪽 인원이
   //  버스마다 중복 포함되고, 뒤쪽 인원은 어디에도 안 들어가 "미배정"으로 누락되던 버그)
   var teamOffset = {};
+  // [v173] 분산배정 팀이 등장하는 "마지막" 버스를 미리 계산 — 그 버스에서는
+  // slot.count(자동배정 당시 team.count 스냅샷) 대신 실제 남은 pax를 전부 소진한다.
+  // team.count와 retreat(실시간 참석인원명단) 필터 결과가 등록 데이터 변경 등으로
+  // 어긋나 있어도, 마지막 버스가 그 차이를 흡수해 특정 인원이 통째로 누락되지 않게 한다.
+  var teamLastBusId = {};
+  allBuses.forEach(function(b){
+    b.slots.forEach(function(s){ teamLastBusId[s.teamId] = b.id; });
+  });
 
   buses.forEach(function(bus){
     var passengers = [];
@@ -6827,7 +7044,9 @@ function buildBusRoster(filterBusId, busType){
       var toAdd;
       if(isSplit){
         var start = teamOffset[team.id] || 0;
-        toAdd = pax.slice(start, start + slot.count);
+        toAdd = (bus.id === teamLastBusId[team.id])
+          ? pax.slice(start)                       // 마지막 버스: 실제 남은 인원 전부(슬롯 count와 무관)
+          : pax.slice(start, start + slot.count);  // 그 외: 기존과 동일
         teamOffset[team.id] = start + toAdd.length; // 실제로 가져온 만큼만 누적(pax 부족 시에도 안전)
       } else {
         toAdd = pax;
@@ -7284,6 +7503,12 @@ function busSaveToSheet(typeOnly, onComplete){
       // updateBusUnassignedBadge()가 방금 배정한 인원까지 "재배정 필요"로 오탐 표시함
       if(doArrive) rosterArriveIndex = rosterRowsToIndex(arrRoster);
       if(doLeave)  rosterLeaveIndex  = rosterRowsToIndex(lvRoster);
+      // 접수인원현황 그리드가 참조하는 전체 인덱스(_rosterFullArr/_rosterFullLv)도 함께 즉시 갱신.
+      // arrRoster/lvRoster는 현재 필터(년도·수양회종류·행사명) 대상자만 포함하므로,
+      // 다른 회차/연도 인원의 기존 인덱스 값을 지우지 않도록 병합 방식으로 반영한다.
+      // → 자동배정 직후 접수인원현황으로 이동해도 "미배정" 오표시 없이 최신 상태 반영
+      if(doArrive) _rosterFullArr = Object.assign({}, _rosterFullArr, rosterRowsToIndex(arrRoster));
+      if(doLeave)  _rosterFullLv  = Object.assign({}, _rosterFullLv,  rosterRowsToIndex(lvRoster));
       renderTable();
       updateBusUnassignedBadge();
       // 팀내역 배정상태 업데이트
@@ -7500,7 +7725,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v168_excel_accounts_reload_on_enter';
+var CACHE_VERSION = 'v183_bus_calc_referror_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -7631,12 +7856,23 @@ function saveAccounts(){
   if(!ok){ showToast('⚠️ 계정 데이터 로컬 저장 실패 — 저장 공간 부족.', 'error'); }
 }
 
-function showToast(msg, type) {
+function showToast(msg, type, persistent) {
   type=type||'info';
   var t=$id('toast'); if(!t) return;
-  t.textContent=msg; t.className='show '+type;
   clearTimeout(t._tmr);
+  if(persistent){
+    // [v181] 지속형 알림 — 사용자가 닫기 전까지 유지, 닫기(×) 버튼 포함
+    t.innerHTML = esc(msg) + ' <span onclick="dismissToast()" style="cursor:pointer;margin-left:10px;font-weight:700;">×</span>';
+    t.className = 'show '+type+' persistent';
+    return;
+  }
+  t.textContent=msg; t.className='show '+type;
   t._tmr=setTimeout(function(){ t.className=''; },3000);
+}
+function dismissToast(){
+  var t=$id('toast'); if(!t) return;
+  clearTimeout(t._tmr);
+  t.className='';
 }
 function showLoading(on) { var el=$id('loading-overlay'); if(el) el.style.display=on?'flex':'none'; }
 function closeModal(id)  { var el=$id(id); if(el) el.classList.remove('show'); }
@@ -8073,7 +8309,7 @@ function initApp() {
   // 버스배정인원관리(bp) 전용 콤보 초기화 — 관리자 전용이라 role 분기 불필요
   populateParishSelect('bp-s-parish', '전체');
   populateParishSelect('bp-e-parish', '선택');
-  bpInitYearSelect();
+  // [v180] bp-s-year 필드 삭제로 bpInitYearSelect() 호출 제거 (상단 공용 콤보 사용으로 대체)
   // 사이드바 사용자 표시
   $id('sb-avatar').textContent=currentUser.name.charAt(0);
   $id('sb-name').textContent=currentUser.name;
@@ -9968,18 +10204,6 @@ function deleteRow(id, fromModal) {
 var bpFiltered    = [];
 var bpCurrentPage = 1;
 
-function bpInitYearSelect(){
-  var sel=$id('bp-s-year'); if(!sel) return;
-  var cur=new Date().getFullYear();
-  var prev=sel.value;
-  sel.innerHTML='<option value="">전체</option>';
-  for(var y=cur+5; y>=cur-5; y--){
-    var opt=document.createElement('option');
-    opt.value=String(y); opt.textContent=String(y);
-    if(String(y)===prev) opt.selected=true;
-    sel.appendChild(opt);
-  }
-}
 function bpSearchParishChange(){
   var parish=$val('bp-s-parish');
   var dsel=$id('bp-s-district');
@@ -9995,29 +10219,44 @@ function bpSearchParishChange(){
     });
   }
 }
+// [v180] 참석/귀가 버스배정 상태 판정 공용 함수 — bpDoSearch(필터)와 bpRenderTable(표시)이
+// 동일 로직을 공유하도록 단일화 (이중 로직으로 인한 판정 불일치 버그 방지)
+// 반환: {value: 화면표시용 문자열, status: 'assigned'|'unassigned'|null(버스 대상 아님)}
+function bpBusAssignInfo(r, kind){
+  var transport = kind==='arrive' ? r.arriveTransport : r.leaveTransport;
+  if((transport||'').trim() !== '버스') return {value:'-', status:null};
+  var rid = r.receiptId||'';
+  var assignedVal = rid ? (kind==='arrive' ? _rosterFullArr[rid] : _rosterFullLv[rid]) : '';
+  return assignedVal ? {value:assignedVal, status:'assigned'} : {value:'미배정', status:'unassigned'};
+}
 function bpDoSearch(){
-  var sYear=$val('bp-s-year').trim();
-  var sRType=$val('bp-s-retreat-type');
-  var sEvent=$val('bp-s-event').trim();
+  // [v180] 검색조건 전용 콤보 대신 상단 공용 콤보(연도/수양회종류/행사명) 값을 조회 시점에 직접 사용
+  var sYear=$val('bus-sel-year').trim();
+  var sRType=$val('bus-sel-season');
+  var sEvent=$val('bus-sel-event').trim();
   var sName=$val('bp-s-name').trim();
   var parish=$val('bp-s-parish').trim();
   var district=$val('bp-s-district').trim();
+  var sArriveStatus=$val('bp-s-arrive-status'); // '', 'assigned', 'unassigned'
+  var sLeaveStatus =$val('bp-s-leave-status');
   bpFiltered=retreat.filter(function(r){
     return (!sYear    || r.year===sYear)&&
            (!sRType   || r.retreatType===sRType)&&
            (!sEvent   || (r.event||'').trim()===sEvent)&&
            (!parish   || r.parish===parish)&&
            (!district || r.district===district)&&
-           (!sName    || (r.name||'').indexOf(sName)>=0);
+           (!sName    || (r.name||'').indexOf(sName)>=0)&&
+           (!sArriveStatus || bpBusAssignInfo(r,'arrive').status===sArriveStatus)&&
+           (!sLeaveStatus  || bpBusAssignInfo(r,'leave').status===sLeaveStatus);
   });
   bpCurrentPage=1; bpRenderTable();
 }
 function bpClearSearch(){
-  $set('bp-s-year','');
-  $set('bp-s-retreat-type','');
-  $set('bp-s-event','');
   $set('bp-s-name','');
   $set('bp-s-parish','');
+  $set('bp-s-district','');
+  $set('bp-s-arrive-status','');
+  $set('bp-s-leave-status','');
   bpSearchParishChange();
   bpDoSearch();
 }
@@ -10044,12 +10283,12 @@ function bpRenderTable(){
       ' <button class="btn btn-sm" style="background:#e8eef8;border:1px solid #c0cfe8;color:var(--navy);" onclick="bpOpenInlineEdit(&quot;'+esc(String(r.id))+'&quot;)">✏️ 수정</button>'+
       ' <button class="btn btn-danger btn-sm" onclick="bpDeleteRow(&quot;'+esc(String(r.id))+'&quot;)">삭제</button>';
     var rid=r.receiptId||'';
-    var arriveBusAssign = r.arriveTransport==='버스'
-      ? (rid && _rosterFullArr[rid] ? _rosterFullArr[rid] : '미배정') : '-';
-    var leaveBusAssign  = r.leaveTransport==='버스'
-      ? (rid && _rosterFullLv[rid]  ? _rosterFullLv[rid]  : '미배정') : '-';
-    var arriveBusStyle = arriveBusAssign==='미배정' ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
-    var leaveBusStyle  = leaveBusAssign==='미배정'  ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
+    var arriveInfo = bpBusAssignInfo(r,'arrive');
+    var leaveInfo  = bpBusAssignInfo(r,'leave');
+    var arriveBusAssign = arriveInfo.value;
+    var leaveBusAssign  = leaveInfo.value;
+    var arriveBusStyle = arriveInfo.status==='unassigned' ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
+    var leaveBusStyle  = leaveInfo.status==='unassigned'  ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
     return '<tr id="bptr-'+esc(String(r.id))+'">'+
       '<td style="color:var(--text-dim);font-size:.74rem">'+((bpCurrentPage-1)*PAGE_SIZE+i+1)+'</td>'+
       '<td style="display:none;">'+esc(rid||'—')+'</td>'+
