@@ -3241,6 +3241,7 @@ function vwOnArrDateChange(){
 
 // ── 구글 시트 저장 (접수ID 기준 중복 제외 + 신규만 등록, 기존 데이터 보존) ──
 var _vwUploadPending = [];
+var _vwMaxExistingNo = 0;  // [v198] 참석인원명단 시트의 현재 최대 NO값 — 신규 등록 시 이어서 채번
 var _vwBtnLabel = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>처리';
 
 // yyyy-mm-dd hh:mm:ss 형식 현재시각 문자열 (처리일시 컬럼용)
@@ -3271,12 +3272,16 @@ function vwCheckDuplicatesAndPreview(){
     .then(function(res){
       if(!(res && res.success)) throw new Error((res&&res.error)||'기존 데이터 조회 실패');
       var existingIds = {}, existingByComposite = {};
+      var maxNo = 0;
       (res.data||res.rows||[]).forEach(function(r){
         var rid = String(r['접수ID']||'').trim();
         var fb = (String(r['성명']||'')+String(r['교구']||'')+String(r['구역']||'')).replace(/\s/g,'');
         if(rid){ existingIds[rid] = true; }
         if(fb){ existingByComposite[fb] = rid; }  // rid가 빈 문자열이어도 그대로 기록(ID 없음 상태 보존)
+        var noVal = parseInt(r['NO'])||0;
+        if(noVal > maxNo) maxNo = noVal;
       });
+      _vwMaxExistingNo = maxNo;  // [v198] 신규 등록 채번 기준값 저장(추가 API 호출 없이 이 조회 결과 재사용)
 
       var srcRows = (vwFilteredRows.length?vwFilteredRows:vwAllRows);
       _vwUploadPending = srcRows.map(function(row){
@@ -3483,7 +3488,7 @@ function vwConfirmUpload(){
     var hdrs=['NO'].concat(VW_COLS.map(function(c){ return c.label; })).concat(['처리일시']);
     var procTime=_nowStr();  // 배치(청크) 전체에 동일한 처리 시각 적용
     var rows=newItems.map(function(item, i){
-      return [i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); })).concat([procTime]);
+      return [_vwMaxExistingNo+i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); })).concat([procTime]);
     });
 
     if(btn){ btn.disabled=true; btn.textContent='전송 중...'; }
@@ -5626,7 +5631,7 @@ function updateBusUnassignedBadge(){
     var el = $id(elId); if (!el) return;
     if (isAdmin && n > 0) {
       el.style.display = '';
-      el.innerHTML = '<strong>⚠️ '+label+'재배정 '+n+'명</strong> — 교통수단이 버스로 바뀌었지만 아직 탑승자 명단에 없는 인원입니다.'
+      el.innerHTML = '<strong>⚠️ '+label+'재배정 '+n+'명</strong> — 버스 사용자 중 미배정된 인원입니다.'
         +'<div style="margin-top:8px;"><button class="btn btn-sm" onclick="busReassignDiff(\''+type+'\')" style="background:#c89b30;border:none;color:#fff;">🔄 '+label+' 재배정</button></div>';
     } else {
       el.style.display = 'none';
@@ -7878,7 +7883,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v196_delete_cascade_roster';
+var CACHE_VERSION = 'v198_upload_no_increment';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
