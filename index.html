@@ -223,6 +223,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
 }
 table{width:100%;border-collapse:collapse;font-size:.82rem;}
 .table-wrap table{width:max-content;min-width:100%;}
+/* [v186] 수양회집계현황 전용 — 스크롤 없이 화면 폭에 맞춰 고정 배분 */
+.agg-compact table{table-layout:fixed;width:100%;min-width:0;}
+.agg-compact thead th{padding:6px 2px;font-size:.62rem;text-align:center;white-space:normal;}
+.agg-compact tbody td{padding:6px 2px;font-size:.72rem;text-align:center;}
+/* [v188] 교구 컬럼 제거로 1칸 당겨짐 — 구역(1번째) 20%, 나머지 8개 컬럼 10%씩 */
+.agg-compact th:nth-child(1),.agg-compact td:nth-child(1){width:20%;text-align:left;}
+.agg-compact th:nth-child(n+2),.agg-compact td:nth-child(n+2){width:10%;}
 thead th{
   padding:10px 12px;text-align:left;
   background:var(--navy);color:#fff;
@@ -605,15 +612,17 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
     <div class="login-card">
       <h2>로그인</h2>
       <div class="login-error" id="login-error">아이디 또는 비밀번호가 올바르지 않습니다.</div>
-      <div class="form-group">
-        <label>아이디</label>
-        <input type="text" id="inp-id" placeholder="아이디 입력" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <div class="form-group">
-        <label>비밀번호</label>
-        <input type="password" id="inp-pw" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <button class="btn btn-navy btn-full" onclick="doLogin()">로그인</button>
+      <form id="login-form" onsubmit="doLogin(); return false;">
+        <div class="form-group">
+          <label>아이디</label>
+          <input type="text" id="inp-id" name="username" autocomplete="username" placeholder="아이디 입력">
+        </div>
+        <div class="form-group">
+          <label>비밀번호</label>
+          <input type="password" id="inp-pw" name="password" autocomplete="current-password" placeholder="비밀번호 입력">
+        </div>
+        <button type="submit" class="btn btn-navy btn-full">로그인</button>
+      </form>
       <div class="login-hint">
         <div><strong>전도인</strong>&nbsp;&nbsp;ID: admin <span style="color:var(--navy2);font-weight:700;">||교구||구역||</span> b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 11구역 → <strong style="color:var(--navy);">admin0111b</strong></span></div>
         <div style="margin-top:2px;"><strong>교구장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||</span> 00b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 → <strong style="color:var(--navy);">user0100b</strong></span></div>
@@ -752,12 +761,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div class="home-agg-row">
             <div class="card">
               <div class="card-header"><div class="card-title">수양회 참석인원</div></div>
-              <div class="table-wrap"><div id="home-table1"></div></div>
+              <div class="table-wrap agg-compact"><div id="home-table1"></div></div>
             </div>
 
             <div class="card">
               <div class="card-header"><div class="card-title">전도</div></div>
-              <div class="table-wrap"><div id="home-table2"></div></div>
+              <div class="table-wrap agg-compact"><div id="home-table2"></div></div>
             </div>
           </div>
         </div>
@@ -1499,9 +1508,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <tr>
                     <th>#</th>
                     <th style="display:none;">접수ID</th>
-                    <th onclick="sortByName()" style="cursor:pointer;user-select:none;">성명 <span id="sort-name-icon" style="font-size:.7rem;"></span></th><th>행사명</th>
-                    <th>구역</th><th>회별</th>
-                    <th>구원여부</th><th>참석버스배정</th>
+                    <th onclick="sortByColumn('name',event.shiftKey)" style="cursor:pointer;user-select:none;">성명 <span id="sort-icon-name" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('event',event.shiftKey)" style="cursor:pointer;user-select:none;">행사명 <span id="sort-icon-event" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
+                    <th>참석버스배정</th>
                     <th>귀가버스배정</th>
                     <th>관리</th>
                   </tr>
@@ -1656,9 +1668,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <span style="font-size:.82rem;color:var(--muted);">총 <strong id="upld-total" style="color:var(--navy);">0</strong>명</span>
               <span style="font-size:.82rem;color:#1a6b45;">✅ 신규 <strong id="upld-new">0</strong>명</span>
               <span style="font-size:.82rem;color:#c04040;">⚠ 중복(skip) <strong id="upld-dup">0</strong>명</span>
+              <span style="font-size:.82rem;color:#b00020;">🗑 삭제대상 <strong id="upld-del">0</strong>명</span>
               <div style="margin-left:auto;display:flex;gap:8px;">
                 <button id="upld-confirm-btn" class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;font-weight:700;"
-                  onclick="vwConfirmUpload()">✅ 신규 <span id="upld-confirm-cnt">0</span>명 등록</button>
+                  onclick="vwConfirmUpload()"><span id="upld-confirm-label">✅ 신규 <span id="upld-confirm-cnt">0</span>명 등록</span></button>
                 <button class="btn btn-sm" style="background:#fff;border:1.5px solid var(--border);color:var(--text2);"
                   onclick="vwCancelUpload()">취소</button>
               </div>
@@ -3245,20 +3258,24 @@ function vwSaveToSheet(){
   vwCheckDuplicatesAndPreview();
 }
 
-// 구글 시트의 참석인원명단을 fresh하게 다시 받아와 접수ID 기준으로 신규/중복을 분류.
-// 접수ID가 없는 행은 이름+교구+구역 조합으로 대체 판정. 중복이 0건이면(최초 등록 등)
-// 확인 절차 없이 곧바로 전송하고, 1건이라도 있으면 미리보기 배너를 띄워 확인을 받음.
+// 구글 시트의 참석인원명단을 fresh하게 다시 받아와 3분기 판정: 중복/신규/삭제.
+// [v190] 판정 기준(매칭은 기존과 동일: 접수ID 있으면 ID로, 없으면 성명+교구+구역 조합으로):
+//   - 시트.접수ID === CSV.접수ID(둘 다 있음)           → 중복(skip)
+//   - 시트에 없음(매칭 자체 안 됨) or 시트.접수ID='' + CSV.접수ID<>'' → 신규(append, 기존과 동일 처리)
+//   - 시트.접수ID<>'' + CSV.접수ID=''(성명+교구+구역으로 매칭됨)      → 삭제(시트에서 해당 행 제거)
+// 중복·삭제가 모두 0건이면(최초 등록 등) 확인 절차 없이 곧바로 전송하고,
+// 하나라도 있으면 미리보기 배너를 띄워 확인을 받음(삭제는 되돌릴 수 없으므로 반드시 확인).
 function vwCheckDuplicatesAndPreview(){
   var btn=document.getElementById('vwBtnSheet'); if(btn){ btn.disabled=true; btn.textContent='기존 데이터 확인 중...'; }
   apiCall({action:'getAll', sheetName:'참석인원명단'})
     .then(function(res){
       if(!(res && res.success)) throw new Error((res&&res.error)||'기존 데이터 조회 실패');
-      var existingIds = {}, existingFallback = {};
+      var existingIds = {}, existingByComposite = {};
       (res.data||res.rows||[]).forEach(function(r){
         var rid = String(r['접수ID']||'').trim();
-        if(rid) { existingIds[rid] = true; return; }
         var fb = (String(r['성명']||'')+String(r['교구']||'')+String(r['구역']||'')).replace(/\s/g,'');
-        if(fb) existingFallback[fb] = true;
+        if(rid){ existingIds[rid] = true; }
+        if(fb){ existingByComposite[fb] = rid; }  // rid가 빈 문자열이어도 그대로 기록(ID 없음 상태 보존)
       });
 
       var srcRows = (vwFilteredRows.length?vwFilteredRows:vwAllRows);
@@ -3268,16 +3285,57 @@ function vwCheckDuplicatesAndPreview(){
         var parish    = String(vwGetV(row,'district')||'').trim();
         var district  = String(vwGetV(row,'zone')||'').trim();
         var group     = String(vwGetV(row,'deptCode')||'').trim();
-        var isDup = receiptId
-          ? !!existingIds[receiptId]
-          : !!existingFallback[(name+parish+district).replace(/\s/g,'')];
-        return { _row:row, _status:isDup?'dup':'new',
+        var composite = (name+parish+district).replace(/\s/g,'');
+        var status, deleteTargetId = null;
+        if(receiptId){
+          // CSV에 접수ID 있음 → 그 ID로 기존행 존재 확인
+          status = existingIds[receiptId] ? 'dup' : 'new';
+        } else if(Object.prototype.hasOwnProperty.call(existingByComposite, composite)){
+          var existingRid = existingByComposite[composite];
+          if(existingRid){
+            // 시트엔 접수ID 있는데 CSV엔 없음(성명+교구+구역으로 매칭) → 삭제 대상
+            status = 'del'; deleteTargetId = existingRid;
+          } else {
+            // ⑤ 방어코드: 둘 다 접수ID 없음(정상 흐름상 발생하지 않는 케이스) → 안전하게 중복 처리
+            status = 'dup';
+          }
+        } else {
+          status = 'new';  // 매칭 자체가 안 되는 완전 신규
+        }
+        return { _row:row, _status:status, deleteTargetId:deleteTargetId,
           receiptId:receiptId, name:name, parish:parish, district:district, group:group };
       });
 
       var dupCnt = _vwUploadPending.filter(function(r){ return r._status==='dup'; }).length;
-      if(dupCnt===0){
-        vwConfirmUpload(); // 중복 없음 → 확인 절차 없이 바로 전송
+
+      // [v191] 진짜 "삭제 대상" 보완 탐지 — CSV 전체에 존재하지 않는 기존 접수ID 찾기
+      // (기존 로직은 CSV 행 순회 기반이라 "CSV에 그 사람 행 자체가 없는" 케이스를 못 잡았음)
+      var csvIdSet = {};
+      srcRows.forEach(function(row){
+        var rid = String(vwGetV(row,'receiptId')||'').trim();
+        if(rid) csvIdSet[rid] = true;
+      });
+      var alreadyFlagged = {};
+      _vwUploadPending.forEach(function(item){
+        if(item._status==='del') alreadyFlagged[item.deleteTargetId]=true;
+      });
+      (res.data||res.rows||[]).forEach(function(r){
+        var rid = String(r['접수ID']||'').trim();
+        if(!rid) return;                 // 시트에 ID 없는 행은 대상 아님
+        if(csvIdSet[rid]) return;         // CSV 어딘가에 존재 → 삭제대상 아님
+        if(alreadyFlagged[rid]) return;   // 중복 방지
+        _vwUploadPending.push({
+          _row:null, _status:'del', deleteTargetId:rid,
+          receiptId:'', name:String(r['성명']||''),
+          parish:String(r['교구']||''), district:String(r['구역']||''),
+          group:String(r['회별']||'')
+        });
+        alreadyFlagged[rid]=true;
+      });
+
+      var delCnt = _vwUploadPending.filter(function(r){ return r._status==='del'; }).length;
+      if(dupCnt===0 && delCnt===0){
+        vwConfirmUpload(); // 중복·삭제 없음 → 확인 절차 없이 바로 전송
       } else {
         _vwRenderUploadPreview();
         if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
@@ -3292,6 +3350,7 @@ function vwCheckDuplicatesAndPreview(){
 function _vwRenderUploadPreview(){
   var newRows = _vwUploadPending.filter(function(r){ return r._status==='new'; });
   var dupRows = _vwUploadPending.filter(function(r){ return r._status==='dup'; });
+  var delRows = _vwUploadPending.filter(function(r){ return r._status==='del'; });
   var banner=document.getElementById('upload-preview-banner');
   var wrap=document.getElementById('upload-preview-wrap');
   var tbody=document.getElementById('upload-preview-body');
@@ -3302,28 +3361,40 @@ function _vwRenderUploadPreview(){
   s2('upld-total', _vwUploadPending.length);
   s2('upld-new', newRows.length);
   s2('upld-dup', dupRows.length);
+  s2('upld-del', delRows.length);
   s2('upld-confirm-cnt', newRows.length);
+  // [v190] 삭제 건수도 버튼 라벨에 함께 표기(삭제는 되돌릴 수 없으므로 실행 전 명확히 안내)
+  var confirmLabel=document.getElementById('upld-confirm-label');
+  if(confirmLabel){
+    confirmLabel.textContent = delRows.length>0
+      ? ('✅ 신규 '+newRows.length+'명 등록 · 🗑 삭제 '+delRows.length+'명 실행')
+      : ('✅ 신규 '+newRows.length+'명 등록');
+  }
   banner.style.display='flex';
   wrap.style.display='';
   var confirmBtn=document.getElementById('upld-confirm-btn');
   if(confirmBtn){
-    confirmBtn.disabled = newRows.length===0;
-    confirmBtn.style.opacity = newRows.length===0 ? '.5' : '';
-    confirmBtn.style.cursor  = newRows.length===0 ? 'not-allowed' : 'pointer';
+    var noAction = newRows.length===0 && delRows.length===0;
+    confirmBtn.disabled = noAction;
+    confirmBtn.style.opacity = noAction ? '.5' : '';
+    confirmBtn.style.cursor  = noAction ? 'not-allowed' : 'pointer';
   }
-  if(newRows.length===0){
-    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:.85rem;padding:24px;">신규처리할 대상이 없습니다.</td></tr>';
+  if(newRows.length===0 && delRows.length===0){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:.85rem;padding:24px;">신규/삭제 처리할 대상이 없습니다.</td></tr>';
     return;
   }
-  var preview=newRows.concat(dupRows).slice(0,200);  // 신규 건을 항상 먼저 노출, 남은 자리에 중복 채움
+  var preview=newRows.concat(delRows).concat(dupRows).slice(0,200);  // 신규 → 삭제대상 → 중복 순 노출
   tbody.innerHTML=preview.map(function(r){
-    var isNew=r._status==='new';
-    var badge=isNew
-      ?'<span style="background:#e6f4ec;color:#1a6b45;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">신규</span>'
-      :'<span style="background:#fdf0f0;color:#c04040;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">중복</span>';
-    return '<tr style="opacity:'+(isNew?'1':'.55')+';">'
+    var badge = r._status==='new'
+      ? '<span style="background:#e6f4ec;color:#1a6b45;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">신규</span>'
+      : r._status==='del'
+        ? '<span style="background:#fdeaea;color:#b00020;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">🗑 삭제</span>'
+        : '<span style="background:#fdf0f0;color:#c04040;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">중복</span>';
+    var rowStyle = r._status==='del' ? 'background:#fff5f5;' : '';
+    var op = r._status==='dup' ? '.55' : '1';
+    return '<tr style="'+rowStyle+'opacity:'+op+';">'
       +'<td>'+badge+'</td>'
-      +'<td style="font-size:.78rem;color:var(--muted);">'+esc(r.receiptId||'—')+'</td>'
+      +'<td style="font-size:.78rem;color:var(--muted);">'+esc(r.receiptId||r.deleteTargetId||'—')+'</td>'
       +'<td style="font-weight:600;">'+esc(r.name||'')+'</td>'
       +'<td>'+esc(r.parish||'')+'</td>'
       +'<td>'+esc(r.district||'')+'</td>'
@@ -3335,9 +3406,11 @@ function _vwRenderUploadPreview(){
   }
 }
 
-// 신규 항목만 mode:'append'로 전송 (overwrite 사용 안 함 — 기존 시트 데이터 보존)
+// 신규 항목은 mode:'append'로 전송, 삭제 대상은 기존 apiCall({action:'delete'}) 패턴 재사용해 먼저 제거
+// (overwrite 사용 안 함 — 기존 시트 데이터는 삭제 대상 외엔 보존)
 function vwConfirmUpload(){
   var newItems = _vwUploadPending.filter(function(r){ return r._status==='new'; });
+  var delItems = _vwUploadPending.filter(function(r){ return r._status==='del'; });
   var dupCnt   = _vwUploadPending.filter(function(r){ return r._status==='dup'; }).length;
   var banner=document.getElementById('upload-preview-banner');
   var wrap=document.getElementById('upload-preview-wrap');
@@ -3345,56 +3418,105 @@ function vwConfirmUpload(){
   if(wrap)   wrap.style.display='none';
   _vwUploadPending=[];
 
-  if(!newItems.length){
-    vwToast(dupCnt?('신규 등록 대상이 없습니다 (전부 중복 '+dupCnt+'명)'):'등록할 데이터가 없습니다.','err');
+  if(!newItems.length && !delItems.length){
+    vwToast(dupCnt?('신규/삭제 대상이 없습니다 (전부 중복 '+dupCnt+'명)'):'처리할 데이터가 없습니다.','err');
     return;
   }
 
-  var hdrs=['NO'].concat(VW_COLS.map(function(c){ return c.label; })).concat(['처리일시']);
-  var procTime=_nowStr();  // 배치(청크) 전체에 동일한 처리 시각 적용
-  var rows=newItems.map(function(item, i){
-    return [i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); })).concat([procTime]);
-  });
+  var btn=document.getElementById('vwBtnSheet'); if(btn){ btn.disabled=true; btn.textContent='처리 중...'; }
+  var delErrored=false;
 
-  var btn=document.getElementById('vwBtnSheet'); if(btn){ btn.disabled=true; btn.textContent='전송 중...'; }
-  var CHUNK=500; var sent=0; var errored=false;
-  function sendChunk(i){
-    if(i>=rows.length){
-      if(!errored) vwToast('✅ 신규 '+sent.toLocaleString()+'명 등록 완료'+(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
+  // [v190] 삭제 대상 먼저 처리 — 기존 deleteRow()가 쓰는 apiCall({action:'delete', id:...}) 패턴 재사용
+  // [v192] 병렬(Promise.all) → 순차 실행으로 전환 — 구글시트 행 삭제는 인덱스 기반이라
+  // 동시 실행 시 행 위치가 꼬여 실패/오작동할 수 있음. 한 건씩 서버 응답을 확인한 뒤 다음 진행.
+  function runDeletes(cb){
+    if(!delItems.length){ cb(); return; }
+    if(btn) btn.textContent='삭제 처리 중... 0/'+delItems.length;
+    var failedNames=[]; var okCnt=0;
+    function next(i){
+      if(i>=delItems.length){
+        if(failedNames.length){
+          delErrored=true;
+          vwToast('❌ 삭제 실패 '+failedNames.length+'명: '+failedNames.slice(0,5).join(', ')
+            +(failedNames.length>5?' 외 '+(failedNames.length-5)+'명':'')
+            +' (나머지 '+okCnt+'명은 정상 삭제됨)','err');
+        }
+        cb(); return;
+      }
+      var item=delItems[i];
+      if(btn) btn.textContent='삭제 처리 중... '+(i+1)+'/'+delItems.length;
+      // [v193] sheetName 명시 — 다른 8곳의 성공 패턴(apiCall({action:'delete', sheetName:..., id:...}))과
+      // 동일하게 맞춤(생략 시 대상 시트가 불명확해 전량 실패하는 문제 확인됨)
+      apiCall({action:'delete', sheetName:'참석인원명단', id:item.deleteTargetId})
+        .then(function(res){
+          if(res && res.success){ okCnt++; }
+          else { failedNames.push((item.name||item.deleteTargetId)+(res&&res.message?'('+res.message+')':'')); }
+          next(i+1);
+        })
+        .catch(function(){
+          failedNames.push(item.name||item.deleteTargetId);
+          next(i+1);  // 한 건 실패해도 나머지는 계속 진행
+        });
+    }
+    next(0);
+  }
+
+  runDeletes(function(){
+    if(!newItems.length){
+      if(!delErrored) vwToast('🗑 삭제 '+delItems.length+'명 처리 완료'+(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
       if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
-      if(!errored) vwLoadLastProcTime();  // 처리 성공 후 엑셀업로드시간 자동 갱신
+      if(!delErrored) vwLoadLastProcTime();
       return;
     }
-    var chunk=rows.slice(i,i+CHUNK);
-    var payload={sheetName:'참석인원명단', mode:'append', headers:hdrs, rows:chunk};
-    fetch(API_URL,{
-      method:'POST',
-      headers:_gasHeaders({'Content-Type':'text/plain'}),
-      body:JSON.stringify(payload),
-      redirect:'follow'
-    })
-    .then(function(res){ return res.text(); })
-    .then(function(txt){
-      try {
-        var j = JSON.parse(txt);
-        if(j && j.result === 'error'){ throw new Error('GAS 오류: ' + (j.message || txt)); }
-      } catch(parseErr){
-        if(txt && txt.indexOf('error')!==-1 && txt.indexOf('Error')!==-1){
-          console.warn('vwConfirmUpload GAS warn:', txt.slice(0,200));
-        }
-      }
-      sent += chunk.length;
-      if(btn) btn.textContent = '전송 중... '+sent+'/'+rows.length;
-      sendChunk(i+CHUNK);
-    })
-    .catch(function(err){
-      errored = true;
-      console.error('vwConfirmUpload error:', err);
-      vwToast('❌ 구글 시트 전송 실패 ('+chunk.length+'행): ' + (err.message||'네트워크 오류'), 'err');
-      if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
+
+    var hdrs=['NO'].concat(VW_COLS.map(function(c){ return c.label; })).concat(['처리일시']);
+    var procTime=_nowStr();  // 배치(청크) 전체에 동일한 처리 시각 적용
+    var rows=newItems.map(function(item, i){
+      return [i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); })).concat([procTime]);
     });
-  }
-  sendChunk(0);
+
+    if(btn){ btn.disabled=true; btn.textContent='전송 중...'; }
+    var CHUNK=500; var sent=0; var errored=false;
+    function sendChunk(i){
+      if(i>=rows.length){
+        if(!errored) vwToast('✅ 신규 '+sent.toLocaleString()+'명 등록 완료'
+          +(delItems.length?' · 🗑 삭제 '+delItems.length+'명 처리':'')
+          +(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
+        if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
+        if(!errored) vwLoadLastProcTime();  // 처리 성공 후 엑셀업로드시간 자동 갱신
+        return;
+      }
+      var chunk=rows.slice(i,i+CHUNK);
+      var payload={sheetName:'참석인원명단', mode:'append', headers:hdrs, rows:chunk};
+      fetch(API_URL,{
+        method:'POST',
+        headers:_gasHeaders({'Content-Type':'text/plain'}),
+        body:JSON.stringify(payload),
+        redirect:'follow'
+      })
+      .then(function(res){ return res.text(); })
+      .then(function(txt){
+        try {
+          var j = JSON.parse(txt);
+          if(j && j.result === 'error'){ throw new Error('GAS 오류: ' + (j.message || txt)); }
+        } catch(parseErr){
+          if(txt && txt.indexOf('error')!==-1 && txt.indexOf('Error')!==-1){
+            console.warn('vwConfirmUpload GAS warn:', txt.slice(0,200));
+          }
+        }
+        sent += chunk.length;
+        if(btn) btn.textContent = '전송 중... '+sent+'/'+rows.length;
+        sendChunk(i+CHUNK);
+      })
+      .catch(function(err){
+        errored = true;
+        console.error('vwConfirmUpload error:', err);
+        vwToast('❌ 구글 시트 전송 실패 ('+chunk.length+'행): ' + (err.message||'네트워크 오류'), 'err');
+        if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
+      });
+    }
+    sendChunk(0);
+  });
 }
 
 function vwCancelUpload(){
@@ -7725,7 +7847,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v183_bus_calc_referror_fix';
+var CACHE_VERSION = 'v193_delete_sheetname_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8607,6 +8729,11 @@ var GROUP_DISPLAY = {
   '봉사회':'봉사회', '어머니회':'어머니회', '은장회':'은장회', '청년회':'청년회',
   '중고등부':'중고등부', '유초등부':'초등부', '미취학':'미취학'
 };
+// [v186] 화면(그리드) 전용 축약 라벨 — CSV 다운로드는 위 GROUP_DISPLAY(전체명) 그대로 사용
+var GROUP_DISPLAY_SHORT = {
+  '봉사회':'봉', '어머니회':'어', '은장회':'은', '청년회':'청',
+  '중고등부':'중고', '유초등부':'초', '미취학':'미'
+};
 
 // 홈 집계 화면 상태
 var homeAggYear = null;            // 선택된 연도 (문자열)
@@ -8766,14 +8893,14 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
   // [요청 반영] 달성율 컬럼은 전체 역할(관리자 포함) 공통으로 숨김 처리
   var showRate = false;
 
-  var thGroups = GROUP_KEYS.map(function(g){ return '<th>'+GROUP_DISPLAY[g]+'</th>'; }).join('');
-  var html = '<table><thead><tr><th>교구</th><th>구역</th>'+(showRate?'<th>달성율</th>':'')+'<th>합계</th>'+thGroups+'</tr></thead><tbody>';
+  var thGroups = GROUP_KEYS.map(function(g){ return '<th>'+GROUP_DISPLAY_SHORT[g]+'</th>'; }).join('');
+  // [v188] 화면 전용 — "교구" 컬럼 제거(구역만 표시), CSV(homeAggExportCSV)는 변경 없음
+  var html = '<table><thead><tr><th>구역</th>'+(showRate?'<th>달성율</th>':'')+'<th>합</th>'+thGroups+'</tr></thead><tbody>';
 
   table.parishes.forEach(function(p){
     p.districts.forEach(function(d){
       var dRate = calcRate(d.total, perDistrictTarget);
       html += '<tr>'
-        + '<td>'+esc(p.parish)+'</td>'
         + '<td>'+esc(d.district)+'</td>'
         + (showRate?'<td>'+fmtRate(dRate)+'</td>':'')
         + '<td><strong>'+d.total+'</strong></td>'
@@ -8782,7 +8909,7 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
     });
     var pRate = calcRate(p.total, perParishTarget);
     html += '<tr style="background:#f5f5f7;font-weight:700;">'
-      + '<td colspan="2">'+esc(p.parish)+' 합계</td>'
+      + '<td>'+esc(p.parish)+' 합계</td>'
       + (showRate?'<td>'+fmtRate(pRate)+'</td>':'')
       + '<td>'+p.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+p.counts[g]+'</td>'; }).join('')
@@ -8793,7 +8920,6 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
   if(table.other){
     table.other.districts.forEach(function(d){
       html += '<tr>'
-        + '<td>'+esc(table.other.parish)+'</td>'
         + '<td>'+esc(d.district)+'</td>'
         + (showRate?'<td>-</td>':'')
         + '<td><strong>'+d.total+'</strong></td>'
@@ -8801,7 +8927,7 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
         + '</tr>';
     });
     html += '<tr style="background:#f5f5f7;font-weight:700;">'
-      + '<td colspan="2">'+esc(table.other.parish)+' 합계</td>'
+      + '<td>'+esc(table.other.parish)+' 합계</td>'
       + (showRate?'<td>-</td>':'')
       + '<td>'+table.other.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+table.other.counts[g]+'</td>'; }).join('')
@@ -8811,7 +8937,7 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
   if(table.grand){
     var gRate = calcRate(table.grand.total, goalTotal);
     html += '<tr style="background:#e8edf5;font-weight:900;">'
-      + '<td colspan="2">총계</td>'
+      + '<td>총계</td>'
       + (showRate?'<td>'+fmtRate(gRate)+'</td>':'')
       + '<td>'+table.grand.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+table.grand.counts[g]+'</td>'; }).join('')
@@ -8877,10 +9003,10 @@ function renderHome(filter) {
   // 표1: 수양회 참석인원 (교구×구역×회별)
   var table1 = buildAggregateTable(scopedRows, scopeParishes, isAdmin);
 
-  // 표2: 전도 — 구원여부 in ('N','P','-')
+  // 표2: 전도 — 구원여부 in ('N','P')
   var evangRows = scopedRows.filter(function(r){
     var sv = (r.salvCode||'').trim();
-    return sv==='N' || sv==='P' || sv==='-';
+    return sv==='N' || sv==='P';
   });
   var table2 = buildAggregateTable(evangRows, scopeParishes, isAdmin);
 
@@ -9283,19 +9409,42 @@ function searchParishChange(){
   // doSearch()는 조회 버튼 클릭 시에만 실행 (자동 조회 제거)
 }
 
-var sortField = null, sortDir = 'asc';
-function sortByName(){
-  sortDir = (sortField==='name' && sortDir==='asc') ? 'desc' : 'asc';
-  sortField = 'name';
+// [v185] 다중 컬럼 정렬 — sortFields: [{field,dir}, ...] 우선순위 순서 배열
+var sortFields = [];
+var SORT_GETTERS = {
+  name:     function(r){ return r.name||''; },
+  event:    function(r){ return r.event||''; },
+  district: function(r){ return r.district||''; },
+  group:    function(r){ return r.group||''; },
+  salvCode: function(r){ return r.salvCode||''; }
+};
+function sortByColumn(field, isShift){
+  var idx = sortFields.findIndex(function(s){ return s.field===field; });
+  if(isShift){
+    // Shift+클릭: 다중 정렬 추가/토글 (기존 정렬 유지)
+    if(idx>=0) sortFields[idx].dir = sortFields[idx].dir==='asc' ? 'desc' : 'asc';
+    else       sortFields.push({field:field, dir:'asc'});
+  } else {
+    // 일반 클릭: 이 컬럼 단일 정렬(다른 컬럼 정렬 해제), 이미 단일 정렬 중이면 방향 토글
+    if(sortFields.length===1 && sortFields[0].field===field){
+      sortFields[0].dir = sortFields[0].dir==='asc' ? 'desc' : 'asc';
+    } else {
+      sortFields = [{field:field, dir:'asc'}];
+    }
+  }
   currentPage = 1;
   _applySortToFiltered();
   renderTable();
 }
 function _applySortToFiltered(){
-  if(sortField!=='name') return;
+  if(sortFields.length===0) return;
   filtered.sort(function(a,b){
-    var r = (a.name||'').localeCompare(b.name||'','ko');
-    return sortDir==='asc' ? r : -r;
+    for(var i=0;i<sortFields.length;i++){
+      var f = sortFields[i], getter = SORT_GETTERS[f.field];
+      var r = String(getter(a)).localeCompare(String(getter(b)),'ko');
+      if(r!==0) return f.dir==='asc' ? r : -r;
+    }
+    return 0;
   });
 }
 function doSearch() {
@@ -9342,8 +9491,17 @@ function renderTable() {
   var body=$id('table-body'), empty=$id('empty-list'), cnt=$id('result-count');
   if(!body) return;
   if(cnt) cnt.textContent=filtered.length;
-  var icon=$id('sort-name-icon');
-  if(icon) icon.textContent = sortField==='name' ? (sortDir==='asc'?'▲':'▼') : '';
+  // [v185] 정렬 가능한 5개 컬럼 각각의 아이콘 갱신, 다중 정렬 시 우선순위 위첨자 표기
+  var SUP = ['','¹','²','³','⁴','⁵'];
+  ['name','event','district','group','salvCode'].forEach(function(f){
+    var ic=$id('sort-icon-'+f);
+    if(!ic) return;
+    var idx = sortFields.findIndex(function(s){ return s.field===f; });
+    if(idx<0){ ic.textContent=''; return; }
+    var arrow = sortFields[idx].dir==='asc' ? '▲' : '▼';
+    var pre = sortFields.length>1 ? (SUP[idx+1]||'') : '';
+    ic.textContent = pre+arrow;
+  });
   var pages=Math.ceil(filtered.length/SEARCH_PAGE_SIZE)||1;
   if(currentPage>pages) currentPage=pages;
   var slice=filtered.slice((currentPage-1)*SEARCH_PAGE_SIZE,currentPage*SEARCH_PAGE_SIZE);
@@ -9892,6 +10050,7 @@ function loadRosterIndex(useFilter, overrideFilter){
             showToast(icon+' 버스배정 인덱스 미로드: '+failedSheets.join(' / '), lvl);
           }
           renderTable();
+          bpRenderTable(); // [v184] 버스배정인원관리 그리드도 함께 최신화 (해당 화면 아니면 안전하게 조기 종료)
           updateBusUnassignedBadge();
         }
       });
@@ -10349,6 +10508,9 @@ function bpReloadFromSheet(){
         updateStats(); renderHome(); bpDoSearch();
         bpUpdateDataSourceBadge('sheet', retreat.length);
         showToast('✅ 구글 시트에서 '+retreat.length+'명 조회 완료','success');
+        // [v184] 참석/귀가 버스배정 컬럼(_rosterFullArr/_rosterFullLv)도 함께 최신화
+        // (기존엔 재조회해도 초기화 이전의 낡은 배정값이 그대로 남아있던 버그 수정)
+        loadRosterIndex();
       } else {
         showToast('조회 실패: '+(res.message||'알 수 없는 오류'),'error');
       }
@@ -12588,7 +12750,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'accRoleChange','accParishChange','confirmDeleteAccount',
     'accHandleCSV','accConfirmUpload','accCancelUpload',
     'accDownloadTemplate','accExportCSV','accSaveToSheet',
-    'exportExcel','exportSearchExcel','sortByName','downloadTemplate','vwConfirmUpload','vwCancelUpload',
+    'exportExcel','exportSearchExcel','sortByColumn','downloadTemplate','vwConfirmUpload','vwCancelUpload',
     'saveApiUrl','copyApiUrlForDeploy','testApiUrl','closeModal','apiUrlEditMode','apiUrlRefreshUI',
     'saveGasApiKey','clearGasApiKey',
     'mypageChangePw',
@@ -12644,7 +12806,7 @@ document.addEventListener('DOMContentLoaded', function() {
     confirmDeleteAccount:confirmDeleteAccount,
     accHandleCSV:accHandleCSV, accConfirmUpload:accConfirmUpload, accCancelUpload:accCancelUpload,
     accDownloadTemplate:accDownloadTemplate, accExportCSV:accExportCSV, accSaveToSheet:accSaveToSheet,
-    exportExcel:exportExcel, exportSearchExcel:exportSearchExcel, sortByName:sortByName,
+    exportExcel:exportExcel, exportSearchExcel:exportSearchExcel, sortByColumn:sortByColumn,
     downloadTemplate:downloadTemplate, vwConfirmUpload:vwConfirmUpload, vwCancelUpload:vwCancelUpload,
     saveApiUrl:saveApiUrl, copyApiUrlForDeploy:copyApiUrlForDeploy, testApiUrl:testApiUrl, closeModal:closeModal,
     apiUrlEditMode:apiUrlEditMode, apiUrlRefreshUI:apiUrlRefreshUI,
