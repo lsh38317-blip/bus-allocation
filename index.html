@@ -751,7 +751,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             onclick="switchPanel('bus')">
           </div>
 
-          <div class="card-title" style="margin:4px 0 10px;font-size:1.05rem;">수양회접수현황집계</div>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
             <select id="home-year-select" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
             <select id="home-parish-select" onchange="homeAggParishChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
@@ -775,16 +774,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
         <!-- GOALSTATUS: 수양회목표달성현황 (조회 전용) -->
         <div class="panel" id="panel-goalstatus">
-          <div class="card-title" style="margin:4px 0 10px;font-size:1.05rem;">수양회목표달성현황</div>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
             <select id="gs-year-select" onchange="goalStatusYearChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
-            <select id="gs-event-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;">
-              <option value="1차">1차</option><option value="2차">2차</option><option value="3차">3차</option>
-              <option value="4차">4차</option><option value="5차">5차</option><option value="6차">6차</option><option value="7차">7차</option>
-            </select>
-            <select id="gs-season-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;">
-              <option value="춘계">춘계</option><option value="하계" selected>하계</option><option value="추계">추계</option><option value="동계">동계</option>
-            </select>
             <select id="gs-parish-select" onchange="goalStatusParishChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
             <select id="gs-district-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
             <button class="btn btn-primary btn-sm" onclick="goalStatusQuery()">🔍 조회</button>
@@ -7937,7 +7928,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v202_goal_status_formula_fix';
+var CACHE_VERSION = 'v204_grand_total_top_and_other_parish';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8998,6 +8989,17 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
   // [v188] 화면 전용 — "교구" 컬럼 제거(구역만 표시), CSV(homeAggExportCSV)는 변경 없음
   var html = '<table><thead><tr><th>구역</th>'+(showRate?'<th>달성율</th>':'')+'<th>합</th>'+thGroups+'</tr></thead><tbody>';
 
+  // [v204] 총계를 그리드 헤더 바로 아래(최상단)로 이동
+  if(table.grand){
+    var gRate = calcRate(table.grand.total, goalTotal);
+    html += '<tr style="background:#e8edf5;font-weight:900;">'
+      + '<td>총계</td>'
+      + (showRate?'<td>'+fmtRate(gRate)+'</td>':'')
+      + '<td>'+table.grand.total+'</td>'
+      + GROUP_KEYS.map(function(g){ return '<td>'+table.grand.counts[g]+'</td>'; }).join('')
+      + '</tr>';
+  }
+
   table.parishes.forEach(function(p){
     p.districts.forEach(function(d){
       var dRate = calcRate(d.total, perDistrictTarget);
@@ -9017,7 +9019,7 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
       + '</tr>';
   });
 
-  // ── 기타교구 렌더 (1~4교구 합계 뒤, 총계 앞) — 달성율은 목표값이 없으므로 '-'로 고정 표시 ──
+  // ── 기타교구 렌더 (1~4교구 합계 뒤) — 달성율은 목표값이 없으므로 '-'로 고정 표시 ──
   if(table.other){
     table.other.districts.forEach(function(d){
       html += '<tr>'
@@ -9032,16 +9034,6 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
       + (showRate?'<td>-</td>':'')
       + '<td>'+table.other.total+'</td>'
       + GROUP_KEYS.map(function(g){ return '<td>'+table.other.counts[g]+'</td>'; }).join('')
-      + '</tr>';
-  }
-
-  if(table.grand){
-    var gRate = calcRate(table.grand.total, goalTotal);
-    html += '<tr style="background:#e8edf5;font-weight:900;">'
-      + '<td>총계</td>'
-      + (showRate?'<td>'+fmtRate(gRate)+'</td>':'')
-      + '<td>'+table.grand.total+'</td>'
-      + GROUP_KEYS.map(function(g){ return '<td>'+table.grand.counts[g]+'</td>'; }).join('')
       + '</tr>';
   }
 
@@ -9163,6 +9155,11 @@ function homeAggExportCSV(){
     var perDistrictTarget = districtsCount>0 ? (goalTotal/districtsCount) : 0;
     var perParishTarget   = goalTotal>0 ? (goalTotal/4) : 0;
     var rows = [];
+    // [v204] 총계를 최상단으로 이동 (화면 그리드와 동일한 순서)
+    if(table.grand){
+      var gRate = calcRate(table.grand.total, goalTotal);
+      rows.push(['총계', ''].concat(showRate?[gRate+'%']:[]).concat([table.grand.total]).concat(GROUP_KEYS.map(function(g){ return table.grand.counts[g]; })));
+    }
     table.parishes.forEach(function(p){
       p.districts.forEach(function(d){
         var dRate = calcRate(d.total, perDistrictTarget);
@@ -9176,10 +9173,6 @@ function homeAggExportCSV(){
         rows.push([table.other.parish, d.district].concat(showRate?['-']:[]).concat([d.total]).concat(GROUP_KEYS.map(function(g){ return d.counts[g]; })));
       });
       rows.push([table.other.parish+' 합계', ''].concat(showRate?['-']:[]).concat([table.other.total]).concat(GROUP_KEYS.map(function(g){ return table.other.counts[g]; })));
-    }
-    if(table.grand){
-      var gRate = calcRate(table.grand.total, goalTotal);
-      rows.push(['총계', ''].concat(showRate?[gRate+'%']:[]).concat([table.grand.total]).concat(GROUP_KEYS.map(function(g){ return table.grand.counts[g]; })));
     }
     return rows;
   }
@@ -12328,7 +12321,7 @@ function goalDistrictClearAll(){
 }
 
 // ── 📈 수양회목표달성현황 (조회 전용) ─────────────────────────────────
-var gsYear = null, gsEventName = null, gsSeason = null, gsParish = null, gsDistrict = null;
+var gsYear = null, gsParish = null, gsDistrict = null;
 var gsCurrent = null; // 최근 집계 결과 캐시 (엑셀다운용)
 
 function goalStatusInit(){
@@ -12362,7 +12355,23 @@ function goalStatusInitParishSelect(){
 
 function goalStatusInitDistrictSelect(){
   var sel = $id('gs-district-select'); if(!sel) return;
-  var list = (gsParish==='전체'||gsParish==='기타교구') ? [] : (PARISH_DISTRICTS[gsParish]||[]);
+  var list;
+  if(gsParish==='전체'){
+    list = [];
+  } else if(gsParish==='기타교구'){
+    // [v204] 홈(수양회집계현황)과 동일하게 선택 연도 데이터에서 실제 구역값을 동적 수집
+    var year = gsYear;
+    var seen = {}; list = [];
+    retreat.forEach(function(r){
+      if(String(r.year||'').trim()!==String(year)) return;
+      var p = (r.parish||'').trim();
+      if(PARISH_DISTRICTS.hasOwnProperty(p)) return;
+      var d = (r.district||'').trim() || '미분류';
+      if(!seen[d]){ seen[d]=true; list.push(d); }
+    });
+  } else {
+    list = PARISH_DISTRICTS[gsParish] || [];
+  }
   if(!gsDistrict || (list.indexOf(gsDistrict)===-1 && gsDistrict!=='전체')) gsDistrict = '전체';
   var opts = ['전체'].concat(list);
   sel.innerHTML = opts.map(function(d){ return '<option value="'+d+'"'+(d===gsDistrict?' selected':'')+'>'+d+'</option>'; }).join('');
@@ -12383,8 +12392,6 @@ function goalStatusYearChange(){
 
 function goalStatusQuery(){
   var ySel=$id('gs-year-select');     if(ySel) gsYear=ySel.value;
-  var eSel=$id('gs-event-select');    if(eSel) gsEventName=eSel.value;
-  var sSel=$id('gs-season-select');   if(sSel) gsSeason=sSel.value;
   var pSel=$id('gs-parish-select');   if(pSel) gsParish=pSel.value;
   var dSel=$id('gs-district-select'); if(dSel) gsDistrict=dSel.value;
   renderGoalStatusPanel();
@@ -12427,6 +12434,35 @@ function buildGoalStatusTable(rows, goalMap, scopeParishes, selDistrict){
     });
     result.parishes.push({ parish:p, districts:dRows, agg:pAgg });
   });
+
+  // ── 기타교구: scopeParishes(1~4교구)에 속하지 않는 교구값을 가진 행들을 구역별로 묶어 별도 집계 ──
+  // (홈의 buildAggregateTable 'other' 로직과 동일한 원리) — 목표값은 CSV 등록 대상이 아니므로 goalMap 매칭 실패 시 0 처리
+  var otherByDistrict = {}; var otherOrder = [];
+  rows.forEach(function(r){
+    var p = (r.parish||'').trim();
+    if(scopeParishes.indexOf(p)!==-1) return; // 이미 위에서 정상 처리된 교구
+    var d = (r.district||'').trim() || '미분류';
+    if(selDistrict !== '전체' && d !== selDistrict) return;
+    if(!otherByDistrict[d]){ otherByDistrict[d] = {preReg:0, evangelReg:0}; otherOrder.push(d); }
+    otherByDistrict[d].preReg++;
+    var sv=(r.salvCode||'').trim();
+    if(sv==='N'||sv==='P') otherByDistrict[d].evangelReg++;
+  });
+  if(otherOrder.length){
+    var otherRows = otherOrder.map(function(d){
+      var goal = goalMap[d] || {receiptGoal:0, memberRoll:0, evangelGoal:0};
+      var preReg = otherByDistrict[d].preReg;
+      var evangelReg = otherByDistrict[d].evangelReg;
+      var row = { district:d, receiptGoal:goal.receiptGoal, preReg:preReg, memberRoll:goal.memberRoll,
+                  memberReg:preReg-evangelReg, evangelGoal:goal.evangelGoal, evangelReg:evangelReg };
+      _gsAddAgg(grand, row);
+      return row;
+    });
+    var otherAgg = _gsEmptyAgg();
+    otherRows.forEach(function(row){ _gsAddAgg(otherAgg, row); });
+    result.other = { parish:'기타교구', districts:otherRows, agg:otherAgg };
+  }
+
   result.grand = grand;
   return result;
 }
@@ -12460,37 +12496,52 @@ function renderGoalStatusTableDOM(containerId, table){
     p.districts.forEach(function(d){ html += rowHtml(d.district, d, '', false); });
     if(p.districts.length>1) html += rowHtml(p.parish+' 합계', p.agg, 'background:#fff9c4;font-weight:700;', false);
   });
+  // 기타교구 (1~4교구 합계 뒤)
+  if(table.other){
+    table.other.districts.forEach(function(d){ html += rowHtml(d.district, d, '', false); });
+    html += rowHtml(table.other.parish+' 합계', table.other.agg, 'background:#fff9c4;font-weight:700;', false);
+  }
   html += '</tbody></table>';
   el.innerHTML = html;
 }
 
 function renderGoalStatusPanel(){
   var year = gsYear || String(new Date().getFullYear());
-  var eventName = gsEventName || '1차';
-  var season = gsSeason || '하계';
   var isAdmin = !!(currentUser && currentUser.role==='admin');
   var selParish   = gsParish   || (isAdmin ? '전체' : ((currentUser&&currentUser.parish)||'1교구'));
   var selDistrict = gsDistrict || '전체';
 
-  var rows = retreat.filter(function(r){
-    return String(r.year||'').trim()===String(year)
-      && String(r.retreatType||'').trim()===season
-      && String(r.event||'').trim()===eventName;
+  // [v203] 조회조건을 홈(수양회집계현황)과 동일하게 연도만으로 필터 (회차/수양회종류 구분 없음)
+  var yearRows = retreat.filter(function(r){
+    return String(r.year||'').trim()===String(year);
   });
 
+  // [v203] 연도만 매칭 — 같은 연도에 여러 회차/종류로 등록된 구역목표기초값이 있으면 구역별로 합산
   var goalMap = {};
   _goalDistrictRows.forEach(function(r){
-    if(r.year===String(year) && r.retreatType===season && r.eventName===eventName){
-      goalMap[r.district] = { receiptGoal:r.receiptGoal, memberRoll:r.memberRoll, evangelGoal:r.evangelGoal };
+    if(r.year===String(year)){
+      if(!goalMap[r.district]) goalMap[r.district] = { receiptGoal:0, memberRoll:0, evangelGoal:0 };
+      goalMap[r.district].receiptGoal += r.receiptGoal;
+      goalMap[r.district].memberRoll  += r.memberRoll;
+      goalMap[r.district].evangelGoal += r.evangelGoal;
     }
   });
 
-  var scopeParishes = (selParish==='전체') ? Object.keys(PARISH_DISTRICTS)
-                     : (selParish==='기타교구') ? []
-                     : [selParish];
+  // [v204] 홈(homeAggQuery)과 동일한 3분기 패턴: 전체/기타교구/특정교구
+  var scopedRows, scopeParishes;
+  if(selParish === '전체'){
+    scopeParishes = Object.keys(PARISH_DISTRICTS);
+    scopedRows = yearRows; // 1~4교구 외 값은 buildGoalStatusTable이 자동으로 '기타교구'로 묶음
+  } else if(selParish === '기타교구'){
+    scopeParishes = [];
+    scopedRows = yearRows.filter(function(r){ return !PARISH_DISTRICTS.hasOwnProperty((r.parish||'').trim()); });
+  } else {
+    scopeParishes = [selParish];
+    scopedRows = yearRows.filter(function(r){ return (r.parish||'').trim()===selParish; });
+  }
 
-  var table = buildGoalStatusTable(rows, goalMap, scopeParishes, selDistrict);
-  gsCurrent = { year:year, eventName:eventName, season:season, table:table };
+  var table = buildGoalStatusTable(scopedRows, goalMap, scopeParishes, selDistrict);
+  gsCurrent = { year:year, table:table };
   renderGoalStatusTableDOM('gs-table', table);
 }
 
@@ -12506,21 +12557,25 @@ function goalStatusExportCSV(){
       d.evangelGoal, d.evangelReg, calcRate(d.evangelReg,d.evangelGoal)+'%'];
   }
   var rows = [];
-  rows.push([gsCurrent.year+'년 '+gsCurrent.season+' '+gsCurrent.eventName+' 수양회목표달성현황']);
+  rows.push([gsCurrent.year+'년 수양회목표달성현황']);
   rows.push([]);
   rows.push(header);
-  // [v202] 원본 엑셀 양식과 동일하게 총계를 최상단에 배치
+  // 원본 엑셀 양식과 동일하게 총계를 최상단에 배치
   rows.push(rowArr('총계', gsCurrent.table.grand, true));
   gsCurrent.table.parishes.forEach(function(p){
     p.districts.forEach(function(d){ rows.push(rowArr(d.district, d, false)); });
     if(p.districts.length>1) rows.push(rowArr(p.parish+' 합계', p.agg, false));
   });
+  if(gsCurrent.table.other){
+    gsCurrent.table.other.districts.forEach(function(d){ rows.push(rowArr(d.district, d, false)); });
+    rows.push(rowArr(gsCurrent.table.other.parish+' 합계', gsCurrent.table.other.agg, false));
+  }
   var csv = '\uFEFF' + rows.map(function(r){
     return r.map(function(v){ return /[,"]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v); }).join(',');
   }).join('\r\n');
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download = '수양회목표달성현황_'+gsCurrent.year+'_'+gsCurrent.season+'_'+gsCurrent.eventName+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.download = '수양회목표달성현황_'+gsCurrent.year+'_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
   showToast('수양회목표달성현황 CSV 저장 완료','success');
 }
