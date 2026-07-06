@@ -663,6 +663,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <nav class="sidebar-nav">
         <div class="nav-section">메뉴</div>
         <button class="nav-item active" id="nav-home"     onclick="switchPanel('home')">    <span class="icon">🏠</span> 수양회집계현황</button>
+        <button class="nav-item" id="nav-goalstatus" onclick="switchPanel('goalstatus')"><span class="icon">📈</span> 수양회목표달성현황</button>
         <button class="nav-item"        id="nav-search"   onclick="switchPanel('search')">  <span class="icon">🔍</span> 접수인원현황</button>
         <button class="nav-item" id="nav-bus-view" onclick="switchPanel('busview')"><span class="icon">📋</span> 버스 배정 현황</button>
         <button class="nav-item" id="nav-roomview" onclick="switchPanel('roomview')"><span class="icon">🛏</span> 숙소 배정 현황</button>
@@ -670,6 +671,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <div class="nav-section" id="admin-section" style="display:none">관리자</div>
         <button class="nav-item"        id="nav-register" onclick="switchPanel('register')" style="display:none"><span class="icon">✏️</span> 자료 등록</button>
         <button class="nav-item" id="nav-excel"    onclick="switchPanel('excel')"    style="display:none"><span class="icon">📊</span> 참석인원관리</button>
+        <button class="nav-item" id="nav-goal"     onclick="switchPanel('goal')"     style="display:none"><span class="icon">🎯</span> 교회 목표 관리</button>
         <button class="nav-item" id="nav-accounts" onclick="switchPanel('accounts')" style="display:none"><span class="icon">👥</span> 계정 관리</button>
         <button class="nav-item" id="nav-bus"      onclick="switchPanel('bus')"      style="display:none"><span class="icon">🚌</span> 버스 배정</button>
         <button class="nav-item" id="nav-room"     onclick="switchPanel('room')"     style="display:none"><span class="icon">🏠</span> 숙소 배정</button>
@@ -768,6 +770,31 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <div class="card-header"><div class="card-title">전도</div></div>
               <div class="table-wrap agg-compact"><div id="home-table2"></div></div>
             </div>
+          </div>
+        </div>
+
+        <!-- GOALSTATUS: 수양회목표달성현황 (조회 전용) -->
+        <div class="panel" id="panel-goalstatus">
+          <div class="card-title" style="margin:4px 0 10px;font-size:1.05rem;">수양회목표달성현황</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+            <select id="gs-year-select" onchange="goalStatusYearChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
+            <select id="gs-event-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;">
+              <option value="1차">1차</option><option value="2차">2차</option><option value="3차">3차</option>
+              <option value="4차">4차</option><option value="5차">5차</option><option value="6차">6차</option><option value="7차">7차</option>
+            </select>
+            <select id="gs-season-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;">
+              <option value="춘계">춘계</option><option value="하계" selected>하계</option><option value="추계">추계</option><option value="동계">동계</option>
+            </select>
+            <select id="gs-parish-select" onchange="goalStatusParishChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
+            <select id="gs-district-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
+            <button class="btn btn-primary btn-sm" onclick="goalStatusQuery()">🔍 조회</button>
+            <button class="btn btn-sm" onclick="goalStatusExportCSV()" style="border:1px solid var(--border2);background:#fff;">📥 엑셀다운</button>
+          </div>
+          <div id="gs-admin-link" style="display:none;font-size:.78rem;color:var(--muted);margin-bottom:12px;">
+            구역별 목표값은 <a href="javascript:void(0)" onclick="switchPanel('goal');goalModalSwitchTab('district');" style="color:var(--navy);font-weight:600;">🎯 교회 목표 관리</a> 메뉴에서 CSV로 등록·수정합니다.
+          </div>
+          <div class="card">
+            <div class="table-wrap agg-compact"><div id="gs-table"></div></div>
           </div>
         </div>
 
@@ -1650,7 +1677,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 </button>
                 <button class="btn btn-danger btn-sm" onclick="vwClearAllConfirm()">🗑 등록데이터 초기화</button>
                 <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ 등록데이터 CSV</button>
-                <button id="btn-goal-modal" class="btn btn-navy btn-sm" onclick="goalOpenModal()" style="display:none;">🎯 교회 목표 관리</button>
               </div>
             </div>
 
@@ -1771,6 +1797,107 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
           </div><!-- /.card -->
         </div><!-- /#panel-excel -->
+
+<!-- GOAL (교회 목표 관리) -->
+        <div class="panel" id="panel-goal">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🎯 교회 목표 관리</div>
+            </div>
+
+            <!-- 탭 -->
+            <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1.5px solid var(--border2);">
+              <button class="btn btn-sm" id="goal-tab-btn-total" onclick="goalModalSwitchTab('total')"
+                style="border:none;border-bottom:3px solid var(--navy);border-radius:0;background:none;font-weight:700;padding:8px 14px;">전체목표</button>
+              <button class="btn btn-sm" id="goal-tab-btn-district" onclick="goalModalSwitchTab('district')"
+                style="border:none;border-bottom:3px solid transparent;border-radius:0;background:none;color:var(--muted);padding:8px 14px;">구역별목표(CSV)</button>
+            </div>
+
+            <!-- 연도/회차/종류 (탭 공용 키) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;max-width:640px;">
+              <div class="form-group" style="margin:0;">
+                <label>연도</label>
+                <select id="goal-year-sel" onchange="goalKeyChange()"></select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>강서교회회차</label>
+                <select id="goal-event-sel" onchange="goalKeyChange()"
+                  style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
+                  <option value="1차" selected>1차</option>
+                  <option value="2차">2차</option>
+                  <option value="3차">3차</option>
+                  <option value="4차">4차</option>
+                  <option value="5차">5차</option>
+                  <option value="6차">6차</option>
+                  <option value="7차">7차</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>수양회종류</label>
+                <select id="goal-season-sel" onchange="goalKeyChange()"
+                  style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
+                  <option value="춘계">춘계</option>
+                  <option value="하계" selected>하계</option>
+                  <option value="추계">추계</option>
+                  <option value="동계">동계</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 탭1: 전체목표 -->
+            <div id="goal-tab-panel-total">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px;max-width:640px;">
+                <div class="form-group" style="margin:0;">
+                  <label>수양회목표</label>
+                  <input type="number" id="goal-retreat" min="0" placeholder="800" oninput="goalCalcPreview()">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label>성도접수목표</label>
+                  <input type="number" id="goal-regist" min="0" placeholder="550" oninput="goalCalcPreview()">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label>전도목표</label>
+                  <input type="number" id="goal-evangel" min="0" placeholder="250" oninput="goalCalcPreview()">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label>구역수</label>
+                  <input type="number" id="goal-districts" min="1" placeholder="20" oninput="goalCalcPreview()">
+                </div>
+              </div>
+
+              <div id="goal-preview" style="background:var(--sky);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;font-size:.78rem;color:var(--text2);margin-bottom:18px;max-width:640px;">
+                구역당 환산: <span id="goal-preview-text">값을 입력하면 자동 계산됩니다</span>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;max-width:640px;">
+                <button id="goal-delete-btn" class="btn btn-sm" style="background:#fff;border:1.5px solid #f5c0c0;color:#d94040;" onclick="goalDelete()">🗑 이 연도 삭제</button>
+                <button class="btn btn-navy" onclick="goalSave()">💾 저장</button>
+              </div>
+            </div>
+
+            <!-- 탭2: 구역별목표(CSV) -->
+            <div id="goal-tab-panel-district" style="display:none;">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+                <input type="file" id="goal-district-csv-input" accept=".csv" style="display:none;" onchange="goalDistrictCsvFileChange(event)">
+                <button class="btn btn-navy btn-sm" onclick="goalDistrictCsvOpen()">📤 CSV 업로드</button>
+                <button class="btn btn-sm" style="background:#fff;border:1.5px solid #f5c0c0;color:#d94040;" onclick="goalDistrictClearAll()">🗑 이 연도/행사 구역목표 전체삭제</button>
+              </div>
+
+              <!-- 업로드 미리보기 (파일 선택 시에만 표시) -->
+              <div id="goal-district-preview-wrap" style="display:none;margin-bottom:20px;">
+                <div id="goal-district-preview-summary" style="font-size:.82rem;font-weight:600;color:var(--navy);margin-bottom:8px;"></div>
+                <div class="table-wrap agg-compact"><div id="goal-district-preview-table"></div></div>
+                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+                  <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;" onclick="goalDistrictPreviewCancel()">취소</button>
+                  <button class="btn btn-navy btn-sm" onclick="goalDistrictConfirmSave()">저장</button>
+                </div>
+              </div>
+
+              <div class="card-title" style="font-size:.9rem;margin-bottom:8px;">현재 저장된 구역별 목표값</div>
+              <div class="table-wrap agg-compact"><div id="goal-district-list-table"></div></div>
+            </div>
+          </div>
+        </div>
 
 <!-- ACCOUNTS -->
         <div class="panel" id="panel-accounts">
@@ -2363,79 +2490,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
   </div>
 </div>
 
-<!-- 교회 목표 관리 모달 -->
-<div class="modal-overlay" id="goal-modal">
-  <div class="modal" style="max-width:460px;">
-    <div class="modal-header">
-      <div class="modal-title">🎯 교회 목표 관리</div>
-      <button class="modal-close" onclick="closeModal('goal-modal')">✕</button>
-    </div>
-
-    <!-- 연도 + 강서교회회차 + 수양회종류 (1행 3등분) -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
-      <div class="form-group" style="margin:0;">
-        <label>연도</label>
-        <select id="goal-year-sel" onchange="goalKeyChange()"></select>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>강서교회회차</label>
-        <select id="goal-event-sel" onchange="goalKeyChange()"
-          style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
-          <option value="1차" selected>1차</option>
-          <option value="2차">2차</option>
-          <option value="3차">3차</option>
-          <option value="4차">4차</option>
-          <option value="5차">5차</option>
-          <option value="6차">6차</option>
-          <option value="7차">7차</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>수양회종류</label>
-        <select id="goal-season-sel" onchange="goalKeyChange()"
-          style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
-          <option value="춘계">춘계</option>
-          <option value="하계" selected>하계</option>
-          <option value="추계">추계</option>
-          <option value="동계">동계</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- 목표 입력 -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px;">
-      <div class="form-group" style="margin:0;">
-        <label>수양회목표</label>
-        <input type="number" id="goal-retreat" min="0" placeholder="800" oninput="goalCalcPreview()">
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>성도접수목표</label>
-        <input type="number" id="goal-regist" min="0" placeholder="550" oninput="goalCalcPreview()">
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>전도목표</label>
-        <input type="number" id="goal-evangel" min="0" placeholder="250" oninput="goalCalcPreview()">
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>구역수</label>
-        <input type="number" id="goal-districts" min="1" placeholder="20" oninput="goalCalcPreview()">
-      </div>
-    </div>
-
-    <!-- 구역당 환산 (자동계산, 보조정보) -->
-    <div id="goal-preview" style="background:var(--sky);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;font-size:.78rem;color:var(--text2);margin-bottom:18px;">
-      구역당 환산: <span id="goal-preview-text">값을 입력하면 자동 계산됩니다</span>
-    </div>
-
-    <div class="modal-footer" style="justify-content:space-between;">
-      <button id="goal-delete-btn" class="btn btn-sm" style="background:#fff;border:1.5px solid #f5c0c0;color:#d94040;" onclick="goalDelete()">🗑 이 연도 삭제</button>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="closeModal('goal-modal')">취소</button>
-        <button class="btn btn-navy" onclick="goalSave()">💾 저장</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- 계정 상세/수정 모달 -->
 <div class="modal-overlay" id="account-detail-modal">
@@ -7883,7 +7937,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v198_upload_no_increment';
+var CACHE_VERSION = 'v202_goal_status_formula_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8441,14 +8495,16 @@ function closeSidebar(){
 }
 
 // ── 초기화 ──
-var PANEL_TITLES={home:'수양회집계현황',register:'자료 등록',search:'접수인원현황',busview:'버스 배정 현황',bus:'버스 배정',excel:'참석인원관리',accounts:'계정 관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
+var PANEL_TITLES={home:'수양회집계현황',goalstatus:'수양회목표달성현황',register:'자료 등록',search:'접수인원현황',busview:'버스 배정 현황',bus:'버스 배정',excel:'참석인원관리',goal:'교회 목표 관리',accounts:'계정 관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
 var PANEL_SUBS={
   home:'수양회 참석자 현황을 확인합니다.',
+  goalstatus:'구역별 목표 대비 접수·성도·전도 달성 현황을 확인합니다.',
   register:'수양회 참석자 정보를 등록합니다.',
   search:'등록된 참석자를 검색하고 조회합니다.',
   busview:'버스별 탑승 현황을 확인합니다.',
   bus:'참석자 버스 탑승 인원을 팀별로 배정합니다.',
   excel:'수양회 접수 파일을 업로드해 확인하고 저장합니다.',
+  goal:'전체 목표 및 구역별 목표(CSV)를 등록하고 관리합니다.',
   accounts:'관리자·구역장·교구장 계정을 등록하고 관리합니다.',
   room:'구역별 숙소 배정을 관리합니다.',
   mypage:'내 계정 정보 조회 및 비밀번호 변경.',
@@ -8475,7 +8531,7 @@ function initApp() {
   $id('sb-role').textContent=roleLabel;
   // 메뉴 노출 — role별 제어
   // 관리자 전용 메뉴 (자료 등록 제외 — 향후 재활성화 예정)
-  ['nav-bus','nav-excel','nav-accounts','nav-room','admin-section'].forEach(function(id){
+  ['nav-bus','nav-excel','nav-accounts','nav-room','nav-goal','admin-section'].forEach(function(id){
     var el=$id(id); if(el) el.style.display=isAdmin?'':'none';
   });
   // 자료 등록: 항상 숨김
@@ -8483,11 +8539,13 @@ function initApp() {
   var ew=$id('btn-export-wrap'); if(ew) ew.style.display=isAdmin?'':'none';
   // 선탑자 지정 탭 버튼: 관리자만 표시
   var leaderTab=$id('bus-tab-leader'); if(leaderTab) leaderTab.style.display=isAdmin?'':'none';
-  var goalBtn=$id('btn-goal-modal'); if(goalBtn) goalBtn.style.display=isAdmin?'':'none';
-  // 자료검색 / 버스현황 / 숙소현황: 모든 권한 표시
+  // 수양회목표달성현황의 관리자 안내링크: 관리자만 표시
+  var gsLink=$id('gs-admin-link'); if(gsLink) gsLink.style.display=isAdmin?'':'none';
+  // 자료검색 / 버스현황 / 숙소현황 / 목표달성현황: 모든 권한 표시
   var navSearch=$id('nav-search');   if(navSearch)   navSearch.style.display='';
   var navBv=$id('nav-bus-view');     if(navBv)       navBv.style.display='';
   var navRv=$id('nav-roomview');     if(navRv)       navRv.style.display='';
+  var navGs=$id('nav-goalstatus');   if(navGs)       navGs.style.display='';
   // T2: 내 계정 메뉴 — 관리자 제외 (구역장/교구장만)
   var navMp=$id('nav-mypage'); if(navMp) navMp.style.display=isAdmin?'none':'';
 
@@ -8549,11 +8607,11 @@ function switchPanel(name, skipRender) {
 
   // ── 접근 제어 ──────────────────────────────────────
   // 관리자 전용 패널
-  if(['register','excel','accounts','bus','room'].indexOf(name)>=0 && !isAdmin){
+  if(['register','excel','accounts','bus','room','goal'].indexOf(name)>=0 && !isAdmin){
     showToast('접근 권한이 없습니다.','error'); return;
   }
-  // 교구장: 자료검색·홈·busview·roomview만 허용
-  if(isParish && ['register','excel','accounts','bus','room'].indexOf(name)>=0){
+  // 교구장: 자료검색·홈·busview·roomview·목표달성현황만 허용
+  if(isParish && ['register','excel','accounts','bus','room','goal'].indexOf(name)>=0){
     showToast('교구장은 조회 권한만 있습니다.','error'); return;
   }
   // T2: 내 계정(mypage) — 관리자는 계정관리 패널 사용
@@ -8573,6 +8631,13 @@ function switchPanel(name, skipRender) {
     if(name==='excel'){
       vwLoadLastProcTime();
       if(USE_SHEET()){ loadData(); }  // 참석인원명단 재조회 — 로컬 캐시 유무와 무관하게 항상 최신화
+    }
+    if(name==='goal'){
+      // 메뉴 진입 시마다 매번 재조회(최신값 보장) — 기존 모달 오픈 방식과 동일한 정책
+      renderGoalPanel();
+    }
+    if(name==='goalstatus'){
+      goalStatusInit();
     }
     if(name==='search'){
       initYearSelect();
@@ -11726,13 +11791,34 @@ function _goalFetchFromSheet(callback, opts){
     });
 }
 
-function goalOpenModal(){
-  $id('goal-modal').classList.add('show');
-  if(_goalLoaded){
-    goalRenderYearOptions();
-    return;
-  }
+// ── 🎯 교회 목표 관리 패널(panel-goal) 진입 시 렌더 ──────────────────────
+// [정책] 메뉴 클릭(패널 진입)마다 매번 구글시트에서 재조회하여 최신값을 보장한다.
+//        (기존 모달 오픈 방식과 동일한 정책을 패널 전환으로 그대로 이식)
+function renderGoalPanel(){
   _goalFetchFromSheet(function(){ goalRenderYearOptions(); }, {showSpinner:true, notify:true});
+  goalDistrictFetchFromSheet(function(){ goalDistrictListRender(); }, {notify:true});
+}
+
+// 탭 전환: 'total'(전체목표) | 'district'(구역별목표 CSV)
+function goalModalSwitchTab(tab){
+  var totalBtn = $id('goal-tab-btn-total'), distBtn = $id('goal-tab-btn-district');
+  var totalPanel = $id('goal-tab-panel-total'), distPanel = $id('goal-tab-panel-district');
+  if(!totalBtn || !distBtn || !totalPanel || !distPanel) return;
+  var activeCss   = {borderBottomColor:'var(--navy)', color:'', fontWeight:'700'};
+  var inactiveCss = {borderBottomColor:'transparent',  color:'var(--muted)', fontWeight:''};
+  function applyCss(btn, css){
+    btn.style.borderBottomColor = css.borderBottomColor;
+    btn.style.color = css.color;
+    btn.style.fontWeight = css.fontWeight;
+  }
+  if(tab==='district'){
+    totalPanel.style.display='none'; distPanel.style.display='';
+    applyCss(distBtn, activeCss); applyCss(totalBtn, inactiveCss);
+    goalDistrictListRender();
+  } else {
+    distPanel.style.display='none'; totalPanel.style.display='';
+    applyCss(totalBtn, activeCss); applyCss(distBtn, inactiveCss);
+  }
 }
 
 function goalRenderYearOptions(){
@@ -11784,6 +11870,9 @@ function goalKeyChange(){
   var delBtn = $id('goal-delete-btn');
   if(delBtn) delBtn.style.display = row ? '' : 'none';
   goalCalcPreview();
+  // [v201] 연도/회차/수양회종류 변경 시 탭2(구역별목표) 하단 "현재 저장된" 리스트도 함께 갱신
+  // (탭1 입력값만 갱신하고 탭2 리스트가 예전 키 기준으로 멈춰있던 버그 수정)
+  goalDistrictListRender();
 }
 
 function goalCalcPreview(){
@@ -11954,6 +12043,486 @@ function _goalSyncToSheet(onSuccess){
   })
   .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
   .finally(function(){ showLoading(false); });
+}
+
+// ── 구역별 목표 기초값 (구역목표기초값 시트) ─────────────────────────────
+// 키: 연도+수양회종류+행사명+구역 (교회목표와 동일한 3키 + 구역)
+var _goalDistrictRows = [];        // [{no,year,retreatType,eventName,district,receiptGoal,memberRoll,evangelGoal,regDate,regBy}]
+var _goalDistrictLoaded = false;
+var _goalDistrictLoading = false;
+var _goalDistrictPendingCsv = null; // CSV 파싱+분류 결과(저장 확정 전 임시 보관)
+
+function _goalCurKey(){
+  return {
+    year:        ($id('goal-year-sel')  ||{value:''}).value,
+    retreatType: ($id('goal-season-sel')||{value:''}).value,
+    eventName:   ($id('goal-event-sel') ||{value:''}).value
+  };
+}
+
+function goalDistrictFetchFromSheet(callback, opts){
+  opts = opts || {};
+  if(_goalDistrictLoading){ if(callback) callback(); return; }
+  if(!USE_SHEET()){
+    _goalDistrictRows = []; _goalDistrictLoaded = true;
+    if(callback) callback();
+    return;
+  }
+  _goalDistrictLoading = true;
+  apiCall({action:'getAll', sheetName:'구역목표기초값'})
+    .then(function(res){
+      if(res && res.success){
+        _goalDistrictRows = (res.data || res.rows || []).map(function(r){
+          return {
+            no:          r['NO'] || '',
+            year:        String(r['연도']||'').trim(),
+            retreatType: String(r['수양회종류']||'').trim(),
+            eventName:   String(r['행사명']||'').trim(),
+            district:    String(r['구역']||'').trim(),
+            receiptGoal: parseFloat(r['접수목표'])||0,
+            memberRoll:  parseFloat(r['성도제적'])||0,
+            evangelGoal: parseFloat(r['전도목표'])||0,
+            regDate:     String(r['등록일']||'').trim(),
+            regBy:       String(r['등록자']||'').trim()
+          };
+        }).filter(function(r){ return r.year && r.district; });
+      } else {
+        _goalDistrictRows = [];
+        if(opts.notify) showToast('구역목표기초값 조회 실패: '+(res&&res.message||'알 수 없는 오류'),'error');
+      }
+      _goalDistrictLoaded = true;
+      if(callback) callback();
+    })
+    .catch(function(e){
+      _goalDistrictRows = []; _goalDistrictLoaded = true;
+      if(opts.notify) showToast('서버 연결 오류: '+(e&&e.message||e),'error');
+      if(callback) callback();
+    })
+    .finally(function(){ _goalDistrictLoading = false; });
+}
+
+// 현재 선택된 연도/종류/행사 스코프의 저장값을 조회 테이블로 렌더
+function goalDistrictListRender(){
+  var el = $id('goal-district-list-table'); if(!el) return;
+  var key = _goalCurKey();
+  var rows = _goalDistrictRows.filter(function(r){
+    return r.year===key.year && r.retreatType===key.retreatType && r.eventName===key.eventName;
+  }).sort(function(a,b){ return (a.district||'').localeCompare(b.district||'','ko'); });
+  if(!rows.length){
+    el.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:.82rem;">등록된 구역별 목표값이 없습니다. CSV를 업로드해 주세요.</div>';
+    return;
+  }
+  var html = '<table><thead><tr><th>구역</th><th>접수목표</th><th>성도제적</th><th>전도목표</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html += '<tr><td>'+esc(r.district)+'</td><td>'+r.receiptGoal+'</td><td>'+r.memberRoll+'</td><td>'+r.evangelGoal+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// CSV 업로드 버튼 클릭 → 숨겨진 file input 트리거
+// (inline onclick은 전역 스코프에서 실행되므로 $id 같은 미노출 헬퍼를 직접 호출하면 안 됨 — 전용 함수로 래핑)
+function goalDistrictCsvOpen(){
+  var inp = $id('goal-district-csv-input');
+  if(inp) inp.click();
+}
+
+// ── CSV 업로드: 파일 선택 → 파싱 → 3-way 분류(신규/변경/삭제) → 미리보기 ──
+function goalDistrictCsvFileChange(event){
+  var file = event.target.files && event.target.files[0];
+  event.target.value = ''; // 동일 파일 재업로드 허용
+  if(!file) return;
+  var key = _goalCurKey();
+  if(!key.year || !key.retreatType || !key.eventName){
+    showToast('연도/수양회종류/강서교회회차를 먼저 선택해 주세요.','error'); return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var parsed = parseGoalDistrictCsv(String(e.target.result||''));
+    if(parsed.error){ showToast(parsed.error,'error'); return; }
+    if(!parsed.rows.length){ showToast('CSV에서 유효한 구역 데이터를 찾지 못했습니다.','error'); return; }
+    var classified = goalDistrictClassify(parsed.rows, key);
+    classified.skipped = parsed.skipped;
+    _goalDistrictPendingCsv = classified;
+    goalDistrictRenderPreview(classified);
+  };
+  reader.onerror = function(){ showToast('파일을 읽는 중 오류가 발생했습니다.','error'); };
+  reader.readAsText(file, 'utf-8');
+}
+
+// CSV 텍스트 → [{district,receiptGoal,memberRoll,evangelGoal}] + 스킵건수
+// 헤더 행은 '구역' 셀을 포함하는 행으로 자동 탐지(제목/날짜 행 스킵)
+// 구역코드 유효성: 순수 숫자(2~3자리)이면서 PARISH_DISTRICTS에 존재하는 구역만 인정
+//                  (총계/N교구 소계 등 집계행은 스킵)
+function parseGoalDistrictCsv(text){
+  var allRows = parseCSV(text);
+  var headerIdx = -1;
+  for(var i=0;i<allRows.length;i++){
+    if(allRows[i].some(function(c){ return String(c||'').replace(/\s+/g,'')==='구역'; })){ headerIdx=i; break; }
+  }
+  if(headerIdx===-1) return {rows:[], skipped:0, error:'헤더 행("구역" 컬럼)을 찾을 수 없습니다.'};
+  var header = allRows[headerIdx].map(function(c){ return String(c||'').replace(/\s+/g,''); });
+  var idxDistrict    = header.indexOf('구역');
+  var idxReceiptGoal = header.indexOf('접수목표');
+  var idxMemberRoll  = header.indexOf('성도제적');
+  var idxEvangelGoal = header.indexOf('전도목표');
+  if(idxReceiptGoal===-1 || idxMemberRoll===-1 || idxEvangelGoal===-1){
+    return {rows:[], skipped:0, error:'필수 컬럼(접수목표/성도제적/전도목표)을 CSV에서 찾을 수 없습니다.'};
+  }
+  var allDistricts = []; Object.keys(PARISH_DISTRICTS).forEach(function(p){ allDistricts = allDistricts.concat(PARISH_DISTRICTS[p]); });
+  function num(v){ var n = parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+  var result = [], skipped = 0;
+  for(var r=headerIdx+1; r<allRows.length; r++){
+    var row = allRows[r];
+    var districtRaw = String(row[idxDistrict]||'').trim();
+    if(!/^\d{2,3}$/.test(districtRaw)){ skipped++; continue; } // 총계/N교구 소계 등 집계행 스킵
+    var districtName = districtRaw + '구역';
+    if(allDistricts.indexOf(districtName)===-1){ skipped++; continue; } // 알 수 없는 구역코드 스킵
+    result.push({
+      district:    districtName,
+      receiptGoal: num(row[idxReceiptGoal]),
+      memberRoll:  num(row[idxMemberRoll]),
+      evangelGoal: num(row[idxEvangelGoal])
+    });
+  }
+  return {rows:result, skipped:skipped};
+}
+
+// 기존 저장값(현재 연도/종류/행사 스코프) 대비 신규/변경/삭제 분류
+function goalDistrictClassify(parsedRows, key){
+  var existing = _goalDistrictRows.filter(function(r){
+    return r.year===key.year && r.retreatType===key.retreatType && r.eventName===key.eventName;
+  });
+  var existingByDistrict = {};
+  existing.forEach(function(r){ existingByDistrict[r.district] = r; });
+  var seen = {};
+  var newList = [], updateList = [], sameList = [];
+  parsedRows.forEach(function(pr){
+    seen[pr.district] = true;
+    var ex = existingByDistrict[pr.district];
+    if(!ex){
+      newList.push(pr);
+    } else if(ex.receiptGoal!==pr.receiptGoal || ex.memberRoll!==pr.memberRoll || ex.evangelGoal!==pr.evangelGoal){
+      updateList.push(pr);
+    } else {
+      sameList.push(pr);
+    }
+  });
+  var removeList = existing.filter(function(r){ return !seen[r.district]; });
+  return { key:key, parsedRows:parsedRows, newList:newList, updateList:updateList, removeList:removeList, sameList:sameList };
+}
+
+function goalDistrictRenderPreview(classified){
+  var wrap = $id('goal-district-preview-wrap'); if(!wrap) return;
+  wrap.style.display = '';
+  var summary = $id('goal-district-preview-summary');
+  if(summary){
+    summary.textContent = '신규 '+classified.newList.length+'건 · 변경 '+classified.updateList.length+'건 · 삭제 '+classified.removeList.length+'건'
+      + (classified.skipped ? ' · 스킵 '+classified.skipped+'건(집계행)' : '');
+  }
+  function statusOf(d){
+    if(classified.newList.indexOf(d)>=0) return {label:'신규', color:'#1a8a4a'};
+    if(classified.updateList.indexOf(d)>=0) return {label:'변경', color:'#b8860b'};
+    return {label:'유지', color:'#888'};
+  }
+  var rows = classified.parsedRows.slice().sort(function(a,b){ return a.district.localeCompare(b.district,'ko'); });
+  var html = '<table><thead><tr><th>구역</th><th>접수목표</th><th>성도제적</th><th>전도목표</th><th>상태</th></tr></thead><tbody>';
+  rows.forEach(function(pr){
+    var st = statusOf(pr);
+    html += '<tr><td>'+esc(pr.district)+'</td><td>'+pr.receiptGoal+'</td><td>'+pr.memberRoll+'</td><td>'+pr.evangelGoal+'</td>'
+      + '<td style="color:'+st.color+';font-weight:700;">'+st.label+'</td></tr>';
+  });
+  classified.removeList.forEach(function(r){
+    html += '<tr style="opacity:.6;"><td>'+esc(r.district)+'</td><td>'+r.receiptGoal+'</td><td>'+r.memberRoll+'</td><td>'+r.evangelGoal+'</td>'
+      + '<td style="color:#d94040;font-weight:700;">삭제</td></tr>';
+  });
+  html += '</tbody></table>';
+  var tEl = $id('goal-district-preview-table'); if(tEl) tEl.innerHTML = html;
+}
+
+function goalDistrictPreviewCancel(){
+  _goalDistrictPendingCsv = null;
+  var wrap = $id('goal-district-preview-wrap'); if(wrap) wrap.style.display='none';
+}
+
+// 저장 확정: 현재 연도/종류/행사 스코프만 통째로 overwrite (다른 스코프의 기존 행은 그대로 유지)
+// → 행 인덱스 추적 없이 최신 전체 시트를 재조회해 재구성하므로 race condition 위험이 없음
+function goalDistrictConfirmSave(){
+  if(!_goalDistrictPendingCsv){ showToast('업로드된 CSV가 없습니다.','error'); return; }
+  if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
+  var key = _goalDistrictPendingCsv.key;
+  if(!key.year || !key.retreatType || !key.eventName){
+    showToast('연도/수양회종류/강서교회회차를 먼저 선택해 주세요.','error'); return;
+  }
+  var hdr = ['NO','연도','수양회종류','행사명','구역','접수목표','성도제적','전도목표','등록일','등록자'];
+  showLoading(true);
+  apiCall({action:'getAll', sheetName:'구역목표기초값'})
+    .then(function(res){
+      var sheetRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      var kept = sheetRows.filter(function(r){
+        return !(String(r['연도']||'').trim()===key.year && String(r['수양회종류']||'').trim()===key.retreatType && String(r['행사명']||'').trim()===key.eventName);
+      });
+      var maxNo = sheetRows.reduce(function(m,r){ var n=parseInt(r['NO'],10); return isNaN(n)?m:Math.max(m,n); }, 0);
+      var now = today();
+      var by = (currentUser&&currentUser.name)||'admin';
+      var newRowsForKey = _goalDistrictPendingCsv.parsedRows.map(function(pr){
+        maxNo++;
+        return [maxNo, key.year, key.retreatType, key.eventName, pr.district, pr.receiptGoal, pr.memberRoll, pr.evangelGoal, now, by];
+      });
+      var keptMapped = kept.map(function(r){
+        return [r['NO']||'', r['연도']||'', r['수양회종류']||'', r['행사명']||'', r['구역']||'', r['접수목표']||'', r['성도제적']||'', r['전도목표']||'', r['등록일']||'', r['등록자']||''];
+      });
+      return fetch(API_URL, {
+        method:'POST', headers:_gasHeaders({'Content-Type':'text/plain'}),
+        body: JSON.stringify({action:'overwrite', sheetName:'구역목표기초값', headers:hdr, rows:keptMapped.concat(newRowsForKey)}),
+        redirect:'follow'
+      }).then(function(r){ return r.json(); });
+    })
+    .then(function(res){
+      if(!res||!res.success) throw new Error(res&&res.error||'저장 실패');
+      var c = _goalDistrictPendingCsv;
+      showToast('✅ 구역별 목표 저장 완료 (신규 '+c.newList.length+' · 변경 '+c.updateList.length+' · 삭제 '+c.removeList.length+')','success');
+      _goalDistrictPendingCsv = null;
+      var wrap = $id('goal-district-preview-wrap'); if(wrap) wrap.style.display='none';
+      goalDistrictFetchFromSheet(function(){
+        goalDistrictListRender();
+        // 연관 이벤트: 수양회목표달성현황 화면이 열려 있으면 자동 재조회
+        var gsPanel = $id('panel-goalstatus');
+        if(gsPanel && gsPanel.classList.contains('active')) goalStatusQuery();
+      });
+    })
+    .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){ showLoading(false); });
+}
+
+function goalDistrictClearAll(){
+  var key = _goalCurKey();
+  if(!key.year || !key.retreatType || !key.eventName){
+    showToast('연도/수양회종류/강서교회회차를 먼저 선택해 주세요.','error'); return;
+  }
+  if(!confirm(key.year+'년 '+key.retreatType+' '+key.eventName+'의 구역별 목표값을 전체 삭제하시겠습니까?')) return;
+  if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
+  var hdr = ['NO','연도','수양회종류','행사명','구역','접수목표','성도제적','전도목표','등록일','등록자'];
+  showLoading(true);
+  apiCall({action:'getAll', sheetName:'구역목표기초값'})
+    .then(function(res){
+      var sheetRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      var remaining = sheetRows.filter(function(r){
+        return !(String(r['연도']||'').trim()===key.year && String(r['수양회종류']||'').trim()===key.retreatType && String(r['행사명']||'').trim()===key.eventName);
+      }).map(function(r){
+        return [r['NO']||'', r['연도']||'', r['수양회종류']||'', r['행사명']||'', r['구역']||'', r['접수목표']||'', r['성도제적']||'', r['전도목표']||'', r['등록일']||'', r['등록자']||''];
+      });
+      return fetch(API_URL, {
+        method:'POST', headers:_gasHeaders({'Content-Type':'text/plain'}),
+        body: JSON.stringify({action:'overwrite', sheetName:'구역목표기초값', headers:hdr, rows:remaining}),
+        redirect:'follow'
+      }).then(function(r){ return r.json(); });
+    })
+    .then(function(res){
+      if(!res||!res.success) throw new Error(res&&res.error||'삭제 실패');
+      showToast('🗑 구역별 목표 전체삭제 완료','success');
+      goalDistrictFetchFromSheet(function(){ goalDistrictListRender(); });
+    })
+    .catch(function(e){ showToast('⚠️ 삭제 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){ showLoading(false); });
+}
+
+// ── 📈 수양회목표달성현황 (조회 전용) ─────────────────────────────────
+var gsYear = null, gsEventName = null, gsSeason = null, gsParish = null, gsDistrict = null;
+var gsCurrent = null; // 최근 집계 결과 캐시 (엑셀다운용)
+
+function goalStatusInit(){
+  var ySel = $id('gs-year-select');
+  if(ySel && !ySel.options.length){
+    var cur = new Date().getFullYear();
+    var html='';
+    for(var y=cur-5;y<=cur+5;y++){ html+='<option value="'+y+'"'+(y===cur?' selected':'')+'>'+y+'년</option>'; }
+    ySel.innerHTML = html;
+    gsYear = String(cur);
+  }
+  goalStatusInitParishSelect();
+  goalStatusInitDistrictSelect();
+  // 참석인원명단 + 구역목표기초값 모두 최신화 후 조회
+  if(USE_SHEET()){
+    loadData().finally(function(){
+      goalDistrictFetchFromSheet(function(){ goalStatusQuery(); });
+    });
+  } else {
+    goalDistrictFetchFromSheet(function(){ goalStatusQuery(); });
+  }
+}
+
+function goalStatusInitParishSelect(){
+  var sel = $id('gs-parish-select'); if(!sel) return;
+  var isAdmin = !!(currentUser && currentUser.role==='admin');
+  var opts = isAdmin ? ['전체','1교구','2교구','3교구','4교구','기타교구'] : ['1교구','2교구','3교구','4교구','기타교구'];
+  if(!gsParish || opts.indexOf(gsParish)===-1) gsParish = isAdmin ? '전체' : ((currentUser&&currentUser.parish)||'1교구');
+  sel.innerHTML = opts.map(function(p){ return '<option value="'+p+'"'+(p===gsParish?' selected':'')+'>'+p+'</option>'; }).join('');
+}
+
+function goalStatusInitDistrictSelect(){
+  var sel = $id('gs-district-select'); if(!sel) return;
+  var list = (gsParish==='전체'||gsParish==='기타교구') ? [] : (PARISH_DISTRICTS[gsParish]||[]);
+  if(!gsDistrict || (list.indexOf(gsDistrict)===-1 && gsDistrict!=='전체')) gsDistrict = '전체';
+  var opts = ['전체'].concat(list);
+  sel.innerHTML = opts.map(function(d){ return '<option value="'+d+'"'+(d===gsDistrict?' selected':'')+'>'+d+'</option>'; }).join('');
+  sel.disabled = (gsParish==='전체');
+}
+
+function goalStatusParishChange(){
+  var sel=$id('gs-parish-select'); if(sel) gsParish=sel.value;
+  gsDistrict='전체';
+  goalStatusInitDistrictSelect();
+  goalStatusQuery();
+}
+
+function goalStatusYearChange(){
+  var sel=$id('gs-year-select'); if(sel) gsYear=sel.value;
+  goalStatusQuery();
+}
+
+function goalStatusQuery(){
+  var ySel=$id('gs-year-select');     if(ySel) gsYear=ySel.value;
+  var eSel=$id('gs-event-select');    if(eSel) gsEventName=eSel.value;
+  var sSel=$id('gs-season-select');   if(sSel) gsSeason=sSel.value;
+  var pSel=$id('gs-parish-select');   if(pSel) gsParish=pSel.value;
+  var dSel=$id('gs-district-select'); if(dSel) gsDistrict=dSel.value;
+  renderGoalStatusPanel();
+}
+
+function _gsEmptyAgg(){ return {receiptGoal:0, preReg:0, memberRoll:0, memberReg:0, evangelGoal:0, evangelReg:0}; }
+function _gsAddAgg(agg, row){
+  agg.receiptGoal += row.receiptGoal; agg.preReg     += row.preReg;
+  agg.memberRoll  += row.memberRoll;  agg.memberReg  += row.memberReg;
+  agg.evangelGoal += row.evangelGoal; agg.evangelReg += row.evangelReg;
+}
+
+// 산식: 사전접수=구역 전체 등록자 수 / 전도접수=구원여부 in(N,P) / 성도접수=사전접수-전도접수
+// 성도목표(구역/교구소계)=성도제적×0.68 [헤더는 "제적의70%"로 표기하되 실제 계산은 원본 엑셀과 동일하게 68% 사용]
+// 성도목표(총계)=접수목표합계-전도목표합계 (구역/교구소계와는 별도 공식 — 원본 엑셀 수식과 동일)
+// [중요] 목표달성율(성도접수÷성도목표)은 반올림 전의 원본 성도목표 값으로 계산해야 원본 엑셀과 일치함
+// (엑셀 셀은 "24"로 표시되어도 실제 값은 24.48이며, 이를 그대로 다음 수식에 사용하는 것과 동일한 원리)
+function _gsMemberGoalRaw(d, isGrand){
+  return isGrand ? (d.receiptGoal - d.evangelGoal) : (d.memberRoll * 0.68);
+}
+
+function buildGoalStatusTable(rows, goalMap, scopeParishes, selDistrict){
+  var result = { parishes: [], grand: null };
+  var grand = _gsEmptyAgg();
+  scopeParishes.forEach(function(p){
+    var districts = PARISH_DISTRICTS[p] || [];
+    if(selDistrict !== '전체') districts = districts.filter(function(d){ return d===selDistrict; });
+    if(!districts.length) return;
+    var dRows = []; var pAgg = _gsEmptyAgg();
+    districts.forEach(function(d){
+      var goal = goalMap[d] || {receiptGoal:0, memberRoll:0, evangelGoal:0};
+      var dRowsData = rows.filter(function(r){ return (r.district||'').trim()===d; });
+      var preReg = dRowsData.length;
+      var evangelReg = dRowsData.filter(function(r){ var sv=(r.salvCode||'').trim(); return sv==='N'||sv==='P'; }).length;
+      var memberReg = preReg - evangelReg;
+      var row = { district:d, receiptGoal:goal.receiptGoal, preReg:preReg, memberRoll:goal.memberRoll,
+                  memberReg:memberReg, evangelGoal:goal.evangelGoal, evangelReg:evangelReg };
+      dRows.push(row);
+      _gsAddAgg(pAgg, row); _gsAddAgg(grand, row);
+    });
+    result.parishes.push({ parish:p, districts:dRows, agg:pAgg });
+  });
+  result.grand = grand;
+  return result;
+}
+
+function renderGoalStatusTableDOM(containerId, table){
+  var el = $id(containerId); if(!el) return;
+  function rowHtml(label, d, styleAttr, isGrand){
+    var memberGoalRaw = _gsMemberGoalRaw(d, isGrand);
+    var memberGoalDisp = Math.round(memberGoalRaw);
+    var preRegRate     = calcRate(d.preReg,    d.receiptGoal);
+    var memberRegRate  = calcRate(d.memberReg, d.memberRoll);
+    var memberGoalRate = calcRate(d.memberReg, memberGoalRaw);
+    var evangelRate    = calcRate(d.evangelReg,d.evangelGoal);
+    return '<tr'+(styleAttr?' style="'+styleAttr+'"':'')+'>'
+      + '<td>'+esc(label)+'</td>'
+      + '<td>'+d.receiptGoal+'</td><td>'+d.preReg+'</td><td>'+fmtRate(preRegRate)+'</td>'
+      + '<td>'+d.memberRoll+'</td><td>'+d.memberReg+'</td><td>'+fmtRate(memberRegRate)+'</td>'
+      + '<td>'+memberGoalDisp+'</td><td>'+fmtRate(memberGoalRate)+'</td>'
+      + '<td>'+d.evangelGoal+'</td><td>'+d.evangelReg+'</td><td>'+fmtRate(evangelRate)+'</td>'
+      + '</tr>';
+  }
+  // [v202] 원본 엑셀 양식과 동일하게: 총계 최상단, 교구소계 노란색 강조
+  var html = '<table><thead><tr>'
+    + '<th>구역</th><th>접수목표</th><th>사전접수</th><th>달성율</th>'
+    + '<th>성도제적</th><th>성도접수</th><th>접수율</th>'
+    + '<th>성도목표(제적의70%)</th><th>목표달성율</th>'
+    + '<th>전도목표</th><th>전도접수</th><th>달성율</th>'
+    + '</tr></thead><tbody>';
+  html += rowHtml('총계', table.grand, 'font-weight:900;', true);
+  table.parishes.forEach(function(p){
+    p.districts.forEach(function(d){ html += rowHtml(d.district, d, '', false); });
+    if(p.districts.length>1) html += rowHtml(p.parish+' 합계', p.agg, 'background:#fff9c4;font-weight:700;', false);
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function renderGoalStatusPanel(){
+  var year = gsYear || String(new Date().getFullYear());
+  var eventName = gsEventName || '1차';
+  var season = gsSeason || '하계';
+  var isAdmin = !!(currentUser && currentUser.role==='admin');
+  var selParish   = gsParish   || (isAdmin ? '전체' : ((currentUser&&currentUser.parish)||'1교구'));
+  var selDistrict = gsDistrict || '전체';
+
+  var rows = retreat.filter(function(r){
+    return String(r.year||'').trim()===String(year)
+      && String(r.retreatType||'').trim()===season
+      && String(r.event||'').trim()===eventName;
+  });
+
+  var goalMap = {};
+  _goalDistrictRows.forEach(function(r){
+    if(r.year===String(year) && r.retreatType===season && r.eventName===eventName){
+      goalMap[r.district] = { receiptGoal:r.receiptGoal, memberRoll:r.memberRoll, evangelGoal:r.evangelGoal };
+    }
+  });
+
+  var scopeParishes = (selParish==='전체') ? Object.keys(PARISH_DISTRICTS)
+                     : (selParish==='기타교구') ? []
+                     : [selParish];
+
+  var table = buildGoalStatusTable(rows, goalMap, scopeParishes, selDistrict);
+  gsCurrent = { year:year, eventName:eventName, season:season, table:table };
+  renderGoalStatusTableDOM('gs-table', table);
+}
+
+function goalStatusExportCSV(){
+  if(!gsCurrent){ showToast('먼저 조회를 실행해 주세요.','error'); return; }
+  var header = ['구역','접수목표','사전접수','달성율','성도제적','성도접수','접수율','성도목표(제적의70%)','목표달성율','전도목표','전도접수','달성율'];
+  function rowArr(label, d, isGrand){
+    var memberGoalRaw = _gsMemberGoalRaw(d, isGrand);
+    var memberGoalDisp = Math.round(memberGoalRaw);
+    return [label, d.receiptGoal, d.preReg, calcRate(d.preReg,d.receiptGoal)+'%',
+      d.memberRoll, d.memberReg, calcRate(d.memberReg,d.memberRoll)+'%',
+      memberGoalDisp, calcRate(d.memberReg, memberGoalRaw)+'%',
+      d.evangelGoal, d.evangelReg, calcRate(d.evangelReg,d.evangelGoal)+'%'];
+  }
+  var rows = [];
+  rows.push([gsCurrent.year+'년 '+gsCurrent.season+' '+gsCurrent.eventName+' 수양회목표달성현황']);
+  rows.push([]);
+  rows.push(header);
+  // [v202] 원본 엑셀 양식과 동일하게 총계를 최상단에 배치
+  rows.push(rowArr('총계', gsCurrent.table.grand, true));
+  gsCurrent.table.parishes.forEach(function(p){
+    p.districts.forEach(function(d){ rows.push(rowArr(d.district, d, false)); });
+    if(p.districts.length>1) rows.push(rowArr(p.parish+' 합계', p.agg, false));
+  });
+  var csv = '\uFEFF' + rows.map(function(r){
+    return r.map(function(v){ return /[,"]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v); }).join(',');
+  }).join('\r\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download = '수양회목표달성현황_'+gsCurrent.year+'_'+gsCurrent.season+'_'+gsCurrent.eventName+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  showToast('수양회목표달성현황 CSV 저장 완료','success');
 }
 
 // ── 계정 → 구글 시트 저장 ───────────────────────────────
@@ -12820,7 +13389,11 @@ document.addEventListener('DOMContentLoaded', function() {
     'busRosterOpen','busRosterOpenForBus','busRosterClose','busRosterFilter',
     '_bvwCalcSheetStats','_bvwFetchSheetStats','_bvwRenderStatsOnly',
     'accGenId','accAutoGenId',
-    'goalOpenModal','goalRenderYearOptions','goalAddNewYear','goalKeyChange','goalCalcPreview','goalSave','goalDelete'
+    'renderGoalPanel','goalModalSwitchTab','goalRenderYearOptions','goalAddNewYear','goalKeyChange','goalCalcPreview','goalSave','goalDelete',
+    'goalDistrictFetchFromSheet','goalDistrictListRender','goalDistrictCsvOpen','goalDistrictCsvFileChange','goalDistrictClassify',
+    'goalDistrictRenderPreview','goalDistrictPreviewCancel','goalDistrictConfirmSave','goalDistrictClearAll',
+    'goalStatusInit','goalStatusInitParishSelect','goalStatusInitDistrictSelect','goalStatusParishChange',
+    'goalStatusYearChange','goalStatusQuery','renderGoalStatusPanel','goalStatusExportCSV'
   ];
   var _self = {
     doLogin:doLogin, doLogout:doLogout, switchPanel:switchPanel,
@@ -12887,8 +13460,17 @@ document.addEventListener('DOMContentLoaded', function() {
     busRosterOpen:busRosterOpen, busRosterOpenForBus:busRosterOpenForBus, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
     _bvwCalcSheetStats:_bvwCalcSheetStats, _bvwFetchSheetStats:_bvwFetchSheetStats, _bvwRenderStatsOnly:_bvwRenderStatsOnly,
     accGenId:accGenId, accAutoGenId:accAutoGenId,
-    goalOpenModal:goalOpenModal, goalRenderYearOptions:goalRenderYearOptions, goalAddNewYear:goalAddNewYear,
-    goalKeyChange:goalKeyChange, goalCalcPreview:goalCalcPreview, goalSave:goalSave, goalDelete:goalDelete
+    renderGoalPanel:renderGoalPanel, goalModalSwitchTab:goalModalSwitchTab, goalRenderYearOptions:goalRenderYearOptions, goalAddNewYear:goalAddNewYear,
+    goalKeyChange:goalKeyChange, goalCalcPreview:goalCalcPreview, goalSave:goalSave, goalDelete:goalDelete,
+    goalDistrictFetchFromSheet:goalDistrictFetchFromSheet, goalDistrictListRender:goalDistrictListRender,
+    goalDistrictCsvOpen:goalDistrictCsvOpen,
+    goalDistrictCsvFileChange:goalDistrictCsvFileChange, goalDistrictClassify:goalDistrictClassify,
+    goalDistrictRenderPreview:goalDistrictRenderPreview, goalDistrictPreviewCancel:goalDistrictPreviewCancel,
+    goalDistrictConfirmSave:goalDistrictConfirmSave, goalDistrictClearAll:goalDistrictClearAll,
+    goalStatusInit:goalStatusInit, goalStatusInitParishSelect:goalStatusInitParishSelect,
+    goalStatusInitDistrictSelect:goalStatusInitDistrictSelect, goalStatusParishChange:goalStatusParishChange,
+    goalStatusYearChange:goalStatusYearChange, goalStatusQuery:goalStatusQuery,
+    renderGoalStatusPanel:renderGoalStatusPanel, goalStatusExportCSV:goalStatusExportCSV
   };
   _expose.forEach(function(name){
     try { window[name] = _self[name]; } catch(e) {}
