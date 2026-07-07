@@ -1871,6 +1871,19 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <button id="goal-delete-btn" class="btn btn-sm" style="background:#fff;border:1.5px solid #f5c0c0;color:#d94040;" onclick="goalDelete()">🗑 이 연도 삭제</button>
                 <button class="btn btn-navy" onclick="goalSave()">💾 저장</button>
               </div>
+
+              <hr style="margin:24px 0;border:none;border-top:1px solid var(--border2);">
+              <div class="card-title" style="font-size:.95rem;margin-bottom:10px;">구역별 목표값</div>
+              <div class="table-wrap agg-compact" style="max-width:640px;">
+                <table>
+                  <thead><tr><th>구역</th><th>접수목표</th><th>성도제적</th><th>전도목표</th><th style="width:36px;"></th></tr></thead>
+                  <tbody id="goal-manual-table-body"></tbody>
+                </table>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;max-width:640px;margin-top:10px;">
+                <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;" onclick="goalManualAddRow()">➕ 구역 추가</button>
+                <button class="btn btn-navy btn-sm" onclick="goalManualSave()">💾 구역별 목표 저장</button>
+              </div>
             </div>
 
             <!-- 탭2: 구역별목표(CSV) -->
@@ -8080,7 +8093,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v209_export_hocha_prevattend_busnum_fix';
+var CACHE_VERSION = 'v212_goal_addrow_button_position';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -11957,7 +11970,7 @@ function _goalFetchFromSheet(callback, opts){
 //        (기존 모달 오픈 방식과 동일한 정책을 패널 전환으로 그대로 이식)
 function renderGoalPanel(){
   _goalFetchFromSheet(function(){ goalRenderYearOptions(); }, {showSpinner:true, notify:true});
-  goalDistrictFetchFromSheet(function(){ goalDistrictListRender(); }, {notify:true});
+  goalDistrictFetchFromSheet(function(){ goalDistrictListRender(); goalManualTableRender(); }, {notify:true});
 }
 
 // 탭 전환: 'total'(전체목표) | 'district'(구역별목표 CSV)
@@ -12034,6 +12047,8 @@ function goalKeyChange(){
   // [v201] 연도/회차/수양회종류 변경 시 탭2(구역별목표) 하단 "현재 저장된" 리스트도 함께 갱신
   // (탭1 입력값만 갱신하고 탭2 리스트가 예전 키 기준으로 멈춰있던 버그 수정)
   goalDistrictListRender();
+  // [v210] 전체목표 탭 내 구역별 인라인 편집표도 함께 갱신
+  goalManualTableRender();
 }
 
 function goalCalcPreview(){
@@ -12048,6 +12063,8 @@ function goalCalcPreview(){
   }
   function fmt(n){ return (Math.round((n/districts)*10)/10).toString(); }
   el.innerHTML = '수양회 <strong>'+fmt(retreat)+'명</strong> · 접수 <strong>'+fmt(regist)+'명</strong> · 전도 <strong>'+fmt(evangel)+'명</strong> (구역당)';
+  // [v211] 수양회목표/전도목표/구역수 변경 시 구역별 목표값 표도 함께 자동 재계산
+  goalManualAutoFillFromTotals();
 }
 
 function goalSave(){
@@ -12408,13 +12425,11 @@ function goalDistrictPreviewCancel(){
 
 // 저장 확정: 현재 연도/종류/행사 스코프만 통째로 overwrite (다른 스코프의 기존 행은 그대로 유지)
 // → 행 인덱스 추적 없이 최신 전체 시트를 재조회해 재구성하므로 race condition 위험이 없음
-function goalDistrictConfirmSave(){
-  if(!_goalDistrictPendingCsv){ showToast('업로드된 CSV가 없습니다.','error'); return; }
+// [v210] CSV 저장과 수동 입력 저장이 공유하는 실제 반영 로직 — 중복 구현 방지
+// key: {year, retreatType, eventName} / parsedRows: [{district,receiptGoal,memberRoll,evangelGoal}]
+// classified: goalDistrictClassify() 결과(신규/변경/삭제 건수 토스트 표시용) / onSuccess: 성공 후 추가 콜백
+function _goalDistrictPersist(key, parsedRows, classified, onSuccess){
   if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
-  var key = _goalDistrictPendingCsv.key;
-  if(!key.year || !key.retreatType || !key.eventName){
-    showToast('연도/수양회종류/강서교회회차를 먼저 선택해 주세요.','error'); return;
-  }
   var hdr = ['NO','연도','수양회종류','행사명','구역','접수목표','성도제적','전도목표','등록일','등록자'];
   showLoading(true);
   apiCall({action:'getAll', sheetName:'구역목표기초값'})
@@ -12426,7 +12441,7 @@ function goalDistrictConfirmSave(){
       var maxNo = sheetRows.reduce(function(m,r){ var n=parseInt(r['NO'],10); return isNaN(n)?m:Math.max(m,n); }, 0);
       var now = today();
       var by = (currentUser&&currentUser.name)||'admin';
-      var newRowsForKey = _goalDistrictPendingCsv.parsedRows.map(function(pr){
+      var newRowsForKey = parsedRows.map(function(pr){
         maxNo++;
         return [maxNo, key.year, key.retreatType, key.eventName, pr.district, pr.receiptGoal, pr.memberRoll, pr.evangelGoal, now, by];
       });
@@ -12441,19 +12456,139 @@ function goalDistrictConfirmSave(){
     })
     .then(function(res){
       if(!res||!res.success) throw new Error(res&&res.error||'저장 실패');
-      var c = _goalDistrictPendingCsv;
-      showToast('✅ 구역별 목표 저장 완료 (신규 '+c.newList.length+' · 변경 '+c.updateList.length+' · 삭제 '+c.removeList.length+')','success');
-      _goalDistrictPendingCsv = null;
-      var wrap = $id('goal-district-preview-wrap'); if(wrap) wrap.style.display='none';
+      showToast('✅ 구역별 목표 저장 완료 (신규 '+classified.newList.length+' · 변경 '+classified.updateList.length+' · 삭제 '+classified.removeList.length+')','success');
       goalDistrictFetchFromSheet(function(){
         goalDistrictListRender();
+        goalManualTableRender();
         // 연관 이벤트: 수양회목표달성현황 화면이 열려 있으면 자동 재조회
         var gsPanel = $id('panel-goalstatus');
         if(gsPanel && gsPanel.classList.contains('active')) goalStatusQuery();
+        if(onSuccess) onSuccess();
       });
     })
     .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
     .finally(function(){ showLoading(false); });
+}
+
+function goalDistrictConfirmSave(){
+  if(!_goalDistrictPendingCsv){ showToast('업로드된 CSV가 없습니다.','error'); return; }
+  var key = _goalDistrictPendingCsv.key;
+  if(!key.year || !key.retreatType || !key.eventName){
+    showToast('연도/수양회종류/강서교회회차를 먼저 선택해 주세요.','error'); return;
+  }
+  var c = _goalDistrictPendingCsv;
+  _goalDistrictPersist(key, c.parsedRows, c, function(){
+    _goalDistrictPendingCsv = null;
+    var wrap = $id('goal-district-preview-wrap'); if(wrap) wrap.style.display='none';
+  });
+}
+
+// ── [v211] 전체목표 탭 내 구역별 목표값 인라인 편집표 (CSV 업로드의 수동 입력 대안) ──
+// 1~4교구 20개 표준 구역 + 저장돼 있는 커스텀 구역(예: 기타구역)을 함께 표시한다.
+// 커스텀 구역 여부와 무관하게 값 조회는 data-district 속성 기반으로 처리(구역명에 특수문자가 있어도 안전).
+function _goalRowHtml(district, ex, isCustom){
+  ex = ex || {};
+  return '<tr data-district="'+esc(district)+'">'
+    + '<td>'+esc(district)+(isCustom?' <span style="color:var(--muted);font-size:.68rem;">(커스텀)</span>':'')+'</td>'
+    + '<td><input type="number" class="gm-receipt" value="'+(ex.receiptGoal!=null?ex.receiptGoal:'')+'" style="width:70px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;font-size:.82rem;"></td>'
+    + '<td><input type="number" class="gm-roll"    value="'+(ex.memberRoll!=null?ex.memberRoll:'')+'" style="width:70px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;font-size:.82rem;"></td>'
+    + '<td><input type="number" class="gm-evangel" value="'+(ex.evangelGoal!=null?ex.evangelGoal:'')+'" style="width:70px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;font-size:.82rem;"></td>'
+    + '<td>'+(isCustom
+        ? '<button onclick="goalManualRemoveRow(this)" title="행 삭제" style="border:none;background:none;cursor:pointer;font-size:.9rem;">❌</button>'
+        : '<button onclick="goalManualRowClear(this)" title="비우기(저장 시 삭제)" style="border:none;background:none;cursor:pointer;font-size:.9rem;">🗑</button>')
+    + '</td></tr>';
+}
+
+function goalManualTableRender(){
+  var tbody = $id('goal-manual-table-body'); if(!tbody) return;
+  var key = _goalCurKey();
+  var standardSet = {};
+  Object.keys(PARISH_DISTRICTS).forEach(function(p){ PARISH_DISTRICTS[p].forEach(function(d){ standardSet[d]=true; }); });
+  var existingByDistrict = {};
+  _goalDistrictRows.forEach(function(r){
+    if(r.year===key.year && r.retreatType===key.retreatType && r.eventName===key.eventName) existingByDistrict[r.district] = r;
+  });
+  var html = '';
+  Object.keys(PARISH_DISTRICTS).forEach(function(p){
+    PARISH_DISTRICTS[p].forEach(function(d){
+      html += _goalRowHtml(d, existingByDistrict[d], false);
+    });
+  });
+  // 표준 20개 구역에 없는 커스텀 구역(예: 기타구역, 5교구 등) — 저장돼 있으면 함께 표시
+  Object.keys(existingByDistrict).forEach(function(d){
+    if(!standardSet[d]) html += _goalRowHtml(d, existingByDistrict[d], true);
+  });
+  tbody.innerHTML = html;
+}
+
+// 표준 구역 행 비우기 — 실제 삭제는 goalManualSave() 클릭 시 반영(빈 행=삭제 후보)
+function goalManualRowClear(btn){
+  var tr = btn.closest('tr'); if(!tr) return;
+  tr.querySelectorAll('input').forEach(function(inp){ inp.value=''; });
+}
+
+// 커스텀 구역 행 자체를 화면에서 제거 (저장 시 자동으로 삭제 처리됨 — 목록에 아예 없으므로)
+function goalManualRemoveRow(btn){
+  var tr = btn.closest('tr'); if(!tr) return;
+  tr.remove();
+}
+
+// [+ 구역 추가] — 표준 20개 구역 외 커스텀 구역(예: 5교구, 기타구역)을 직접 추가
+function goalManualAddRow(){
+  var name = prompt('추가할 구역명을 입력하세요 (예: 기타구역, 51구역)');
+  if(!name) return;
+  name = name.trim();
+  if(!name){ showToast('구역명을 입력해 주세요.','error'); return; }
+  var tbody = $id('goal-manual-table-body'); if(!tbody) return;
+  var exists = Array.prototype.some.call(tbody.querySelectorAll('tr'), function(tr){
+    return tr.getAttribute('data-district')===name;
+  });
+  if(exists){ showToast('이미 존재하는 구역명입니다.','error'); return; }
+  tbody.insertAdjacentHTML('beforeend', _goalRowHtml(name, null, true));
+}
+
+// [v211] 상단 수양회목표/전도목표/구역수 변경 시 — 표에 보이는 모든 행(표준+커스텀)의
+// 접수목표=수양회목표÷구역수, 전도목표=전도목표÷구역수(소수1자리)로 일괄 재계산해 덮어씀.
+// 개별로 다르게 입력해둔 값도 이 재계산으로 전부 교체됨(요청하신 동작).
+function goalManualAutoFillFromTotals(){
+  var tbody = $id('goal-manual-table-body'); if(!tbody) return;
+  var rows = tbody.querySelectorAll('tr[data-district]');
+  if(!rows.length) return;
+  var retreat   = parseFloat(($id('goal-retreat')||{value:''}).value)   || 0;
+  var evangel   = parseFloat(($id('goal-evangel')||{value:''}).value)   || 0;
+  var districts = parseFloat(($id('goal-districts')||{value:''}).value) || 0;
+  if(!districts) return; // 구역수 없으면 나눌 수 없으므로 자동계산 보류
+  var receiptPerDistrict = Math.round((retreat/districts)*10)/10;
+  var evangelPerDistrict = Math.round((evangel/districts)*10)/10;
+  rows.forEach(function(tr){
+    var rEl = tr.querySelector('.gm-receipt'); if(rEl) rEl.value = receiptPerDistrict;
+    var eEl = tr.querySelector('.gm-evangel'); if(eEl) eEl.value = evangelPerDistrict;
+  });
+}
+
+// 표에 실제로 그려진 모든 행(표준+커스텀)을 순회해 신규/수정/삭제 일괄 반영 (CSV 업로드와 동일한 분류 로직 재사용)
+function goalManualSave(){
+  var key = _goalCurKey();
+  if(!key.year || !key.retreatType || !key.eventName){
+    showToast('연도/수양회종류/강서교회회차를 먼저 선택해 주세요.','error'); return;
+  }
+  var tbody = $id('goal-manual-table-body'); if(!tbody) return;
+  function num(v){ var n=parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+  var parsedRows = [];
+  tbody.querySelectorAll('tr[data-district]').forEach(function(tr){
+    var d = tr.getAttribute('data-district');
+    var rv = tr.querySelector('.gm-receipt').value;
+    var mv = tr.querySelector('.gm-roll').value;
+    var ev = tr.querySelector('.gm-evangel').value;
+    if(rv===''&&mv===''&&ev==='') return; // 3칸 모두 비어있으면 삭제 후보(목록에서 제외)
+    parsedRows.push({district:d, receiptGoal:num(rv), memberRoll:num(mv), evangelGoal:num(ev)});
+  });
+  var classified = goalDistrictClassify(parsedRows, key);
+  if(!classified.newList.length && !classified.updateList.length && !classified.removeList.length){
+    showToast('변경된 내용이 없습니다.','error'); return;
+  }
+  if(!confirm('구역별 목표를 저장할까요? (신규 '+classified.newList.length+' · 변경 '+classified.updateList.length+' · 삭제 '+classified.removeList.length+')')) return;
+  _goalDistrictPersist(key, parsedRows, classified);
 }
 
 function goalDistrictClearAll(){
@@ -13652,6 +13787,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'renderGoalPanel','goalModalSwitchTab','goalRenderYearOptions','goalAddNewYear','goalKeyChange','goalCalcPreview','goalSave','goalDelete',
     'goalDistrictFetchFromSheet','goalDistrictListRender','goalDistrictCsvOpen','goalDistrictCsvFileChange','goalDistrictClassify',
     'goalDistrictRenderPreview','goalDistrictPreviewCancel','goalDistrictConfirmSave','goalDistrictClearAll',
+    'goalManualTableRender','goalManualRowClear','goalManualSave','goalManualAddRow','goalManualRemoveRow','goalManualAutoFillFromTotals',
     'goalStatusInit','goalStatusInitParishSelect','goalStatusInitDistrictSelect','goalStatusParishChange',
     'goalStatusYearChange','goalStatusQuery','renderGoalStatusPanel','goalStatusExportCSV'
   ];
@@ -13727,6 +13863,8 @@ document.addEventListener('DOMContentLoaded', function() {
     goalDistrictCsvFileChange:goalDistrictCsvFileChange, goalDistrictClassify:goalDistrictClassify,
     goalDistrictRenderPreview:goalDistrictRenderPreview, goalDistrictPreviewCancel:goalDistrictPreviewCancel,
     goalDistrictConfirmSave:goalDistrictConfirmSave, goalDistrictClearAll:goalDistrictClearAll,
+    goalManualTableRender:goalManualTableRender, goalManualRowClear:goalManualRowClear, goalManualSave:goalManualSave,
+    goalManualAddRow:goalManualAddRow, goalManualRemoveRow:goalManualRemoveRow, goalManualAutoFillFromTotals:goalManualAutoFillFromTotals,
     goalStatusInit:goalStatusInit, goalStatusInitParishSelect:goalStatusInitParishSelect,
     goalStatusInitDistrictSelect:goalStatusInitDistrictSelect, goalStatusParishChange:goalStatusParishChange,
     goalStatusYearChange:goalStatusYearChange, goalStatusQuery:goalStatusQuery,
