@@ -5335,6 +5335,122 @@ function busCalcRequiredBuses(type){
   return { normalNeeded: normalNeeded, jhNeeded: jhNeeded, calculated: normalNeeded + jhNeeded };
 }
 // ── 자동 배정 ────────────────────────────────────────
+// ── [v213] 보호자 동승 처리 ──────────────────────────────────────────
+// 매칭 기준: person.guardian(보호자 이름) === 후보.name 이고, person.contact(연락처) === 후보.contact
+// (둘 다 값이 있어야 매칭 — 이름만으로는 동명이인 오매칭 위험이 있어 연락처까지 함께 확인)
+// 범위: 같은 팀(구역/부서) 내 인원만 대상 — 다른 팀 소속 보호자는 이번 범위에서 제외
+function _busFindGuardianPerson(person, teamPax){
+  var gName = (person.guardian||'').trim();
+  var gContact = (person.contact||'').trim();
+  if(!gName || !gContact) return null;
+  return teamPax.find(function(o){
+    return o.receiptId !== person.receiptId
+      && (o.name||'').trim() === gName
+      && (o.contact||'').trim() === gContact;
+  }) || null;
+}
+
+// [핵심 수정] 팀 인원 배열에서 보호자-피보호자를 서로 바로 인접하게 재배치한다.
+// getBusPaxByTeam()이 반환하는 배열 순서 그대로 분산배정 시 버스별로 순차 slice되므로,
+// 여기서 미리 인접시켜두면 대부분의 경우 같은 버스 구간에 자연스럽게 함께 들어간다.
+// (이전 버전은 슬롯 count를 사후에 조정하려다 "같은 팀 내에서 1명 빼고 1명 넣기"가
+//  상쇄되어 실제로는 아무 효과가 없는 버그가 있었음 — 배열 순서 자체를 바꾸는 방식으로 대체)
+function _busGroupGuardianPairs(pax){
+  if(!pax.length) return pax;
+  var result = pax.slice();
+  // 각 사람에 대해 보호자를 찾아, 아직 인접하지 않으면 person을 guardian 바로 뒤로 옮긴다.
+  // (guardian을 먼저 만나든 person을 먼저 만나든 상관없이 항상 동작하도록 splice 기반으로 처리)
+  pax.forEach(function(person){
+    var guardian = _busFindGuardianPerson(person, pax);
+    if(!guardian) return;
+    var pIdx = result.findIndex(function(x){ return x.receiptId===person.receiptId; });
+    var gIdx = result.findIndex(function(x){ return x.receiptId===guardian.receiptId; });
+    if(pIdx===-1 || gIdx===-1 || Math.abs(pIdx-gIdx)===1) return; // 계산 불가하거나 이미 인접
+    var moved = result.splice(pIdx,1)[0];
+    var newGIdx = result.findIndex(function(x){ return x.receiptId===guardian.receiptId; });
+    result.splice(newGIdx+1, 0, moved);
+  });
+  return result;
+}
+
+// 분산배정(2개 이상 버스에 슬롯이 나뉜) 팀 안에서, 인접 재정렬 후에도 여전히
+// 보호자-피보호자가 다른 버스로 갈리는 경우(정확히 슬롯 경계에 걸친 경우)를 감지해
+// 슬롯 경계를 필요한 만큼 이동시켜 같은 버스로 합친다. busArr: 그룹(일반 또는 중고등부)의
+// 버스 배열, teamsInGroup: 그 그룹의 team 목록.
+function busReuniteGuardianPairs(busArr, teamsInGroup, busType, cap){
+  var reunitedCount = 0, failedPairs = [];
+  teamsInGroup.forEach(function(team){
+    var busesWithSlot = busArr.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); });
+    if(busesWithSlot.length < 2) return; // 분산배정된 팀이 아니면 대상 아님
+
+    // getBusPaxByTeam이 이미 보호자-피보호자를 인접시켜 반환하므로, 그 순서 그대로 슬롯 경계로 나눈다.
+    var teamPax = getBusPaxByTeam(team, busType);
+    var offset = 0;
+    var personBusIdx = {}; // receiptId -> busArr 인덱스
+    var busIdxOfSlot = []; // busArr 인덱스 목록(이 팀 슬롯을 가진 버스만, 순서대로)
+    busArr.forEach(function(b, bi){
+      var slot = b.slots.find(function(s){ return s.teamId===team.id; });
+      if(!slot) return;
+      var segment = teamPax.slice(offset, offset+slot.count);
+      segment.forEach(function(p){ personBusIdx[p.receiptId] = bi; });
+      busIdxOfSlot.push(bi);
+      offset += slot.count;
+    });
+
+    teamPax.forEach(function(person){
+      var guardian = _busFindGuardianPerson(person, teamPax);
+      if(!guardian) return;
+      var pIdx = personBusIdx[person.receiptId];
+      var gIdx = personBusIdx[guardian.receiptId];
+      if(pIdx==null || gIdx==null || pIdx===gIdx) return; // 이미 같은 버스이거나 계산 불가
+
+      // 인접 재정렬 이후에도 갈렸다는 것은 정확히 슬롯 경계에 걸쳤다는 뜻 —
+      // 경계를 사이에 둔 두 버스(직접 이웃 관계)의 count를 1씩 조정해 합친다.
+      var busP = busArr[pIdx], busG = busArr[gIdx];
+      var loadG = busG.slots.reduce(function(s,sl){ return s+sl.count; },0);
+      var slotP = busP.slots.find(function(s){ return s.teamId===team.id; });
+      var slotG = busG.slots.find(function(s){ return s.teamId===team.id; });
+
+      if(loadG < cap && slotP && slotP.count>0){
+        // guardian 쪽 버스에 여유가 있으면 그대로 경계 이동
+        slotP.count -= 1;
+        if(slotG) slotG.count += 1; else busG.slots.push({teamId:team.id, count:1});
+        personBusIdx[person.receiptId] = gIdx;
+        reunitedCount++;
+        return;
+      }
+
+      // guardian 버스가 꽉 찼으면: 그 버스에서 "다른 팀" 소속 승객 1명을 여유 있는
+      // 다른 버스로 옮겨 자리를 만든 뒤 합류시킨다(같은 팀 슬롯을 건드리면 상쇄되므로 제외).
+      var moved = false;
+      for(var oi=0; oi<busArr.length && !moved; oi++){
+        if(oi===gIdx) continue;
+        var otherLoad = busArr[oi].slots.reduce(function(s,sl){ return s+sl.count; },0);
+        if(otherLoad >= cap) continue;
+        for(var si=0; si<busG.slots.length; si++){
+          var slot = busG.slots[si];
+          if(slot.teamId===team.id) continue; // 같은 팀 슬롯은 제외(상쇄 방지)
+          if(slot.count<=0) continue;
+          slot.count -= 1;
+          var destSlot = busArr[oi].slots.find(function(s){ return s.teamId===slot.teamId; });
+          if(destSlot) destSlot.count += 1; else busArr[oi].slots.push({teamId:slot.teamId, count:1});
+          // guardian 버스에 1자리 확보됨 → person을 이 팀 슬롯으로 편입
+          if(slotP && slotP.count>0){ slotP.count -= 1; }
+          if(slotG) slotG.count += 1; else busG.slots.push({teamId:team.id, count:1});
+          personBusIdx[person.receiptId] = gIdx;
+          reunitedCount++;
+          moved = true;
+          break;
+        }
+      }
+      if(!moved){
+        failedPairs.push((person.name||'')+'/'+(guardian.name||''));
+      }
+    });
+  });
+  return { reunitedCount:reunitedCount, failedPairs:failedPairs };
+}
+
 function busAutoAssign(type){
   type = type || busAssignSub;  // 인자 없으면 현재 탭 기준
   var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
@@ -5471,6 +5587,14 @@ function busAutoAssign(type){
     recoverUnassigned(jhBuses, jhLoads, jhBusCount, jhUnassigned);
   }
 
+  // ── [v213] 보호자 동승 처리: 같은 팀(구역/부서) 내에서 분산배정된 경우에만,
+  //     보호자-피보호자(이름+연락처 일치)가 서로 다른 버스로 갈리지 않도록 재배치 ──
+  var guardianResult = { reunitedCount:0, failedPairs:[] };
+  var g1 = busReuniteGuardianPairs(normalBuses, sortedNormal, type, cap);
+  var g2 = jhTeams.length>0 ? busReuniteGuardianPairs(jhBuses, jhTeams, type, cap) : {reunitedCount:0, failedPairs:[]};
+  guardianResult.reunitedCount = g1.reunitedCount + g2.reunitedCount;
+  guardianResult.failedPairs   = g1.failedPairs.concat(g2.failedPairs);
+
   // ── 재배정 후: 백업해둔 선탑자를 실제로 그 팀이 들어간 버스에 재연결 ──
   // team.id는 busUid()일 수도 있어 신뢰할 수 없으므로(생성 경로에 따라 다름),
   // 항상 teamKey와 동일하게 유지되는 team.name으로 매칭한다.
@@ -5513,7 +5637,9 @@ function busAutoAssign(type){
     msg='✅ 자동 배정 완료 ('+actual+'대, 총 '+total+'명)'+jhMsg;
   }
   if(leaderAmbiguous.length) msg += ' · ⚠️ 분산배정된 선탑자 재확인 필요: '+leaderAmbiguous.join(', ');
-  showToast(msg, (unassignedTotal>0||leaderAmbiguous.length)?'error':'success');
+  if(guardianResult.reunitedCount>0) msg += ' · 👨‍👩‍👧 보호자 동승 처리 '+guardianResult.reunitedCount+'쌍';
+  if(guardianResult.failedPairs.length>0) msg += ' · ⚠️ 보호자 동승 실패(수동 확인 필요) '+guardianResult.failedPairs.length+'쌍: '+guardianResult.failedPairs.slice(0,3).join(', ')+(guardianResult.failedPairs.length>3?' 외':'');
+  showToast(msg, (unassignedTotal>0||leaderAmbiguous.length||guardianResult.failedPairs.length>0)?'error':'success');
 
   // ── 팀내역 + 요약/탑승자 시트 즉시 저장 ──
   // 수정②: _busUpdateTeamSheetFromBuses 먼저, busSaveToSheet 완료 후 탭 전환
@@ -7341,9 +7467,9 @@ function getBusPaxByTeam(team, busType){
 
   // 중고등부 통합팀: 구역 무관하게 isJuniorHighBus 조건으로 조회
   if(name === '중고등부'){
-    return _src.filter(function(r){
+    return _busGroupGuardianPairs(_src.filter(function(r){
       return (r[field]||'').trim()==='버스' && isJuniorHighBus(r) && !isBusExcluded(r);
-    });
+    }));
   }
 
   // 매칭 함수: r.parish + r.district 조합으로 다양한 팀명 형식 지원
@@ -7370,7 +7496,7 @@ function getBusPaxByTeam(team, busType){
     return false;
   }
 
-  return _src.filter(matches);
+  return _busGroupGuardianPairs(_src.filter(matches));
 }
 
 // ── 버스별 탑승자 명단 빌드 ──────────────────────────
@@ -8093,7 +8219,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v212_goal_addrow_button_position';
+var CACHE_VERSION = 'v213_bus_guardian_reunite';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -13760,7 +13886,7 @@ document.addEventListener('DOMContentLoaded', function() {
     '_navGuardCancel','_navGuardLeave','_navGuardSaveAndLeave',
     'updateBusUnassignedBadge','busReassignDiff','busReAssignFromSheet','busReAssignFromSheetConfirm',
     'busSetCount','busSetCap','busTab','busAddTeam','busDeleteTeamConfirm','busDeleteTeamExecute','busTeamDeleteModalClose',
-    'busEditTeam','busEditSave','busHandleCSV','busAutoAssign','busRemoveSlot',
+    'busEditTeam','busEditSave','busHandleCSV','busAutoAssign','busRemoveSlot','busReuniteGuardianPairs','getBusPaxByTeam',
     'busDeleteBus','busResetAll','busResetConfirm','vwClearAllConfirm','_busTeamTabReset','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew',
     'busSaveMeta','busSaveLocationOnly','busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSetLocation','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh',
     'busSaveToSheet','busExportCSV','busRestore',
@@ -13824,7 +13950,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateBusUnassignedBadge:updateBusUnassignedBadge, busReassignDiff:busReassignDiff, busReAssignFromSheet:busReAssignFromSheet, busReAssignFromSheetConfirm:busReAssignFromSheetConfirm,
     busSetCount:busSetCount, busSetCap:busSetCap, busTab:busTab,
     busAddTeam:busAddTeam, busDeleteTeamConfirm:busDeleteTeamConfirm, busDeleteTeamExecute:busDeleteTeamExecute, busTeamDeleteModalClose:busTeamDeleteModalClose, busEditTeam:busEditTeam,
-    busEditSave:busEditSave, busHandleCSV:busHandleCSV, busAutoAssign:busAutoAssign,
+    busEditSave:busEditSave, busHandleCSV:busHandleCSV, busAutoAssign:busAutoAssign, busReuniteGuardianPairs:busReuniteGuardianPairs, getBusPaxByTeam:getBusPaxByTeam,
     busRemoveSlot:busRemoveSlot, busDeleteBus:busDeleteBus,
     busResetAll:busResetAll, busResetConfirm:busResetConfirm, vwClearAllConfirm:vwClearAllConfirm, _busTeamTabReset:_busTeamTabReset, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear,
     busDrop:busDrop, busMoveSlot:busMoveSlot, busDragOverEnter:busDragOverEnter, busDragOverLeave:busDragOverLeave, busRenderView:busRenderView, busSetDrag:busSetDrag, busSetDragNew:busSetDragNew,
