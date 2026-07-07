@@ -1536,8 +1536,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
-                    <th>연락처</th>
-                    <th>보호자</th>
                     <th>참석버스배정</th>
                     <th>귀가버스배정</th>
                     <th>관리</th>
@@ -5792,6 +5790,15 @@ function busSplitAssignReassign(busId, reassignId, type){
 
 // ── 교통수단 변경 시 버스 슬롯 처리 헬퍼 ────────────────
 // 팀 키: '{parish} {district}' 또는 '중고등부'
+// [v217] 분산배정 라벨(전체N명) 표시용 — team.count(최초 배정 시점 스냅샷, 이후 어긋날 수 있음) 대신
+// 해당 팀이 실제로 배정된 모든 버스 슬롯의 합계를 매번 계산해 반환. 항상 화면에 보이는
+// 버스들의 합계와 일치하도록 보장한다 (team.count 필드 자체는 다른 기능에서 계속 사용되므로 유지).
+function busTeamSlotTotal(team, busArr) {
+  return busArr.reduce(function(sum, b) {
+    var sl = b.slots.find(function(s) { return s.teamId === team.id; });
+    return sum + (sl ? sl.count : 0);
+  }, 0);
+}
 function busGetTeamKey(r) {
   if (isJuniorHighBus && isJuniorHighBus(r)) return '중고등부';
   return ((r.parish||'미분류') + ' ' + (r.district||'')).trim();
@@ -6763,7 +6770,7 @@ function busRenderBuses(type){
           (isSplit?'<span style="font-size:.65rem;color:#c89b30;flex-shrink:0;">✂️</span>':'')+
           '</div>'+
           '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">'+
-          '<span style="color:'+(isSplit?'#c89b30':team.color)+';font-size:.75rem;font-weight:700;">'+(isSplit?(slot.count+'/'+team.count+'명'):(slot.count+'명'))+'</span>'+
+          '<span style="color:'+(isSplit?'#c89b30':team.color)+';font-size:.75rem;font-weight:700;">'+(isSplit?(slot.count+'/'+busTeamSlotTotal(team,buses)+'명'):(slot.count+'명'))+'</span>'+
           '<button onclick="busRemoveSlot(\''+bus.id+'\',\''+team.id+'\',\''+type+'\')" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:0;line-height:1;">✕</button>'+
           '</div></div>';
       });
@@ -6925,7 +6932,7 @@ function busRenderSummary(type){
         html+='<div style="background:'+(isSplit?'#fdf6e3':'#f7f8fc')+';border:1px solid '+(isSplit?'#f0dea0':'var(--border2)')+';border-radius:7px;padding:4px 11px;display:flex;align-items:center;gap:5px;">'+
           '<div style="width:7px;height:7px;border-radius:50%;background:'+(isSplit?'#c89b30':team.color)+';flex-shrink:0;"></div>'+
           '<span style="font-size:.82rem;font-weight:600;color:var(--text);">'+esc(team.name)+'</span>'+
-          '<span style="font-size:.75rem;color:'+(isSplit?'#c89b30':team.color)+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+team.count+'명'):slot.count+'명')+'</span>'+
+          '<span style="font-size:.75rem;color:'+(isSplit?'#c89b30':team.color)+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+busTeamSlotTotal(team,buses)+'명'):slot.count+'명')+'</span>'+
           (isSplit?'<span style="font-size:.65rem;color:#c89b30;">✂️</span>':'')+
           '</div>';
       });
@@ -6946,7 +6953,7 @@ function busRenderSummary(type){
       var sb=buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); });
       html+='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">'+
         '<span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span>'+
-        '<span style="font-size:.78rem;color:var(--muted);">총 '+team.count+'명 →</span>'+
+        '<span style="font-size:.78rem;color:var(--muted);">총 '+busTeamSlotTotal(team,sb)+'명 →</span>'+
         sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+
         '</div>';
     });
@@ -7772,7 +7779,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
             '<div style="width:7px;height:7px;border-radius:50%;background:'+(isMine?'#2d8a5a':isSplit?'#c89b30':team.color)+';flex-shrink:0;"></div>'+
             (isMine?'<span style="font-size:.65rem;background:#2d8a5a;color:#fff;border-radius:3px;padding:1px 5px;font-weight:700;">내구역</span>':'')+
             '<span style="font-size:.83rem;font-weight:600;color:var(--text);">'+esc(team.name)+'</span>'+
-            '<span style="font-size:.76rem;color:'+slotColor+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+team.count+'명'):slot.count+'명')+'</span>'+
+            '<span style="font-size:.76rem;color:'+slotColor+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+busTeamSlotTotal(team,curBuses)+'명'):slot.count+'명')+'</span>'+
             (isSplit?'<span style="font-size:.65rem;color:#c89b30;">✂️</span>':'')+
             '<span style="font-size:.65rem;color:var(--muted);margin-left:2px;">▶</span>'+
             '</div>';
@@ -7782,7 +7789,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
   // ── 미배정팀 박스: 관리자+시트 데이터 우선, 아니면 로컬 기준 ──
   var renderUnassign = sheetUnassignTeams || unassign;
   if(renderUnassign.length>0) html+='<div style="background:#fff0f0;border:1px solid #f5c0c0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#d94040;margin-bottom:8px;font-size:.88rem;">⚠️ 미배정 팀 ('+renderUnassign.length+')</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'+renderUnassign.map(function(t){ return '<div style="background:#fff;border:1px solid #f5c0c0;border-radius:7px;padding:4px 12px;font-size:.82rem;color:#d94040;font-weight:600;">'+esc(t.name)+' ('+t.count+'명)</div>'; }).join('')+'</div></div>';
-  if(partial.length>0) html+='<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#c89b30;margin-bottom:8px;font-size:.88rem;">✂️ 분산 배정 팀 ('+partial.length+')</div><div style="display:flex;flex-direction:column;gap:6px;">'+partial.map(function(team){ var sb=curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }); return '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;"><span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span><span style="font-size:.78rem;color:var(--muted);">총 '+team.count+'명 →</span>'+sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+'</div>'; }).join('')+'</div></div>';
+  if(partial.length>0) html+='<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#c89b30;margin-bottom:8px;font-size:.88rem;">✂️ 분산 배정 팀 ('+partial.length+')</div><div style="display:flex;flex-direction:column;gap:6px;">'+partial.map(function(team){ var sb=curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }); return '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;"><span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span><span style="font-size:.78rem;color:var(--muted);">총 '+busTeamSlotTotal(team,sb)+'명 →</span>'+sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+'</div>'; }).join('')+'</div></div>';
   listEl.innerHTML=html;
 }
 
@@ -8228,7 +8235,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v216_bus_reduce_count_fix';
+var CACHE_VERSION = 'v218_search_grid_hide_contact';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -9950,8 +9957,6 @@ function renderTable() {
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td>'+esc(r.group||'-')+'</td>'+
       '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
-      '<td style="font-size:.79rem;">'+esc(r.contact||'-')+'</td>'+
-      '<td style="font-size:.79rem;">'+esc(r.guardian||'-')+'</td>'+
       '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
       '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
