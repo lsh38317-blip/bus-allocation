@@ -230,6 +230,9 @@ table{width:100%;border-collapse:collapse;font-size:.82rem;}
 /* [v188] 교구 컬럼 제거로 1칸 당겨짐 — 구역(1번째) 20%, 나머지 8개 컬럼 10%씩 */
 .agg-compact th:nth-child(1),.agg-compact td:nth-child(1){width:20%;text-align:left;}
 .agg-compact th:nth-child(n+2),.agg-compact td:nth-child(n+2){width:10%;}
+/* [v205] 수양회목표달성현황: 컬럼 압축 대신 자연 너비 + 가로스크롤 auto */
+#gs-table-wrap table th,#gs-table-wrap table td{white-space:nowrap;padding:7px 10px;font-size:.8rem;}
+#gs-table-wrap table th:first-child,#gs-table-wrap table td:first-child{text-align:left;}
 thead th{
   padding:10px 12px;text-align:left;
   background:var(--navy);color:#fff;
@@ -785,7 +788,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             구역별 목표값은 <a href="javascript:void(0)" onclick="switchPanel('goal');goalModalSwitchTab('district');" style="color:var(--navy);font-weight:600;">🎯 교회 목표 관리</a> 메뉴에서 CSV로 등록·수정합니다.
           </div>
           <div class="card">
-            <div class="table-wrap agg-compact"><div id="gs-table"></div></div>
+            <div class="table-wrap" id="gs-table-wrap"><div id="gs-table"></div></div>
           </div>
         </div>
 
@@ -1531,6 +1534,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
+                    <th>연락처</th>
+                    <th>보호자</th>
                     <th>참석버스배정</th>
                     <th>귀가버스배정</th>
                     <th>관리</th>
@@ -1684,7 +1689,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <span style="font-size:.82rem;font-weight:700;color:#7a5800;">📄 <span id="upld-file-name"></span></span>
               <span style="font-size:.82rem;color:var(--muted);">총 <strong id="upld-total" style="color:var(--navy);">0</strong>명</span>
               <span style="font-size:.82rem;color:#1a6b45;">✅ 신규 <strong id="upld-new">0</strong>명</span>
-              <span style="font-size:.82rem;color:#c04040;">⚠ 중복(skip) <strong id="upld-dup">0</strong>명</span>
+              <span style="font-size:.82rem;color:#b8860b;">🛠 수정 <strong id="upld-upd">0</strong>명</span>
+              <span style="font-size:.82rem;color:#c04040;">⚠ 중복(변경없음) <strong id="upld-dup">0</strong>명</span>
               <span style="font-size:.82rem;color:#b00020;">🗑 삭제대상 <strong id="upld-del">0</strong>명</span>
               <div style="margin-left:auto;display:flex;gap:8px;">
                 <button id="upld-confirm-btn" class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;font-weight:700;"
@@ -1704,6 +1710,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th>교구</th>
                     <th>구역</th>
                     <th>회별</th>
+                    <th>변경내용</th>
                   </tr>
                 </thead>
                 <tbody id="upload-preview-body"></tbody>
@@ -2292,6 +2299,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="예">전참</option>
           </select>
         </div>
+        <div class="form-group">
+          <label>연락처</label>
+          <input type="text" id="e-contact" placeholder="010-0000-0000">
+        </div>
+        <div class="form-group">
+          <label>보호자</label>
+          <input type="text" id="e-guardian" placeholder="보호자 성명">
+        </div>
       </div>
       <div class="modal-footer" style="margin-top:18px;">
         <button class="btn btn-primary btn-sm" onclick="cancelEdit()">취소</button>
@@ -2388,6 +2403,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="아니요">해당없음</option>
             <option value="예">전참</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>연락처</label>
+          <input type="text" id="bp-e-contact" placeholder="010-0000-0000">
+        </div>
+        <div class="form-group">
+          <label>보호자</label>
+          <input type="text" id="bp-e-guardian" placeholder="보호자 성명">
         </div>
       </div>
       <div class="modal-footer" style="margin-top:18px;">
@@ -2708,6 +2731,11 @@ var VW_COLS = [
   { key:'depTrans',   label:'귀가교통수단', badge:'', input:'inpDepTrans' },
   { key:'fullAttend', label:'전참여부',     badge:'', input:'inpFullAttend' },
   { key:'salvCode',   label:'구원여부',     badge:'', aliases:['구원여부','salvcode','구원 여부'] },
+  // [v207] 연락처: 원본 CSV에서 결측을 "--"로 표기하는 경우가 있어 빈 문자열로 정규화
+  { key:'contact', label:'연락처', badge:'', aliases:['연락처','전화번호','휴대폰','휴대폰번호','phone','contact','연 락처'],
+    transform: function(v){ var s=v?String(v).trim():''; return (s==='--'||s==='-') ? '' : s; }
+  },
+  { key:'guardian', label:'보호자', badge:'', aliases:['보호자','보호자명','guardian','보호자 명'] },
   // 업로드 화면에는 표시하지 않지만, 구글 시트 저장 / CSV 다운로드 시에는 마지막 컬럼으로 포함됨 (hidden:true → vwRenderTable에서만 제외)
   { key:'gender',     label:'성별',         badge:'', hidden:true, aliases:['성별','성 별','sex','gender'] },
 ];
@@ -3304,11 +3332,19 @@ function vwSaveToSheet(){
   vwCheckDuplicatesAndPreview();
 }
 
-// 구글 시트의 참석인원명단을 fresh하게 다시 받아와 3분기 판정: 중복/신규/삭제.
-// [v190] 판정 기준(매칭은 기존과 동일: 접수ID 있으면 ID로, 없으면 성명+교구+구역 조합으로):
-//   - 시트.접수ID === CSV.접수ID(둘 다 있음)           → 중복(skip)
+// 구글 시트의 참석인원명단을 fresh하게 다시 받아와 4분기 판정: 신규/수정/중복(변경없음)/삭제.
+// [v190] 매칭 기준(접수ID 있으면 ID로, 없으면 성명+교구+구역 조합으로):
+//   - 시트.접수ID === CSV.접수ID(둘 다 있음) → 필드값 비교 → 하나라도 다르면 '수정', 모두 같으면 '중복(skip)'
 //   - 시트에 없음(매칭 자체 안 됨) or 시트.접수ID='' + CSV.접수ID<>'' → 신규(append, 기존과 동일 처리)
 //   - 시트.접수ID<>'' + CSV.접수ID=''(성명+교구+구역으로 매칭됨)      → 삭제(시트에서 해당 행 제거)
+// [v206] '수정' 비교 대상은 CSV 컬럼 기반 필드만(성명/연도/행사명/교구/구역/회별/봉사코드/봉사명/숙소코드/숙소1/숙소2/구원여부/성별).
+//        수양회종류/참석일자/참석교통수단/귀가일자/귀가교통수단/전참여부는 업로드 툴바에서 이번 업로드 전체에 일괄 적용하는 값이라
+//        비교·갱신 대상에서 제외(안 그러면 기존 인원 전체가 오탐지되어 확정 정보가 초기화되는 사고 위험).
+//        교구/구역/회별이 바뀌면 버스 배정이 무효화되므로 탑승자_참석/귀가에서 해당 접수ID를 자동 삭제(재배정 필요 상태로 전환).
+var VW_UPDATE_CASCADE_KEYS = ['district','zone','deptCode']; // 교구/구역/회별
+function _vwCompareCols(){
+  return VW_COLS.filter(function(c){ return !c.input && c.key!=='receiptId'; });
+}
 // 중복·삭제가 모두 0건이면(최초 등록 등) 확인 절차 없이 곧바로 전송하고,
 // 하나라도 있으면 미리보기 배너를 띄워 확인을 받음(삭제는 되돌릴 수 없으므로 반드시 확인).
 function vwCheckDuplicatesAndPreview(){
@@ -3316,18 +3352,19 @@ function vwCheckDuplicatesAndPreview(){
   apiCall({action:'getAll', sheetName:'참석인원명단'})
     .then(function(res){
       if(!(res && res.success)) throw new Error((res&&res.error)||'기존 데이터 조회 실패');
-      var existingIds = {}, existingByComposite = {};
+      var existingRows = {}, existingByComposite = {};
       var maxNo = 0;
       (res.data||res.rows||[]).forEach(function(r){
         var rid = String(r['접수ID']||'').trim();
         var fb = (String(r['성명']||'')+String(r['교구']||'')+String(r['구역']||'')).replace(/\s/g,'');
-        if(rid){ existingIds[rid] = true; }
+        if(rid){ existingRows[rid] = r; }  // [v206] boolean → 행 전체 객체(필드 비교용)
         if(fb){ existingByComposite[fb] = rid; }  // rid가 빈 문자열이어도 그대로 기록(ID 없음 상태 보존)
         var noVal = parseInt(r['NO'])||0;
         if(noVal > maxNo) maxNo = noVal;
       });
       _vwMaxExistingNo = maxNo;  // [v198] 신규 등록 채번 기준값 저장(추가 API 호출 없이 이 조회 결과 재사용)
 
+      var compareCols = _vwCompareCols();
       var srcRows = (vwFilteredRows.length?vwFilteredRows:vwAllRows);
       _vwUploadPending = srcRows.map(function(row){
         var receiptId = String(vwGetV(row,'receiptId')||'').trim();
@@ -3336,10 +3373,27 @@ function vwCheckDuplicatesAndPreview(){
         var district  = String(vwGetV(row,'zone')||'').trim();
         var group     = String(vwGetV(row,'deptCode')||'').trim();
         var composite = (name+parish+district).replace(/\s/g,'');
-        var status, deleteTargetId = null;
+        var status, deleteTargetId = null, existingRow = null, changedFields = [], cascade = false;
         if(receiptId){
-          // CSV에 접수ID 있음 → 그 ID로 기존행 존재 확인
-          status = existingIds[receiptId] ? 'dup' : 'new';
+          existingRow = existingRows[receiptId] || null;
+          if(existingRow){
+            // [v206] CSV에 접수ID 있고 시트에도 존재 → 필드값 비교로 신규/수정 세분화
+            // [수정] 이번 CSV에 해당 컬럼 자체가 없으면(별칭 미탐지) 비교 대상에서 제외한다.
+            //        컬럼이 없는 것과 실제로 빈값을 입력한 것은 다르므로, 없는 컬럼을 빈값으로 간주해
+            //        비교하면 구원여부/성별처럼 CSV에 없는 필드가 매번 "변경됨"으로 오탐지된다.
+            compareCols.forEach(function(col){
+              if(!vwColMap[col.key]) return; // 이번 CSV에 없는 컬럼 → 비교/갱신 모두 제외(기존값 보존)
+              var newVal = String(vwGetV(row,col.key)||'').trim();
+              var oldVal = String(existingRow[col.label]||'').trim();
+              if(newVal !== oldVal){
+                changedFields.push(col.label);
+                if(VW_UPDATE_CASCADE_KEYS.indexOf(col.key)>=0) cascade = true;
+              }
+            });
+            status = changedFields.length ? 'upd' : 'dup';
+          } else {
+            status = 'new';
+          }
         } else if(Object.prototype.hasOwnProperty.call(existingByComposite, composite)){
           var existingRid = existingByComposite[composite];
           if(existingRid){
@@ -3353,6 +3407,7 @@ function vwCheckDuplicatesAndPreview(){
           status = 'new';  // 매칭 자체가 안 되는 완전 신규
         }
         return { _row:row, _status:status, deleteTargetId:deleteTargetId,
+          _existingRow:existingRow, _changedFields:changedFields, _cascade:cascade,
           receiptId:receiptId, name:name, parish:parish, district:district, group:group };
       });
 
@@ -3399,6 +3454,7 @@ function vwCheckDuplicatesAndPreview(){
 
 function _vwRenderUploadPreview(){
   var newRows = _vwUploadPending.filter(function(r){ return r._status==='new'; });
+  var updRows = _vwUploadPending.filter(function(r){ return r._status==='upd'; });
   var dupRows = _vwUploadPending.filter(function(r){ return r._status==='dup'; });
   var delRows = _vwUploadPending.filter(function(r){ return r._status==='del'; });
   var banner=document.getElementById('upload-preview-banner');
@@ -3410,38 +3466,46 @@ function _vwRenderUploadPreview(){
   s2('upld-file-name', pillName ? pillName.textContent : '');
   s2('upld-total', _vwUploadPending.length);
   s2('upld-new', newRows.length);
+  s2('upld-upd', updRows.length);
   s2('upld-dup', dupRows.length);
   s2('upld-del', delRows.length);
   s2('upld-confirm-cnt', newRows.length);
-  // [v190] 삭제 건수도 버튼 라벨에 함께 표기(삭제는 되돌릴 수 없으므로 실행 전 명확히 안내)
+  // [v206] 신규/수정/삭제 건수를 모두 버튼 라벨에 표기(수정·삭제는 되돌리기 어려우므로 실행 전 명확히 안내)
   var confirmLabel=document.getElementById('upld-confirm-label');
   if(confirmLabel){
-    confirmLabel.textContent = delRows.length>0
-      ? ('✅ 신규 '+newRows.length+'명 등록 · 🗑 삭제 '+delRows.length+'명 실행')
-      : ('✅ 신규 '+newRows.length+'명 등록');
+    var parts = [];
+    parts.push('✅ 신규 '+newRows.length+'명 등록');
+    if(updRows.length) parts.push('🛠 수정 '+updRows.length+'명 반영');
+    if(delRows.length) parts.push('🗑 삭제 '+delRows.length+'명 실행');
+    confirmLabel.textContent = parts.join(' · ');
   }
   banner.style.display='flex';
   wrap.style.display='';
   var confirmBtn=document.getElementById('upld-confirm-btn');
   if(confirmBtn){
-    var noAction = newRows.length===0 && delRows.length===0;
+    var noAction = newRows.length===0 && updRows.length===0 && delRows.length===0;
     confirmBtn.disabled = noAction;
     confirmBtn.style.opacity = noAction ? '.5' : '';
     confirmBtn.style.cursor  = noAction ? 'not-allowed' : 'pointer';
   }
-  if(newRows.length===0 && delRows.length===0){
-    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:.85rem;padding:24px;">신규/삭제 처리할 대상이 없습니다.</td></tr>';
+  if(newRows.length===0 && updRows.length===0 && delRows.length===0){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:.85rem;padding:24px;">신규/수정/삭제 처리할 대상이 없습니다.</td></tr>';
     return;
   }
-  var preview=newRows.concat(delRows).concat(dupRows).slice(0,200);  // 신규 → 삭제대상 → 중복 순 노출
+  var preview=newRows.concat(updRows).concat(delRows).concat(dupRows).slice(0,200);  // 신규 → 수정 → 삭제대상 → 중복 순 노출
   tbody.innerHTML=preview.map(function(r){
     var badge = r._status==='new'
       ? '<span style="background:#e6f4ec;color:#1a6b45;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">신규</span>'
-      : r._status==='del'
-        ? '<span style="background:#fdeaea;color:#b00020;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">🗑 삭제</span>'
-        : '<span style="background:#fdf0f0;color:#c04040;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">중복</span>';
-    var rowStyle = r._status==='del' ? 'background:#fff5f5;' : '';
+      : r._status==='upd'
+        ? '<span style="background:#fdf3d9;color:#8a6300;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">🛠 수정</span>'
+        : r._status==='del'
+          ? '<span style="background:#fdeaea;color:#b00020;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">🗑 삭제</span>'
+          : '<span style="background:#fdf0f0;color:#c04040;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">중복</span>';
+    var rowStyle = r._status==='del' ? 'background:#fff5f5;' : r._status==='upd' ? 'background:#fffbf0;' : '';
     var op = r._status==='dup' ? '.55' : '1';
+    var changeText = (r._status==='upd' && r._changedFields && r._changedFields.length)
+      ? esc(r._changedFields.join(', ')+' 변경'+(r._cascade?' (버스 재배정 필요)':''))
+      : '';
     return '<tr style="'+rowStyle+'opacity:'+op+';">'
       +'<td>'+badge+'</td>'
       +'<td style="font-size:.78rem;color:var(--muted);">'+esc(r.receiptId||r.deleteTargetId||'—')+'</td>'
@@ -3449,17 +3513,53 @@ function _vwRenderUploadPreview(){
       +'<td>'+esc(r.parish||'')+'</td>'
       +'<td>'+esc(r.district||'')+'</td>'
       +'<td>'+esc(r.group||'')+'</td>'
+      +'<td style="font-size:.74rem;color:#8a6300;">'+changeText+'</td>'
       +'</tr>';
   }).join('');
   if(_vwUploadPending.length>200){
-    tbody.innerHTML+='<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:.78rem;padding:8px;">... 이하 '+(_vwUploadPending.length-200)+'건 생략</td></tr>';
+    tbody.innerHTML+='<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:.78rem;padding:8px;">... 이하 '+(_vwUploadPending.length-200)+'건 생략</td></tr>';
   }
 }
 
 // 신규 항목은 mode:'append'로 전송, 삭제 대상은 기존 apiCall({action:'delete'}) 패턴 재사용해 먼저 제거
 // (overwrite 사용 안 함 — 기존 시트 데이터는 삭제 대상 외엔 보존)
+// [v206] 참석인원명단 개별 행 수정 payload 빌드 — toSheetObj와 동일한 한글 컬럼 shape 유지.
+// NO/수양회종류/참석일자/참석교통수단/귀가일자/귀가교통수단/전참여부는 업로드 툴바 값이 아니라
+// 기존 시트값을 그대로 보존한다(그렇지 않으면 기존 인원의 확정 정보가 CSV 업로드 때마다 초기화됨).
+// [수정] 그 외 필드도 이번 CSV에 해당 컬럼이 없으면(별칭 미탐지) 기존 시트값을 그대로 보존한다.
+//        (컬럼이 없는 것을 빈값으로 오해해 기존 데이터를 지우는 사고 방지 — 비교 로직과 동일한 원칙)
+function _vwBuildUpdatePayload(item){
+  var er = item._existingRow || {};
+  var row = item._row;
+  function v(key, label){ return vwColMap[key] ? vwGetV(row,key) : (er[label]||''); }
+  return {
+    'NO':           er['NO']||'',
+    '접수ID':       item.receiptId,
+    '성명':         v('name','성명'),
+    '연도':         v('year','연도'),
+    '수양회종류':   er['수양회종류']||'',
+    '행사명':       v('event','행사명'),
+    '교구':         v('district','교구'),
+    '구역':         v('zone','구역'),
+    '회별':         v('deptCode','회별'),
+    '봉사코드':     v('svcCode','봉사코드'),
+    '봉사명':       v('svcName','봉사명'),
+    '숙소코드':     v('roomCode','숙소코드'),
+    '숙소1':        v('room1','숙소1'),
+    '숙소2':        v('room2','숙소2'),
+    '참석일자':     er['참석일자']||'',
+    '참석교통수단': er['참석교통수단']||'',
+    '귀가일자':     er['귀가일자']||'',
+    '귀가교통수단': er['귀가교통수단']||'',
+    '전참여부':     er['전참여부']||'',
+    '구원여부':     v('salvCode','구원여부'),
+    '성별':         v('gender','성별'),
+  };
+}
+
 function vwConfirmUpload(){
   var newItems = _vwUploadPending.filter(function(r){ return r._status==='new'; });
+  var updItems = _vwUploadPending.filter(function(r){ return r._status==='upd'; });
   var delItems = _vwUploadPending.filter(function(r){ return r._status==='del'; });
   var dupCnt   = _vwUploadPending.filter(function(r){ return r._status==='dup'; }).length;
   var banner=document.getElementById('upload-preview-banner');
@@ -3468,13 +3568,13 @@ function vwConfirmUpload(){
   if(wrap)   wrap.style.display='none';
   _vwUploadPending=[];
 
-  if(!newItems.length && !delItems.length){
-    vwToast(dupCnt?('신규/삭제 대상이 없습니다 (전부 중복 '+dupCnt+'명)'):'처리할 데이터가 없습니다.','err');
+  if(!newItems.length && !updItems.length && !delItems.length){
+    vwToast(dupCnt?('신규/수정/삭제 대상이 없습니다 (전부 중복 '+dupCnt+'명)'):'처리할 데이터가 없습니다.','err');
     return;
   }
 
   var btn=document.getElementById('vwBtnSheet'); if(btn){ btn.disabled=true; btn.textContent='처리 중...'; }
-  var delErrored=false;
+  var delErrored=false, updErrored=false;
 
   // [v190] 삭제 대상 먼저 처리 — 기존 deleteRow()가 쓰는 apiCall({action:'delete', id:...}) 패턴 재사용
   // [v192] 병렬(Promise.all) → 순차 실행으로 전환 — 구글시트 행 삭제는 인덱스 기반이라
@@ -3522,61 +3622,113 @@ function vwConfirmUpload(){
     next(0);
   }
 
-  runDeletes(function(){
-    if(!newItems.length){
-      if(!delErrored) vwToast('🗑 삭제 '+delItems.length+'명 처리 완료'+(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
-      if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
-      if(!delErrored) vwLoadLastProcTime();
-      return;
+  // [v206] 수정 대상 처리 — 삭제와 동일하게 순차 실행(행 인덱스 충돌 방지).
+  // 교구/구역/회별이 바뀐 건은 참석인원명단 수정 성공 후 탑승자_참석/귀가에서 해당 접수ID를 정리해
+  // "재배정 필요" 상태로 전환한다. 숙소배정내역은 개인별 id-삭제가 구조상 불가능(팀 단위 overwrite 집계)해
+  // 이번 자동화 범위에서 제외 — 관리자가 숙소배정 화면에서 별도 확인 필요.
+  function runUpdates(cb){
+    if(!updItems.length){ cb(); return; }
+    if(btn) btn.textContent='수정 처리 중... 0/'+updItems.length;
+    var failedNames=[]; var okCnt=0;
+    function next(i){
+      if(i>=updItems.length){
+        if(failedNames.length){
+          updErrored=true;
+          vwToast('❌ 수정 실패 '+failedNames.length+'명: '+failedNames.slice(0,5).join(', ')
+            +(failedNames.length>5?' 외 '+(failedNames.length-5)+'명':'')
+            +' (나머지 '+okCnt+'명은 정상 반영됨)','err');
+        }
+        cb(); return;
+      }
+      var item=updItems[i];
+      if(btn) btn.textContent='수정 처리 중... '+(i+1)+'/'+updItems.length;
+      apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, _vwBuildUpdatePayload(item)))
+        .then(function(res){
+          if(res && res.success){
+            okCnt++;
+            if(item._cascade){
+              return apiCall({action:'delete', sheetName:'탑승자_참석', id:item.receiptId}).catch(function(){})
+                .then(function(){
+                  return apiCall({action:'delete', sheetName:'탑승자_귀가', id:item.receiptId}).catch(function(){});
+                });
+            }
+          } else {
+            failedNames.push((item.name||item.receiptId)+(res&&res.message?'('+res.message+')':''));
+          }
+        })
+        .catch(function(){
+          failedNames.push(item.name||item.receiptId);
+        })
+        .then(function(){
+          next(i+1);
+        });
     }
+    next(0);
+  }
 
-    var hdrs=['NO'].concat(VW_COLS.map(function(c){ return c.label; })).concat(['처리일시']);
-    var procTime=_nowStr();  // 배치(청크) 전체에 동일한 처리 시각 적용
-    var rows=newItems.map(function(item, i){
-      return [_vwMaxExistingNo+i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); })).concat([procTime]);
-    });
-
-    if(btn){ btn.disabled=true; btn.textContent='전송 중...'; }
-    var CHUNK=500; var sent=0; var errored=false;
-    function sendChunk(i){
-      if(i>=rows.length){
-        if(!errored) vwToast('✅ 신규 '+sent.toLocaleString()+'명 등록 완료'
-          +(delItems.length?' · 🗑 삭제 '+delItems.length+'명 처리':'')
-          +(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
+  runDeletes(function(){
+    runUpdates(function(){
+      if(!newItems.length){
+        var msgParts=[];
+        if(updItems.length && !updErrored) msgParts.push('🛠 수정 '+updItems.length+'명 반영');
+        if(delItems.length && !delErrored)  msgParts.push('🗑 삭제 '+delItems.length+'명 처리');
+        if(msgParts.length) vwToast(msgParts.join(' · ')+(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
         if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
-        if(!errored) vwLoadLastProcTime();  // 처리 성공 후 엑셀업로드시간 자동 갱신
+        if(!delErrored && !updErrored) vwLoadLastProcTime();
         return;
       }
-      var chunk=rows.slice(i,i+CHUNK);
-      var payload={sheetName:'참석인원명단', mode:'append', headers:hdrs, rows:chunk};
-      fetch(API_URL,{
-        method:'POST',
-        headers:_gasHeaders({'Content-Type':'text/plain'}),
-        body:JSON.stringify(payload),
-        redirect:'follow'
-      })
-      .then(function(res){ return res.text(); })
-      .then(function(txt){
-        try {
-          var j = JSON.parse(txt);
-          if(j && j.result === 'error'){ throw new Error('GAS 오류: ' + (j.message || txt)); }
-        } catch(parseErr){
-          if(txt && txt.indexOf('error')!==-1 && txt.indexOf('Error')!==-1){
-            console.warn('vwConfirmUpload GAS warn:', txt.slice(0,200));
-          }
-        }
-        sent += chunk.length;
-        if(btn) btn.textContent = '전송 중... '+sent+'/'+rows.length;
-        sendChunk(i+CHUNK);
-      })
-      .catch(function(err){
-        errored = true;
-        console.error('vwConfirmUpload error:', err);
-        vwToast('❌ 구글 시트 전송 실패 ('+chunk.length+'행): ' + (err.message||'네트워크 오류'), 'err');
-        if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
+
+      var hdrs=['NO'].concat(VW_COLS.map(function(c){ return c.label; })).concat(['처리일시']);
+      var procTime=_nowStr();  // 배치(청크) 전체에 동일한 처리 시각 적용
+      var rows=newItems.map(function(item, i){
+        return [_vwMaxExistingNo+i+1].concat(VW_COLS.map(function(c){ return vwGetV(item._row,c.key); })).concat([procTime]);
       });
-    }
-    sendChunk(0);
+
+      if(btn){ btn.disabled=true; btn.textContent='전송 중...'; }
+      var CHUNK=500; var sent=0; var errored=false;
+      function sendChunk(i){
+        if(i>=rows.length){
+          if(!errored){
+            var msgParts=['✅ 신규 '+sent.toLocaleString()+'명 등록 완료'];
+            if(updItems.length && !updErrored) msgParts.push('🛠 수정 '+updItems.length+'명 반영');
+            if(delItems.length && !delErrored)  msgParts.push('🗑 삭제 '+delItems.length+'명 처리');
+            vwToast(msgParts.join(' · ')+(dupCnt?' (중복 '+dupCnt+'명 제외)':''),'ok');
+          }
+          if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
+          if(!errored) vwLoadLastProcTime();  // 처리 성공 후 엑셀업로드시간 자동 갱신
+          return;
+        }
+        var chunk=rows.slice(i,i+CHUNK);
+        var payload={sheetName:'참석인원명단', mode:'append', headers:hdrs, rows:chunk};
+        fetch(API_URL,{
+          method:'POST',
+          headers:_gasHeaders({'Content-Type':'text/plain'}),
+          body:JSON.stringify(payload),
+          redirect:'follow'
+        })
+        .then(function(res){ return res.text(); })
+        .then(function(txt){
+          try {
+            var j = JSON.parse(txt);
+            if(j && j.result === 'error'){ throw new Error('GAS 오류: ' + (j.message || txt)); }
+          } catch(parseErr){
+            if(txt && txt.indexOf('error')!==-1 && txt.indexOf('Error')!==-1){
+              console.warn('vwConfirmUpload GAS warn:', txt.slice(0,200));
+            }
+          }
+          sent += chunk.length;
+          if(btn) btn.textContent = '전송 중... '+sent+'/'+rows.length;
+          sendChunk(i+CHUNK);
+        })
+        .catch(function(err){
+          errored = true;
+          console.error('vwConfirmUpload error:', err);
+          vwToast('❌ 구글 시트 전송 실패 ('+chunk.length+'행): ' + (err.message||'네트워크 오류'), 'err');
+          if(btn){ btn.disabled=false; btn.innerHTML=_vwBtnLabel; }
+        });
+      }
+      sendChunk(0);
+    });
   });
 }
 
@@ -7870,8 +8022,8 @@ function busExportCSV(){
 // ════════════════════════════════════════════════════════
 //  설정 / 유틸
 // ════════════════════════════════════════════════════════
-var COLS = ['접수ID','년도','수양회종류','회차','교구','구역','회별','이름','참석일자','참석교통수단','참석배정호차','귀가일자','귀가교통수단','귀가배정호차','전참여부','구원여부'];
-var KEYS = ['receiptId','year','retreatType','hocha','parish','district','group','name','arriveDate','arriveTransport','busNum','leaveDate','leaveTransport','leaveBusNum','prevAttend','salvCode'];
+var COLS = ['접수ID','년도','수양회종류','회차','교구','구역','회별','이름','참석일자','참석교통수단','참석배정호차','귀가일자','귀가교통수단','귀가배정호차','전참여부','구원여부','연락처','보호자'];
+var KEYS = ['receiptId','year','retreatType','event','parish','district','group','name','arriveDate','arriveTransport','busNum','leaveDate','leaveTransport','leaveBusNum','prevAttend','salvCode','contact','guardian'];
 
 var ACCOUNTS = JSON.parse((function(){ try{return localStorage.getItem('retreat_accounts');}catch(e){return null;} }()) || 'null') || [
   {id:'admin',   name:'관리자',  pw:'admin1234', role:'admin',    position:'담당목사', parish:'',     district:'', regDate:'20260601', regBy:'system'},
@@ -7928,7 +8080,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v204_grand_total_top_and_other_parish';
+var CACHE_VERSION = 'v209_export_hocha_prevattend_busnum_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -8247,6 +8399,8 @@ function sheetRowToObj(r) {
     regDate:        fmtDate(g('regDate','등록일')),
     salvCode:       g('salvCode','구원여부'),
     gender:         g('gender','성별'),
+    contact:        g('contact','연락처'),
+    guardian:       g('guardian','보호자'),
   };
 }
 // ── JS 객체(영문키) → 구글시트 한글 컬럼명 객체 변환 ──────────────────────
@@ -8275,6 +8429,8 @@ function toSheetObj(r){
     '전참여부':   r.prevAttend || '',
     '구원여부':   r.salvCode   || '',
     '성별':       r.gender     || '',
+    '연락처':     r.contact    || '',
+    '보호자':     r.guardian   || '',
   };
 }
 function loadData() {
@@ -9646,6 +9802,8 @@ function renderTable() {
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td>'+esc(r.group||'-')+'</td>'+
       '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
+      '<td style="font-size:.79rem;">'+esc(r.contact||'-')+'</td>'+
+      '<td style="font-size:.79rem;">'+esc(r.guardian||'-')+'</td>'+
       '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
       '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
@@ -10182,6 +10340,8 @@ function openDetail(id) {
       return (rid && _rosterFullLv[rid]) ? _rosterFullLv[rid] : '미배정';
     })()],
     ['전참 여부',  r.prevAttend==='예'?'전참':'해당없음'],
+    ['연락처',    r.contact||'-'],
+    ['보호자',    r.guardian||'-'],
   ];
   var mb=$id('modal-body');
   if(mb) mb.innerHTML=fields.map(function(f){
@@ -10208,6 +10368,7 @@ function openEditMode(id) {
   $id('e-arrive-date').value=r.arriveDate||''; $id('e-arrive-transport').value=r.arriveTransport||'';
   $id('e-leave-date').value=r.leaveDate||''; $id('e-leave-transport').value=r.leaveTransport||'';
   $id('e-prev-attend').value=r.prevAttend||'아니요';
+  $id('e-contact').value=r.contact||''; $id('e-guardian').value=r.guardian||'';
   // 참석/귀가 버스배정 — 구역장만 수정 가능, 본인 구역이 배정된 버스 범위 내에서만 선택 (UI만, 시트 반영은 추후 처리)
   var eArrBus=$id('e-arrive-bus');
   if(eArrBus){
@@ -10299,6 +10460,8 @@ function saveEdit() {
     arriveDate:  $id('e-arrive-date').value, arriveTransport: $id('e-arrive-transport').value,
     leaveDate:   $id('e-leave-date').value,  leaveTransport:  $id('e-leave-transport').value,
     prevAttend:  isAdmin ? $id('e-prev-attend').value         : r.prevAttend,
+    contact:     isAdmin ? $id('e-contact').value.trim()      : r.contact,
+    guardian:    isAdmin ? $id('e-guardian').value.trim()     : r.guardian,
   };
   var updated=Object.assign({},r,changes);
   // 검증도 관리자가 실제로 수정 가능한 경우에만 적용 (구역장은 항상 원본값이라 검증 불필요)
@@ -10650,6 +10813,8 @@ function bpOpenDetail(id){
       return (rid && _rosterFullLv[rid]) ? _rosterFullLv[rid] : '미배정';
     })()],
     ['전참 여부', r.prevAttend==='예'?'전참':'해당없음'],
+    ['연락처', r.contact||'-'],
+    ['보호자', r.guardian||'-'],
   ];
   var mb=$id('bp-modal-body');
   if(mb) mb.innerHTML=fields.map(function(f){
@@ -10673,6 +10838,7 @@ function bpOpenEditMode(id){
   $id('bp-e-arrive-date').value=r.arriveDate||''; $id('bp-e-arrive-transport').value=r.arriveTransport||'';
   $id('bp-e-leave-date').value=r.leaveDate||''; $id('bp-e-leave-transport').value=r.leaveTransport||'';
   $id('bp-e-prev-attend').value=r.prevAttend||'아니요';
+  $id('bp-e-contact').value=r.contact||''; $id('bp-e-guardian').value=r.guardian||'';
   var eArrBus=$id('bp-e-arrive-bus');
   if(eArrBus){
     eArrBus.innerHTML=busAssignOptionsHtml('arrive', (r.receiptId&&rosterArriveIndex[r.receiptId])||'', r, 'search');
@@ -10709,6 +10875,8 @@ function bpSaveEdit(){
     arriveDate: $id('bp-e-arrive-date').value, arriveTransport: $id('bp-e-arrive-transport').value,
     leaveDate: $id('bp-e-leave-date').value, leaveTransport: $id('bp-e-leave-transport').value,
     prevAttend: $id('bp-e-prev-attend').value,
+    contact: $id('bp-e-contact').value.trim(),
+    guardian: $id('bp-e-guardian').value.trim(),
   };
   var updated=Object.assign({},r,changes);
   if(!updated.name)  { showToast('이름을 입력해 주세요.','error'); return; }
@@ -12621,12 +12789,24 @@ function _downloadCSV(rows, filename) {
   var a=document.createElement('a'); a.href=url; a.download=filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
+// [v209] 검색결과 그리드(renderTable)와 동일한 규칙으로 배정호차 계산 — CSV/화면 표기 불일치 방지
+// 버스가 아니면 '-', 버스인데 미배정이면 '미배정', 배정됐으면 실제 호차명
+function _exportBusAssign(r, which){
+  var rid = r.receiptId||'';
+  if(which==='arrive'){
+    return r.arriveTransport==='버스' ? (rid && _rosterFullArr[rid] ? _rosterFullArr[rid] : '미배정') : '-';
+  }
+  return r.leaveTransport==='버스' ? (rid && _rosterFullLv[rid] ? _rosterFullLv[rid] : '미배정') : '-';
+}
+
 function exportExcel() {
   if(!retreat.length){ showToast('등록된 데이터가 없습니다.','error'); return; }
   var nameIdx = KEYS.indexOf('name');
   var rows=[['NO'].concat(COLS)].concat(retreat.map(function(r, i){
     return [i+1].concat(KEYS.map(function(k, ki){
-      if(k==='prevAttend') return r[k]==='Y'?'전참':'해당없음';
+      if(k==='prevAttend') return r[k]==='예'?'전참':'해당없음';
+      if(k==='busNum')      return _exportBusAssign(r,'arrive');
+      if(k==='leaveBusNum') return _exportBusAssign(r,'leave');
       if(ki===nameIdx) return maskName(r[k]||'');
       return r[k]||'';
     }));
@@ -12636,8 +12816,8 @@ function exportExcel() {
 }
 // 접수인원현황(자료검색) 전용 CSV — 그리드와 동일한 컬럼 구성(5개 제외 + 구원여부 라벨 변환)
 // exportExcel()은 버스배정인원관리 CSV 버튼이 그대로 공유 중이라 별도 함수로 분리함
-var SEARCH_EXPORT_COLS = ['접수ID','회차','구역','회별','이름','구원여부','참석교통수단','참석배정호차','귀가교통수단','귀가배정호차','전참여부'];
-var SEARCH_EXPORT_KEYS = ['receiptId','hocha','district','group','name','salvCode','arriveTransport','busNum','leaveTransport','leaveBusNum','prevAttend'];
+var SEARCH_EXPORT_COLS = ['접수ID','회차','구역','회별','이름','구원여부','참석교통수단','참석배정호차','귀가교통수단','귀가배정호차','전참여부','연락처','보호자'];
+var SEARCH_EXPORT_KEYS = ['receiptId','event','district','group','name','salvCode','arriveTransport','busNum','leaveTransport','leaveBusNum','prevAttend','contact','guardian'];
 function exportSearchExcel() {
   if(!retreat.length){ showToast('등록된 데이터가 없습니다.','error'); return; }
   var nameIdx = SEARCH_EXPORT_KEYS.indexOf('name');
@@ -12645,6 +12825,8 @@ function exportSearchExcel() {
     return [i+1].concat(SEARCH_EXPORT_KEYS.map(function(k, ki){
       if(k==='prevAttend') return r[k]==='예'?'전참':'해당없음';
       if(k==='salvCode')   return _salvLabel(r[k]);
+      if(k==='busNum')      return _exportBusAssign(r,'arrive');
+      if(k==='leaveBusNum') return _exportBusAssign(r,'leave');
       if(ki===nameIdx) return maskName(r[k]||'');
       return r[k]||'';
     }));
@@ -12848,7 +13030,19 @@ function roomRestore(onDone){
     showLoading(true);
     apiCall({action:'getAll', sheetName:'숙소배정내역'})
       .then(function(res){
-        var rows = (res && res.success) ? (res.data || res.rows || []) : [];
+        if(!(res && res.success)){
+          // [v208] 조회 실패를 조용히 삼키지 않고 명확히 표시 —
+          // 그동안은 "배정이 완료되지 않았습니다"와 구분이 안 돼 실제로는 조회 실패인데
+          // 진짜 배정이 없는 것처럼 보이는 문제가 있었음.
+          console.error('roomRestore getAll 실패:', res);
+          showToast('⚠️ 숙소배정 데이터 조회 실패: '+((res&&(res.message||res.error))||'알 수 없는 오류'),'error');
+          roomData = [];
+          roomRenderTabs();
+          showLoading(false);
+          if(onDone) onDone();
+          return;
+        }
+        var rows = res.data || res.rows || [];
         if(rows.length){
           var no = 1;
           roomData = rows.map(function(r){
@@ -12856,6 +13050,7 @@ function roomRestore(onDone){
               no: no++,
               year:      String(r['년도']||r.year||'').trim(),
               retreatType: String(r['수양회종류']||r.retreatType||'').trim(),
+              event:     String(r['행사명']||r.event||'').trim(),  // [v208] 누락돼 있던 회차(행사명) 필드 추가
               receiptId: String(r['접수ID']||r.receiptId||'').trim(),
               building:  String(r['건물명']||r.building||'').trim(),
               room:      String(r['배정호']||r.room||'').trim(),
@@ -12865,6 +13060,10 @@ function roomRestore(onDone){
             };
           }).filter(function(d){ return d.building; });
           _ls.set('room_data', JSON.stringify(roomData));
+          // [v208] 원본 행 수 대비 필터 후 건수가 다르면(건물명 없는 행이 있으면) 콘솔에 남겨 다음 진단에 활용
+          if(roomData.length !== rows.length){
+            console.warn('roomRestore: 건물명 없는 행 '+(rows.length-roomData.length)+'건 제외됨(원본 '+rows.length+'건 중 '+roomData.length+'건만 표시)');
+          }
         } else {
           // 시트 비어있음 → 로컬 캐시 초기화
           roomData = [];
@@ -12874,7 +13073,9 @@ function roomRestore(onDone){
         showLoading(false);
         if(onDone) onDone();
       })
-      .catch(function(){
+      .catch(function(e){
+        console.error('roomRestore 네트워크/서버 오류:', e);
+        showToast('⚠️ 숙소배정 데이터 조회 실패: '+(e&&e.message||'서버 연결 오류'),'error');
         roomData = []; roomRenderTabs(); showLoading(false);
         if(onDone) onDone();
       });
@@ -13161,18 +13362,13 @@ function roomRenderView(){
     return;
   }
 
-  // 필터 후 데이터 없음
-  if(!baseData.length){
-    elEmpty.style.display='';
-    elContent.style.display='none';
-    elEmpty.innerHTML='<div style="text-align:center;padding:40px 0;"><div style="font-size:2rem;">🔍</div>'
-      +'<div style="margin-top:12px;color:var(--muted);font-size:.9rem;">선택한 연도·수양회·차수 배정 데이터가 없습니다.<br>조회 조건을 변경하거나 배정 후 다시 확인해 주세요.</div></div>';
-    return;
-  }
-
   var current = (typeof currentUser!=='undefined'&&currentUser)?currentUser:{};
 
   // ── 년도·수양회종류·행사명 필터 (조회 콤보 기준) ──
+  // [v208 버그수정] baseData를 참조(아래 빈값 체크)보다 반드시 먼저 계산해야 함.
+  // 기존엔 baseData 선언(당시엔 아래쪽)보다 참조가 앞에 있어 데이터가 있을 때마다
+  // "TypeError: Cannot read properties of undefined"로 함수가 즉시 중단되고,
+  // 화면은 페이지 로드 시의 초기 문구("배정이 완료되지 않았습니다")에 멈춰 있었음.
   var rvYear  = (function(){ var el=$id('roomview-sel-year');  return el?el.value:''; })();
   var rvType  = (function(){ var el=$id('roomview-sel-type');  return el?el.value:''; })();
   var rvEvent = (function(){ var el=$id('roomview-sel-event'); return el?el.value:''; })();
@@ -13191,6 +13387,15 @@ function roomRenderView(){
     if(current.parish)   return d.parish===current.parish;
     return true;
   });
+
+  // 필터 후 데이터 없음
+  if(!baseData.length){
+    elEmpty.style.display='';
+    elContent.style.display='none';
+    elEmpty.innerHTML='<div style="text-align:center;padding:40px 0;"><div style="font-size:2rem;">🔍</div>'
+      +'<div style="margin-top:12px;color:var(--muted);font-size:.9rem;">선택한 연도·수양회·차수 배정 데이터가 없습니다.<br>조회 조건을 변경하거나 배정 후 다시 확인해 주세요.</div></div>';
+    return;
+  }
 
   elEmpty.style.display='none';
   elContent.style.display='';
