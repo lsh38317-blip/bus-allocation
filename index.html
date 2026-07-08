@@ -3547,6 +3547,10 @@ function _vwRenderUploadPreview(){
 // 기존 시트값을 그대로 보존한다(그렇지 않으면 기존 인원의 확정 정보가 CSV 업로드 때마다 초기화됨).
 // [수정] 그 외 필드도 이번 CSV에 해당 컬럼이 없으면(별칭 미탐지) 기존 시트값을 그대로 보존한다.
 //        (컬럼이 없는 것을 빈값으로 오해해 기존 데이터를 지우는 사고 방지 — 비교 로직과 동일한 원칙)
+// [v220] 날짜 필드 정리용 — fmtDate()는 빈값을 '-'로 반환하므로, 원래 "빈 문자열 유지" 의미를
+// 보존하기 위해 '-'는 다시 빈 문자열로 되돌린다. 구글시트 API가 내려주는 ISO 타임스탬프
+// (예: "2026-07-07T07:00:00.000Z")를 'YYYY-MM-DD'로 정리해 재기록 시 형식이 깨지지 않도록 함.
+function _vwFmtOrBlank(v){ var f=fmtDate(v); return f==='-' ? '' : f; }
 function _vwBuildUpdatePayload(item){
   var er = item._existingRow || {};
   var row = item._row;
@@ -3566,13 +3570,15 @@ function _vwBuildUpdatePayload(item){
     '숙소코드':     v('roomCode','숙소코드'),
     '숙소1':        v('room1','숙소1'),
     '숙소2':        v('room2','숙소2'),
-    '참석일자':     er['참석일자']||'',
+    '참석일자':     _vwFmtOrBlank(er['참석일자']),
     '참석교통수단': er['참석교통수단']||'',
-    '귀가일자':     er['귀가일자']||'',
+    '귀가일자':     _vwFmtOrBlank(er['귀가일자']),
     '귀가교통수단': er['귀가교통수단']||'',
     '전참여부':     er['전참여부']||'',
     '구원여부':     v('salvCode','구원여부'),
     '성별':         v('gender','성별'),
+    '연락처':       v('contact','연락처'),
+    '보호자':       v('guardian','보호자'),
   };
 }
 
@@ -8241,7 +8247,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v219_vw_falsy_zero_fix';
+var CACHE_VERSION = 'v220_vw_update_payload_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
