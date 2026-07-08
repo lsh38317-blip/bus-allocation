@@ -1327,7 +1327,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <div class="toolbar-info">검색결과: <strong id="bp-result-count">0</strong>명</div>
               <div style="display:flex;align-items:center;gap:8px;">
                 <span id="bp-data-source-badge" style="font-size:.72rem;padding:2px 9px;border-radius:20px;font-weight:600;"></span>
-                <button class="btn btn-sm" id="bp-btn-bulk" style="background:#fff3e0;border:1px solid #f0c080;color:#8a5a00;font-weight:700;" onclick="bpBulkToggleTransport()">🔁 일괄변경</button>
                 <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ CSV 다운로드</button>
               </div>
             </div>
@@ -1335,7 +1334,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <table style="min-width:760px;">
                 <thead>
                   <tr>
-                    <th style="width:32px;"><input type="checkbox" id="bp-chk-all" onchange="bpToggleAll(this)"></th>
                     <th>#</th>
                     <th style="display:none;">접수ID</th>
                     <th>성명</th><th>연도</th><th>수양회종류</th><th>행사명</th>
@@ -1536,6 +1534,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
+                    <th>연락처</th>
+                    <th>보호자</th>
                     <th>참석버스배정</th>
                     <th>귀가버스배정</th>
                     <th>관리</th>
@@ -1765,6 +1765,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <span class="ctag">교제부서코드</span><span class="ctag">봉사코드</span>
                   <span class="ctag k">봉사명</span><span class="ctag">숙소코드</span>
                   <span class="ctag k">숙소1</span><span class="ctag k">숙소2</span>
+                  <span class="ctag">연락처</span><span class="ctag">보호자</span>
                 </div>
               </div>
             </div>
@@ -3397,7 +3398,11 @@ function vwCheckDuplicatesAndPreview(){
             compareCols.forEach(function(col){
               if(!vwColMap[col.key]) return; // 이번 CSV에 없는 컬럼 → 비교/갱신 모두 제외(기존값 보존)
               var newVal = String(vwGetV(row,col.key)||'').trim();
-              var oldVal = String(existingRow[col.label]||'').trim();
+              // [수정] existingRow 값이 숫자 0이면 "0||''"가 0을 falsy로 취급해 빈 문자열로
+              // 오염시키는 버그가 있었음(숙소코드=0인 사람이 매번 "변경됨"으로 오탐지됨) —
+              // null/undefined만 빈 문자열로 처리하도록 명시적 체크로 교체.
+              var rawOld = existingRow[col.label];
+              var oldVal = String(rawOld==null ? '' : rawOld).trim();
               if(newVal !== oldVal){
                 changedFields.push(col.label);
                 if(VW_UPDATE_CASCADE_KEYS.indexOf(col.key)>=0) cascade = true;
@@ -5790,15 +5795,6 @@ function busSplitAssignReassign(busId, reassignId, type){
 
 // ── 교통수단 변경 시 버스 슬롯 처리 헬퍼 ────────────────
 // 팀 키: '{parish} {district}' 또는 '중고등부'
-// [v217] 분산배정 라벨(전체N명) 표시용 — team.count(최초 배정 시점 스냅샷, 이후 어긋날 수 있음) 대신
-// 해당 팀이 실제로 배정된 모든 버스 슬롯의 합계를 매번 계산해 반환. 항상 화면에 보이는
-// 버스들의 합계와 일치하도록 보장한다 (team.count 필드 자체는 다른 기능에서 계속 사용되므로 유지).
-function busTeamSlotTotal(team, busArr) {
-  return busArr.reduce(function(sum, b) {
-    var sl = b.slots.find(function(s) { return s.teamId === team.id; });
-    return sum + (sl ? sl.count : 0);
-  }, 0);
-}
 function busGetTeamKey(r) {
   if (isJuniorHighBus && isJuniorHighBus(r)) return '중고등부';
   return ((r.parish||'미분류') + ' ' + (r.district||'')).trim();
@@ -5818,32 +5814,25 @@ function busRemoveTeamFromAll(teamKey, type) {
 }
 
 // 특정 팀의 슬롯 인원 1명 차감 (0이 되면 슬롯 제거)
-// [v216] 버그수정: 팀이 여러 버스에 분산 배정된 경우(예: 25구역이 6호차+7호차에 나뉘어 배정)
-// 기존엔 조건에 맞는 "모든 버스의 슬롯"에서 각각 차감되어 1명 차감 호출 한 번에 N개 버스가
-// 동시에 줄어드는 중복차감 버그가 있었음. "1명 차감"이라는 함수 목적대로 최초 매칭되는
-// 슬롯 1곳에서만 차감하고 즉시 중단하도록 수정 (버스별 슬롯합계 = 팀 전체인원 일치 보장).
 function busReduceTeamCount(teamKey, type) {
   var buses = type === 'leave' ? busLeaveBuses : busArriveBuses;
   var teams = type === 'leave' ? busLeaveTeams : busArriveTeams;
-  var reduced = false;
-  for (var i = 0; i < buses.length && !reduced; i++) {
-    var b = buses[i];
-    for (var j = 0; j < b.slots.length; j++) {
-      var s = b.slots[j];
+  var changed = false;
+  buses.forEach(function(b) {
+    b.slots.forEach(function(s) {
       if (s.teamId === teamKey && s.count > 0) {
         s.count--;
-        reduced = true;
-        break; // 최초 매칭 슬롯 1곳만 차감 — 다른 버스의 동일 팀 슬롯은 건드리지 않음
+        changed = true;
       }
-    }
+    });
     b.slots = b.slots.filter(function(s) { return s.count > 0; });
-  }
+  });
   // 팀 총 인원도 1 차감
   teams.forEach(function(t) {
     if (t.id === teamKey && t.count > 0) t.count--;
   });
-  if (reduced) busSave();
-  return reduced;
+  if (changed) busSave();
+  return changed;
 }
 
 // ── 버스 미배정 인원 집계 — 교통수단=버스인데 실제 어느 버스에도 배정 안 된 인원 수 ──
@@ -6770,7 +6759,7 @@ function busRenderBuses(type){
           (isSplit?'<span style="font-size:.65rem;color:#c89b30;flex-shrink:0;">✂️</span>':'')+
           '</div>'+
           '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">'+
-          '<span style="color:'+(isSplit?'#c89b30':team.color)+';font-size:.75rem;font-weight:700;">'+(isSplit?(slot.count+'/'+busTeamSlotTotal(team,buses)+'명'):(slot.count+'명'))+'</span>'+
+          '<span style="color:'+(isSplit?'#c89b30':team.color)+';font-size:.75rem;font-weight:700;">'+(isSplit?(slot.count+'/'+team.count+'명'):(slot.count+'명'))+'</span>'+
           '<button onclick="busRemoveSlot(\''+bus.id+'\',\''+team.id+'\',\''+type+'\')" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:0;line-height:1;">✕</button>'+
           '</div></div>';
       });
@@ -6932,7 +6921,7 @@ function busRenderSummary(type){
         html+='<div style="background:'+(isSplit?'#fdf6e3':'#f7f8fc')+';border:1px solid '+(isSplit?'#f0dea0':'var(--border2)')+';border-radius:7px;padding:4px 11px;display:flex;align-items:center;gap:5px;">'+
           '<div style="width:7px;height:7px;border-radius:50%;background:'+(isSplit?'#c89b30':team.color)+';flex-shrink:0;"></div>'+
           '<span style="font-size:.82rem;font-weight:600;color:var(--text);">'+esc(team.name)+'</span>'+
-          '<span style="font-size:.75rem;color:'+(isSplit?'#c89b30':team.color)+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+busTeamSlotTotal(team,buses)+'명'):slot.count+'명')+'</span>'+
+          '<span style="font-size:.75rem;color:'+(isSplit?'#c89b30':team.color)+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+team.count+'명'):slot.count+'명')+'</span>'+
           (isSplit?'<span style="font-size:.65rem;color:#c89b30;">✂️</span>':'')+
           '</div>';
       });
@@ -6953,7 +6942,7 @@ function busRenderSummary(type){
       var sb=buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); });
       html+='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">'+
         '<span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span>'+
-        '<span style="font-size:.78rem;color:var(--muted);">총 '+busTeamSlotTotal(team,sb)+'명 →</span>'+
+        '<span style="font-size:.78rem;color:var(--muted);">총 '+team.count+'명 →</span>'+
         sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+
         '</div>';
     });
@@ -7779,7 +7768,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
             '<div style="width:7px;height:7px;border-radius:50%;background:'+(isMine?'#2d8a5a':isSplit?'#c89b30':team.color)+';flex-shrink:0;"></div>'+
             (isMine?'<span style="font-size:.65rem;background:#2d8a5a;color:#fff;border-radius:3px;padding:1px 5px;font-weight:700;">내구역</span>':'')+
             '<span style="font-size:.83rem;font-weight:600;color:var(--text);">'+esc(team.name)+'</span>'+
-            '<span style="font-size:.76rem;color:'+slotColor+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+busTeamSlotTotal(team,curBuses)+'명'):slot.count+'명')+'</span>'+
+            '<span style="font-size:.76rem;color:'+slotColor+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+team.count+'명'):slot.count+'명')+'</span>'+
             (isSplit?'<span style="font-size:.65rem;color:#c89b30;">✂️</span>':'')+
             '<span style="font-size:.65rem;color:var(--muted);margin-left:2px;">▶</span>'+
             '</div>';
@@ -7789,7 +7778,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
   // ── 미배정팀 박스: 관리자+시트 데이터 우선, 아니면 로컬 기준 ──
   var renderUnassign = sheetUnassignTeams || unassign;
   if(renderUnassign.length>0) html+='<div style="background:#fff0f0;border:1px solid #f5c0c0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#d94040;margin-bottom:8px;font-size:.88rem;">⚠️ 미배정 팀 ('+renderUnassign.length+')</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'+renderUnassign.map(function(t){ return '<div style="background:#fff;border:1px solid #f5c0c0;border-radius:7px;padding:4px 12px;font-size:.82rem;color:#d94040;font-weight:600;">'+esc(t.name)+' ('+t.count+'명)</div>'; }).join('')+'</div></div>';
-  if(partial.length>0) html+='<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#c89b30;margin-bottom:8px;font-size:.88rem;">✂️ 분산 배정 팀 ('+partial.length+')</div><div style="display:flex;flex-direction:column;gap:6px;">'+partial.map(function(team){ var sb=curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }); return '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;"><span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span><span style="font-size:.78rem;color:var(--muted);">총 '+busTeamSlotTotal(team,sb)+'명 →</span>'+sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+'</div>'; }).join('')+'</div></div>';
+  if(partial.length>0) html+='<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#c89b30;margin-bottom:8px;font-size:.88rem;">✂️ 분산 배정 팀 ('+partial.length+')</div><div style="display:flex;flex-direction:column;gap:6px;">'+partial.map(function(team){ var sb=curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }); return '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;"><span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span><span style="font-size:.78rem;color:var(--muted);">총 '+team.count+'명 →</span>'+sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+'</div>'; }).join('')+'</div></div>';
   listEl.innerHTML=html;
 }
 
@@ -8235,7 +8224,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v218_search_grid_hide_contact';
+var CACHE_VERSION = 'v215_upload_zero_value_falsy_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -9957,6 +9946,8 @@ function renderTable() {
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td>'+esc(r.group||'-')+'</td>'+
       '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
+      '<td style="font-size:.79rem;">'+esc(r.contact||'-')+'</td>'+
+      '<td style="font-size:.79rem;">'+esc(r.guardian||'-')+'</td>'+
       '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
       '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
@@ -10772,11 +10763,6 @@ function deleteRow(id, fromModal) {
 // ══════════════════════════════════════════════════════════════════
 var bpFiltered    = [];
 var bpCurrentPage = 1;
-// [v214] 그리드 셀(참석/귀가교통수단) 클릭 토글 — "일괄변경" 버튼으로 확정 저장하기 전까지는
-// 서버 반영 없이 화면에만 예약(스테이징)되는 값. 조회/초기화 시 폐기됨.
-var bpStagedArrive = {}; // {id: 예약된 참석교통수단}
-var bpStagedLeave  = {}; // {id: 예약된 귀가교통수단}
-var bpSelectedIds  = new Set(); // 체크박스로 선택된 행 id (문자열)
 
 function bpSearchParishChange(){
   var parish=$val('bp-s-parish');
@@ -10823,12 +10809,9 @@ function bpDoSearch(){
            (!sArriveStatus || bpBusAssignInfo(r,'arrive').status===sArriveStatus)&&
            (!sLeaveStatus  || bpBusAssignInfo(r,'leave').status===sLeaveStatus);
   });
-  // [v214] 재조회 시 미확정 스테이징 값(배지 클릭으로 예약만 되고 저장은 안 된 값)은 폐기
-  bpStagedArrive = {}; bpStagedLeave = {}; bpSelectedIds.clear();
   bpCurrentPage=1; bpRenderTable();
 }
 function bpClearSearch(){
-  bpStagedArrive = {}; bpStagedLeave = {}; bpSelectedIds.clear();
   $set('bp-s-name','');
   $set('bp-s-parish','');
   $set('bp-s-district','');
@@ -10860,21 +10843,13 @@ function bpRenderTable(){
       ' <button class="btn btn-sm" style="background:#e8eef8;border:1px solid #c0cfe8;color:var(--navy);" onclick="bpOpenInlineEdit(&quot;'+esc(String(r.id))+'&quot;)">✏️ 수정</button>'+
       ' <button class="btn btn-danger btn-sm" onclick="bpDeleteRow(&quot;'+esc(String(r.id))+'&quot;)">삭제</button>';
     var rid=r.receiptId||'';
-    var idStr = String(r.id);
     var arriveInfo = bpBusAssignInfo(r,'arrive');
     var leaveInfo  = bpBusAssignInfo(r,'leave');
     var arriveBusAssign = arriveInfo.value;
     var leaveBusAssign  = leaveInfo.value;
     var arriveBusStyle = arriveInfo.status==='unassigned' ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
     var leaveBusStyle  = leaveInfo.status==='unassigned'  ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
-    // [v214] 배지 표시값 — 미확정 스테이징 값이 있으면 그 값을 우선 표시(예약중)
-    var arriveDisp = bpStagedArrive.hasOwnProperty(idStr) ? bpStagedArrive[idStr] : (r.arriveTransport||'-');
-    var leaveDisp  = bpStagedLeave.hasOwnProperty(idStr)  ? bpStagedLeave[idStr]  : (r.leaveTransport||'-');
-    var arrivePending = bpStagedArrive.hasOwnProperty(idStr);
-    var leavePending  = bpStagedLeave.hasOwnProperty(idStr);
-    var isChecked = bpSelectedIds.has(idStr);
-    return '<tr id="bptr-'+esc(idStr)+'">'+
-      '<td><input type="checkbox" class="bp-chk-row" data-id="'+esc(idStr)+'" '+(isChecked?'checked':'')+' onchange="bpToggleCheck(&quot;'+esc(idStr)+'&quot;,this.checked)"></td>'+
+    return '<tr id="bptr-'+esc(String(r.id))+'">'+
       '<td style="color:var(--text-dim);font-size:.74rem">'+((bpCurrentPage-1)*PAGE_SIZE+i+1)+'</td>'+
       '<td style="display:none;">'+esc(rid||'—')+'</td>'+
       '<td><strong>'+maskName(r.name)+'</strong></td>'+
@@ -10885,182 +10860,16 @@ function bpRenderTable(){
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td>'+esc(r.group||'-')+'</td>'+
       '<td style="font-size:.79rem">'+esc(fmtDate(r.arriveDate)||'-')+'</td>'+
-      '<td><span class="bp-trans-badge" id="bp-arrive-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(arriveDisp,arrivePending)+'" onclick="bpToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(arriveDisp)+'</span></td>'+
+      '<td>'+esc(r.arriveTransport||'-')+'</td>'+
       '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
       '<td style="font-size:.79rem">'+esc(fmtDate(r.leaveDate)||'-')+'</td>'+
-      '<td><span class="bp-trans-badge" id="bp-leave-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(leaveDisp,leavePending)+'" onclick="bpToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(leaveDisp)+'</span></td>'+
+      '<td>'+esc(r.leaveTransport||'-')+'</td>'+
       '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
       '<td><span class="badge '+(r.prevAttend==='예'?'badge-y':'badge-n')+'">'+(r.prevAttend==='예'?'전참':'해당없음')+'</span></td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
   }).join('');
   bpRenderPagination(pages);
-}
-// [v214] 참석/귀가교통수단 배지 스타일 — 버스=파란색 계열, 자동차=주황색 계열
-// pending=true(미확정 스테이징 상태)면 점선 테두리로 "예약중" 표시
-function bpTransBadgeStyle(v, pending){
-  var isBus = (v||'').trim()==='버스';
-  var base = 'display:inline-block;padding:2px 10px;border-radius:12px;font-size:.78rem;font-weight:700;cursor:pointer;user-select:none;';
-  var colorStyle = isBus
-    ? 'background:#e3edfb;color:#1e5fa8;border:1.5px solid '+(pending?'#1e5fa8':'#b7cdec')+';'
-    : 'background:#fdecd8;color:#a15c00;border:1.5px solid '+(pending?'#a15c00':'#f0c98a')+';';
-  return base + colorStyle + (pending ? 'border-style:dashed;' : '');
-}
-// [v215] 체크박스 선택 상태 관리
-// 체크 해제 시: 해당 행의 스테이징(예약)값을 전부 취소하고 배지를 원상복구한다.
-// (배지 클릭 없이 값이 바뀌는 걸 막기 위해 — 체크박스는 "스테이징된 행"의 부산물 표시일 뿐,
-//  해제하면 그 스테이징 자체를 취소하는 것이 사용자 기대와 일치)
-function bpToggleCheck(id, checked){
-  var idStr=String(id);
-  if(checked){
-    bpSelectedIds.add(idStr);
-  } else {
-    bpSelectedIds.delete(idStr);
-    delete bpStagedArrive[idStr];
-    delete bpStagedLeave[idStr];
-    bpRefreshRowBadges(idStr);
-  }
-  bpUpdateBulkBtnLabel();
-}
-function bpToggleAll(cb){
-  // 현재 페이지(slice) 표시분 기준으로만 전체선택/해제 (검색결과 전체 대상 오조작 방지)
-  var rows = document.querySelectorAll('#bp-table-body .bp-chk-row');
-  rows.forEach(function(el){
-    el.checked = cb.checked;
-    var idStr = el.getAttribute('data-id');
-    if(cb.checked){
-      bpSelectedIds.add(idStr);
-    } else {
-      bpSelectedIds.delete(idStr);
-      delete bpStagedArrive[idStr];
-      delete bpStagedLeave[idStr];
-      bpRefreshRowBadges(idStr);
-    }
-  });
-  bpUpdateBulkBtnLabel();
-}
-// [v215] 스테이징 취소 시 배지를 원본값/실선 테두리로 즉시 원상복구
-function bpRefreshRowBadges(id){
-  var r = retreat.find(function(x){ return String(x.id)===String(id); }); if(!r) return;
-  var idStr = String(id);
-  var arriveBadge = $id('bp-arrive-badge-'+idStr);
-  if(arriveBadge){ arriveBadge.textContent = r.arriveTransport||'-'; arriveBadge.setAttribute('style', bpTransBadgeStyle(r.arriveTransport, false)); }
-  var leaveBadge = $id('bp-leave-badge-'+idStr);
-  if(leaveBadge){ leaveBadge.textContent = r.leaveTransport||'-'; leaveBadge.setAttribute('style', bpTransBadgeStyle(r.leaveTransport, false)); }
-}
-// [v215] 일괄변경 버튼 카운트 — "체크된 행 수"가 아닌 "실제 스테이징(변경예약)된 고유 행 수" 기준
-function bpUpdateBulkBtnLabel(){
-  var btn=$id('bp-btn-bulk'); if(!btn) return;
-  var ids = {};
-  Object.keys(bpStagedArrive).forEach(function(k){ ids[k]=true; });
-  Object.keys(bpStagedLeave).forEach(function(k){ ids[k]=true; });
-  var n = Object.keys(ids).length;
-  btn.textContent = n ? ('🔁 일괄변경 ('+n+')') : '🔁 일괄변경';
-}
-// [v214] 배지 클릭 — 서버 저장 없이 화면에만 예약(스테이징). "일괄변경" 버튼을 눌러야 실제 저장됨.
-function bpToggleTransport(id, kind){
-  var r = retreat.find(function(x){ return String(x.id)===String(id); }); if(!r) return;
-  var idStr = String(id);
-  var staged = kind==='arrive' ? bpStagedArrive : bpStagedLeave;
-  var current = staged.hasOwnProperty(idStr) ? staged[idStr] : ((kind==='arrive'?r.arriveTransport:r.leaveTransport)||'');
-  var next = (current.trim()==='버스') ? '자동차' : '버스';
-  staged[idStr] = next;
-  // 변경된 행임을 표시 + 일괄변경 대상으로 자동 포함
-  bpSelectedIds.add(idStr);
-  var tr = $id('bptr-'+idStr);
-  if(tr){
-    var chk = tr.querySelector('.bp-chk-row'); if(chk) chk.checked = true;
-    var badge = $id(kind==='arrive' ? ('bp-arrive-badge-'+idStr) : ('bp-leave-badge-'+idStr));
-    if(badge){ badge.textContent = next; badge.setAttribute('style', bpTransBadgeStyle(next, true)); }
-  }
-  bpUpdateBulkBtnLabel();
-}
-// [v214] 실제 서버 반영 캐스케이드 로직 — bpSaveInlineEdit()의 팀카운트/탑승자시트 삭제 로직을
-// 단일 필드(참석 또는 귀가)용으로 추출해 재사용 (개별클릭 즉시저장이 아닌 "일괄변경" 확정저장 시에만 호출됨)
-function bpApplyTransportChange(r, kind, newValue){
-  var prev = ((kind==='arrive' ? r.arriveTransport : r.leaveTransport) || '').trim();
-  var next = (newValue||'').trim();
-  if(prev===next) return Promise.resolve({changed:false});
-  var teamKey = busGetTeamKey(r);
-  var rid = r.receiptId||'';
-  var needDelete = false;
-  if(prev==='버스' && next!=='버스'){
-    busReduceTeamCount(teamKey, kind);
-    needDelete = true; // 배정정보 유무와 무관하게 delete 호출 — 미배정 건은 GAS에서 대상 없음으로 조용히 무시됨
-  } else if(prev!=='버스' && next==='버스'){
-    var teams = kind==='arrive' ? busArriveTeams : busLeaveTeams;
-    var team = teams.find(function(t){ return t.id===teamKey; });
-    if(team){ team.count++; busSave(); }
-    else {
-      teams.push({id:teamKey, name:teamKey, parish:r.parish||'', district:r.district||'', count:1, color: kind==='arrive'?'#4a7fc1':'#2d8a5a'});
-      busSave();
-    }
-  }
-  // 로컬 반영
-  if(kind==='arrive') r.arriveTransport = next; else r.leaveTransport = next;
-  var idx = retreat.findIndex(function(x){ return String(x.id)===String(r.id); });
-  if(idx!==-1) retreat[idx] = r;
-
-  if(!USE_SHEET()){ return Promise.resolve({changed:true}); }
-  var maskedRow = Object.assign({}, r, {name: maskName(r.name||'')});
-  return apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedRow)))
-    .then(function(res){
-      if(!(res&&res.success)) throw new Error(res&&(res.error||res.message)||'업데이트 실패');
-      if(needDelete && rid){
-        var sheetName = kind==='arrive' ? '탑승자_참석' : '탑승자_귀가';
-        return apiCall({action:'delete', sheetName:sheetName, id:rid}).catch(function(){}).then(function(){
-          if(kind==='arrive') _rosterFullArr[rid]=''; else _rosterFullLv[rid]='';
-          return {changed:true};
-        });
-      }
-      return {changed:true};
-    });
-}
-// [v215] "일괄변경" 버튼 — 체크박스가 아닌 "배지를 실제로 클릭해 스테이징된 필드"만 처리 대상으로 삼는다.
-// 참석교통수단부터 건by건 순차 처리 → 완료되면 귀가교통수단을 건by건 순차 처리.
-// (클릭하지 않은 필드는 체크박스가 켜져 있어도 절대 변경하지 않음 — 필드 단위 처리)
-function bpBulkToggleTransport(){
-  var arriveIds = Object.keys(bpStagedArrive);
-  var leaveIds  = Object.keys(bpStagedLeave);
-  if(!arriveIds.length && !leaveIds.length){ alert('변경 예약(배지 클릭)된 항목이 없습니다.'); return; }
-  if(!confirm('참석 '+arriveIds.length+'건 / 귀가 '+leaveIds.length+'건의 변경사항을 저장하시겠습니까?')) return;
-
-  showLoading(true);
-  var arriveCount=0, leaveCount=0, failCount=0;
-
-  // [단계1] 참석교통수단 — 스테이징된 행만, 건by건 순차 처리
-  var chain = arriveIds.reduce(function(p, idStr){
-    return p.then(function(){
-      var r = retreat.find(function(x){ return String(x.id)===idStr; });
-      if(!r) return;
-      return bpApplyTransportChange(r, 'arrive', bpStagedArrive[idStr])
-        .then(function(res){ if(res && res.changed) arriveCount++; })
-        .catch(function(e){ failCount++; console.warn('[참석교통수단 일괄변경 실패]', r.name, e&&e.message||e); });
-    });
-  }, Promise.resolve());
-
-  // [단계2] 참석 전체 완료 후 → 귀가교통수단, 스테이징된 행만 건by건 순차 처리
-  chain = chain.then(function(){
-    return leaveIds.reduce(function(p, idStr){
-      return p.then(function(){
-        var r = retreat.find(function(x){ return String(x.id)===idStr; });
-        if(!r) return;
-        return bpApplyTransportChange(r, 'leave', bpStagedLeave[idStr])
-          .then(function(res){ if(res && res.changed) leaveCount++; })
-          .catch(function(e){ failCount++; console.warn('[귀가교통수단 일괄변경 실패]', r.name, e&&e.message||e); });
-      });
-    }, Promise.resolve());
-  });
-
-  return chain.then(function(){
-    save(); updateStats(); updateBusUnassignedBadge();
-    bpStagedArrive = {}; bpStagedLeave = {}; bpSelectedIds.clear();
-    bpDoSearch();
-    var msg = '✅ 일괄변경 완료 (참석 '+arriveCount+'건 / 귀가 '+leaveCount+'건)'+(failCount?(' · 실패 '+failCount+'건'):'');
-    showToast(msg, failCount ? 'error' : 'success');
-  }).finally(function(){
-    showLoading(false);
-  });
 }
 function bpUpdateDataSourceBadge(source, count){
   var badge=$id('bp-data-source-badge'); if(!badge) return;
@@ -14091,7 +13900,6 @@ document.addEventListener('DOMContentLoaded', function() {
     'busMainTypeTab','busMainTypeMenuToggle','busMainTypeSelect','busPeopleAutoQuery',
     'bpDoSearch','bpClearSearch','bpSearchParishChange','bpReloadFromSheet','bpGoPage',
     'bpOpenDetail','bpOpenInlineEdit','bpSaveInlineEdit','bpDeleteRow','bpCancelEdit','bpSaveEdit',
-    'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport',
     'busTeamsSubTab','busAssignSubTab','busSummarySubTab',
     'busLeaderSubTab','busLeaderRender','busLeaderSave',
     'vwReset','vwResetConfirm','vwFilter','vwOnSearch','vwOnArrDateChange',
@@ -14159,7 +13967,6 @@ document.addEventListener('DOMContentLoaded', function() {
     busMainTypeTab:busMainTypeTab, busMainTypeMenuToggle:busMainTypeMenuToggle, busMainTypeSelect:busMainTypeSelect, busPeopleAutoQuery:busPeopleAutoQuery,
     bpDoSearch:bpDoSearch, bpClearSearch:bpClearSearch, bpSearchParishChange:bpSearchParishChange, bpReloadFromSheet:bpReloadFromSheet, bpGoPage:bpGoPage,
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
-    bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport,
     busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderSave:busLeaderSave,
     vwReset:vwReset, vwResetConfirm:vwResetConfirm, vwFilter:vwFilter,
