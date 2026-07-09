@@ -316,6 +316,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;}
 .form-group select:disabled{cursor:not-allowed;opacity:.45;}
 .form-group input:invalid:not(:placeholder-shown){border-color:var(--red)!important;}
+/* [v239] 배정인원등록 참석/귀가일자 — 수양회접수내역 팝업에서 불러온 값 형식차로 인한
+   invalid 빨간 테두리 강조를 이 두 필드에서만 제외(등록폼은 별도 필수값 검증을 하지 않음) */
+#enroll-arrive-date:invalid, #enroll-leave-date:invalid{border-color:var(--border2)!important;}
 /* 호차 필드 비활성 시 */
 .form-group select[disabled]{background:#f5f5f7;}
 
@@ -667,8 +670,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <div class="nav-section">메뉴</div>
         <button class="nav-item active" id="nav-home"     onclick="switchPanel('home')">    <span class="icon">🏠</span> 수양회집계현황</button>
         <button class="nav-item" id="nav-goalstatus" onclick="switchPanel('goalstatus')"><span class="icon">📈</span> 수양회목표달성현황</button>
-        <button class="nav-item" id="nav-enroll"     onclick="switchPanel('enroll')"    style="display:none"><span class="icon">📝</span> 접수인원등록</button>
-        <button class="nav-item"        id="nav-search"   onclick="switchPanel('search')">  <span class="icon">🔍</span> 접수인원현황</button>
+        <button class="nav-item" id="nav-enroll"     onclick="switchPanel('enroll')"    style="display:none"><span class="icon">📝</span> 배정인원등록</button>
+        <button class="nav-item"        id="nav-search"   onclick="switchPanel('search')">  <span class="icon">🔍</span> 배정인원현황</button>
         <button class="nav-item" id="nav-bus-view" onclick="switchPanel('busview')"><span class="icon">📋</span> 버스 배정 현황</button>
         <button class="nav-item" id="nav-roomview" onclick="switchPanel('roomview')"><span class="icon">🛏</span> 숙소 배정 현황</button>
         <button class="nav-item" id="nav-mypage"   onclick="switchPanel('mypage')"   style="display:none"><span class="icon">🔑</span> 내 계정</button>
@@ -1576,11 +1579,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <div class="panel" id="panel-enroll">
           <div class="card">
             <div class="card-header">
-              <div class="card-title">📝 접수인원등록</div>
+              <div class="card-title">📝 배정인원등록</div>
             </div>
 
-            <!-- 초기화/저장 버튼 (행사명 행 위에 위치) -->
+            <!-- 수양회접수내역 조회 팝업 / 초기화 / 저장 버튼 (행사명 행 위에 위치) -->
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;max-width:820px;">
+              <button class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;white-space:nowrap;" onclick="enrollHistoryOpen()">📋 수양회접수내역</button>
               <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="enrollFormReset()">↺ 초기화</button>
               <button class="btn btn-navy" id="enroll-save-btn" onclick="enrollSave()">💾 저장</button>
             </div>
@@ -2496,6 +2500,73 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         </div>
 
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- [v238] 수양회접수내역 조회 팝업 — 배정인원등록 폼에서 기존 등록자를 검색해 더블클릭으로 불러옴 -->
+<div class="modal-overlay" id="enroll-history-modal">
+  <div class="modal" style="max-width:820px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 수양회접수내역 조회</div>
+      <button class="modal-close" onclick="closeModal('enroll-history-modal')">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:.78rem;">연도</label>
+        <select id="eh-year"></select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:.78rem;">수양회종류</label>
+        <select id="eh-retreat-type">
+          <option value="">전체</option>
+          <option value="춘계">춘계</option>
+          <option value="하계">하계</option>
+          <option value="추계">추계</option>
+          <option value="동계">동계</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:.78rem;">회차</label>
+        <select id="eh-event">
+          <option value="">전체</option>
+          <option value="1차">1차</option>
+          <option value="2차">2차</option>
+          <option value="3차">3차</option>
+          <option value="4차">4차</option>
+          <option value="5차">5차</option>
+          <option value="6차">6차</option>
+          <option value="7차">7차</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:.78rem;">교구</label>
+        <select id="eh-parish" onchange="enrollHistoryParishChange()"><option value="">전체</option></select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:.78rem;">구역</label>
+        <select id="eh-district"><option value="">전체</option></select>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <button class="btn btn-sm" id="eh-query-btn" style="background:#1a6b45;color:#fff;border:none;" onclick="enrollHistoryQuery()">🔍 조회</button>
+    </div>
+    <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">행을 더블클릭하면 접수ID를 포함한 정보가 등록폼에 반영됩니다.</div>
+    <div style="max-height:420px;overflow:auto;border:1px solid var(--border2);border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+        <thead style="position:sticky;top:0;background:#f5f7fb;">
+          <tr>
+            <th style="padding:8px;text-align:left;display:none;">접수ID</th>
+            <th style="padding:8px;text-align:left;">성명</th>
+            <th style="padding:8px;text-align:left;">교구</th>
+            <th style="padding:8px;text-align:left;">구역</th>
+            <th style="padding:8px;text-align:left;">회별</th>
+          </tr>
+        </thead>
+        <tbody id="eh-grid-body">
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">조회 조건을 선택하고 조회 버튼을 눌러주세요.</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -9236,7 +9307,7 @@ function closeSidebar(){
 }
 
 // ── 초기화 ──
-var PANEL_TITLES={home:'수양회집계현황',goalstatus:'수양회목표달성현황',register:'자료 등록',enroll:'접수인원등록',search:'접수인원현황',busview:'버스 배정 현황',bus:'버스 배정',busbase:'버스배정 기초정보',excel:'참석인원관리',goal:'교회 목표 관리',accounts:'계정 관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
+var PANEL_TITLES={home:'수양회집계현황',goalstatus:'수양회목표달성현황',register:'자료 등록',enroll:'배정인원등록',search:'배정인원현황',busview:'버스 배정 현황',bus:'버스 배정',busbase:'버스배정 기초정보',excel:'참석인원관리',goal:'교회 목표 관리',accounts:'계정 관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
 var PANEL_SUBS={
   home:'수양회 참석자 현황을 확인합니다.',
   goalstatus:'구역별 목표 대비 접수·성도·전도 달성 현황을 확인합니다.',
@@ -15118,6 +15189,10 @@ function enrollGenId(){
   return String(max + 1);
 }
 
+// [v239] <input type="date">에 안전하게 넣기 위한 날짜 정리 — fmtDate()는 빈값을 '-'로 반환하므로
+// 그 경우 빈 문자열로 되돌린다(그렇지 않으면 date input이 '-'를 인식 못해 invalid 상태가 될 수 있음).
+function _enrollFmtDateOrBlank(v){ var f=fmtDate(v); return f==='-' ? '' : f; }
+
 // 등록일자 타임스탬프: "YYYY-MM-DD HH:MM:SS" 포맷 (예: 2026-07-09 16:19:35)
 function _enrollNowStr(){
   var d = new Date();
@@ -15312,10 +15387,12 @@ function enrollEditRow(id){
   $set('enroll-group', row.group);
   $set('enroll-name', row.name);
   $set('enroll-contact', bbFormatPhone(row.contact||''));
-  $set('enroll-arrive-date', row.arriveDate);
+  // [v239] 구글시트에서 불러온 날짜값(ISO 타임스탬프 등)은 fmtDate()로 'YYYY-MM-DD'로 정리 후 반영.
+  // 그렇지 않으면 <input type="date">가 값을 인식하지 못해 invalid 상태(빨간 테두리)가 될 수 있음.
+  $set('enroll-arrive-date', _enrollFmtDateOrBlank(row.arriveDate));
   $set('enroll-arrive-transport', row.arriveTransport);
   $set('enroll-arrive-assign-type', row.arriveAssignType);
-  $set('enroll-leave-date', row.leaveDate);
+  $set('enroll-leave-date', _enrollFmtDateOrBlank(row.leaveDate));
   $set('enroll-leave-transport', row.leaveTransport);
   $set('enroll-leave-assign-type', row.leaveAssignType);
   $set('enroll-salv-code', row.salvCode);
@@ -15324,6 +15401,101 @@ function enrollEditRow(id){
   enrollToggleAssignType('arrive');
   enrollToggleAssignType('leave');
   enrollRenderList();
+}
+
+// ── [v238] 수양회접수내역 조회 팝업 ──
+// 배정인원등록 폼에서 기존 등록자를 검색해 더블클릭으로 접수ID를 포함한 정보를 불러온다.
+// 구글시트 참석인원명단을 직접 조회(getAll)하므로 로컬 retreat 배열 상태와 무관하게 항상 최신값을 보여준다.
+var _ehRows = []; // 최근 조회 결과 캐시 (더블클릭 시 재조회 없이 바로 사용)
+function enrollHistoryOpen(){
+  var role = currentUser ? currentUser.role : '';
+  var isDistrict = role === 'district';
+
+  enrollRenderYearOptions('eh-year', true); // includeAll=true — 조회 필터이므로 '전체' 옵션 필요
+  populateParishSelect('eh-parish', '전체');
+
+  var pSel=$id('eh-parish'), dSel=$id('eh-district');
+  if(isDistrict && currentUser.parish && currentUser.district){
+    // 구역장: 배정인원등록 폼과 동일하게 본인 소속으로 고정
+    if(pSel){ pSel.value = currentUser.parish; pSel.disabled = true; pSel.style.opacity='.7'; }
+    populateDistrictSelect('eh-district', currentUser.parish, '전체', currentUser.district);
+    if(dSel){ dSel.disabled = true; dSel.style.opacity='.7'; }
+  } else {
+    if(pSel){ pSel.disabled=false; pSel.style.opacity=''; pSel.value=''; }
+    if(dSel){ dSel.disabled=false; dSel.style.opacity=''; populateDistrictSelect('eh-district', '', '전체'); }
+  }
+
+  _ehRows = [];
+  var tbody=$id('eh-grid-body');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">조회 조건을 선택하고 조회 버튼을 눌러주세요.</td></tr>';
+  $id('enroll-history-modal').classList.add('show');
+}
+function enrollHistoryParishChange(){
+  var parish = ($id('eh-parish')||{value:''}).value;
+  populateDistrictSelect('eh-district', parish, '전체');
+}
+function enrollHistoryQuery(){
+  if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
+  var year        = ($id('eh-year')||{value:''}).value;
+  var retreatType = ($id('eh-retreat-type')||{value:''}).value;
+  var event       = ($id('eh-event')||{value:''}).value;
+  var parish      = ($id('eh-parish')||{value:''}).value;
+  var district    = ($id('eh-district')||{value:''}).value;
+
+  var btn=$id('eh-query-btn'); if(btn){ btn.disabled=true; btn.textContent='조회 중...'; }
+  showLoading(true);
+  apiCall({action:'getAll', sheetName:'참석인원명단'})
+    .then(function(res){
+      if(!(res && res.success)) throw new Error((res&&res.error)||'조회 실패');
+      var rows = (res.data||res.rows||[]).map(sheetRowToObj);
+      var filtered = rows.filter(function(r){
+        if(year && String(r.year)!==String(year)) return false;
+        if(retreatType && r.retreatType!==retreatType) return false;
+        if(event && r.event!==event) return false;
+        if(parish && r.parish!==parish) return false;
+        if(district && r.district!==district) return false;
+        return true;
+      });
+      _ehRows = filtered;
+      enrollHistoryRenderGrid(filtered);
+    })
+    .catch(function(e){ showToast('❌ 조회 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){
+      showLoading(false);
+      if(btn){ btn.disabled=false; btn.textContent='🔍 조회'; }
+    });
+}
+function enrollHistoryRenderGrid(rows){
+  var tbody=$id('eh-grid-body'); if(!tbody) return;
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">조회 결과가 없습니다.</td></tr>';
+    return;
+  }
+  // [v239] 접수ID는 더블클릭 시 내부적으로만 사용 — 화면에는 숨김(th/td 모두 display:none)
+  tbody.innerHTML = rows.map(function(r, idx){
+    return '<tr ondblclick="enrollHistorySelectRow('+idx+')" style="cursor:pointer;" '
+      +'onmouseover="this.style.background=\'#f5f7fb\'" onmouseout="this.style.background=\'\'">'
+      +'<td style="padding:8px;display:none;">'+esc(r.receiptId||'')+'</td>'
+      +'<td style="padding:8px;font-weight:600;">'+esc(maskName(r.name)||'')+'</td>'
+      +'<td style="padding:8px;">'+esc(r.parish||'')+'</td>'
+      +'<td style="padding:8px;">'+esc(r.district||'')+'</td>'
+      +'<td style="padding:8px;">'+esc(r.group||'')+'</td>'
+      +'</tr>';
+  }).join('');
+}
+// 더블클릭한 행(_ehRows[idx])을 로컬 retreat 배열에 반영(없으면 추가, 있으면 갱신)한 뒤
+// 기존 enrollEditRow()를 그대로 재사용해 배정인원등록 폼에 채운다(중복 구현 방지).
+function enrollHistorySelectRow(idx){
+  var row = _ehRows[idx]; if(!row) return;
+  if(!_enrollCheckDistrictScope(row.parish, row.district)){
+    showToast('본인 소속 구역 데이터만 불러올 수 있습니다.','error'); return;
+  }
+  var existingIdx = retreat.findIndex(function(x){ return String(x.receiptId)===String(row.receiptId); });
+  if(existingIdx>=0) retreat[existingIdx] = Object.assign({}, retreat[existingIdx], row);
+  else retreat.push(row);
+  closeModal('enroll-history-modal'); // [v238] 반영 후 자동 닫힘
+  enrollEditRow(row.receiptId);
+  showToast('✅ '+(row.name||'')+' ('+row.receiptId+') 정보를 불러왔습니다.','success');
 }
 
 function enrollDeleteRow(id){
@@ -15428,6 +15600,10 @@ window.enrollRenderList      = enrollRenderList;
 window.enrollSearchClick     = enrollSearchClick;
 window.enrollParishChange    = enrollParishChange;
 window.enrollToggleAssignType = enrollToggleAssignType;
+window.enrollHistoryOpen         = enrollHistoryOpen;
+window.enrollHistoryParishChange = enrollHistoryParishChange;
+window.enrollHistoryQuery        = enrollHistoryQuery;
+window.enrollHistorySelectRow    = enrollHistorySelectRow;
 
 })(); // IIFE 종료
 </script>
