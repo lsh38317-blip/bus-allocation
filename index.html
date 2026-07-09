@@ -15295,6 +15295,21 @@ function _enrollCheckDistrictScope(parish, district){
   return parish === currentUser.parish && district === currentUser.district;
 }
 
+// [v240] 신규 등록 시 연도+수양회종류+행사명(회차)+교구+구역+성명 6개 항목이 모두 일치하는
+// 기존 데이터를 로컬 retreat 캐시에서 찾는다(중복 접수 방지). 성명은 공백 차이를 무시하고 비교.
+function _enrollFindDuplicate(year, retreatType, event, parish, district, name){
+  var normName = String(name||'').trim().replace(/\s/g,'');
+  if(!normName) return null;
+  return retreat.find(function(r){
+    return String(r.year)===String(year)
+      && (r.retreatType||'')===retreatType
+      && (r.event||'')===event
+      && (r.parish||'')===parish
+      && (r.district||'')===district
+      && String(r.name||'').trim().replace(/\s/g,'')===normName;
+  }) || null;
+}
+
 function enrollSave(){
   var year        = ($id('enroll-year')           ||{value:''}).value;
   var retreatType  = ($id('enroll-retreat-type')  ||{value:''}).value;
@@ -15330,7 +15345,23 @@ function enrollSave(){
     showToast('본인 소속 구역 데이터만 수정할 수 있습니다.','error'); return;
   }
 
-  var receiptId = isNew ? enrollGenId() : _enrollEditingId;
+  // [v240] 신규 등록 시도 시 — 연도+수양회종류+행사명(회차)+교구+구역+성명이 모두 일치하는
+  // 기존 데이터가 로컬 캐시(retreat)에 있으면 새 접수ID를 채번하지 않고 해당 데이터를 수정 처리한다.
+  // (팝업/수정모드를 거치지 않고 동일 인물을 다시 등록하려는 실수로 인한 중복 접수 방지)
+  var viaDupMatch = false;
+  if(isNew){
+    var dupMatch = _enrollFindDuplicate(year, retreatType, event, parish, district, name);
+    if(dupMatch){
+      if(!_enrollCheckDistrictScope(dupMatch.parish, dupMatch.district)){
+        showToast('본인 소속 구역 데이터만 수정할 수 있습니다.','error'); return;
+      }
+      existing = dupMatch;
+      isNew = false;
+      viaDupMatch = true;
+    }
+  }
+
+  var receiptId = isNew ? enrollGenId() : existing.receiptId;
   var row = {
     id: existing ? existing.id : '',
     receiptId: receiptId, name: name,
@@ -15358,7 +15389,9 @@ function enrollSave(){
       } else {
         var idx = retreat.findIndex(function(r){ return String(r.receiptId)===String(receiptId); });
         if(idx>=0) retreat[idx]=row; else retreat.push(row);
-        showToast('✅ '+name+' 수정 완료','success');
+        showToast(viaDupMatch
+          ? ('✅ 동일 조건의 기존 접수 정보(접수ID '+receiptId+')를 찾아 수정 처리했습니다.')
+          : ('✅ '+name+' 수정 완료'), 'success');
       }
       try{ _ls.set('retreat_data', JSON.stringify(retreat)); }catch(e){}
       enrollFormReset();
