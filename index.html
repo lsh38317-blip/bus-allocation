@@ -1463,10 +1463,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th>#</th>
                     <th style="display:none;">접수ID</th>
                     <th>성명</th><th>연도</th><th>수양회종류</th><th>행사명</th>
-                    <th>교구</th><th>구역</th><th>회별</th>
-                    <th>참석일자</th><th>참석교통수단</th><th>참석버스배정</th>
-                    <th>귀가일자</th><th>귀가교통수단</th><th>귀가버스배정</th>
-                    <th>전참여부</th><th>관리</th>
+                    <th>구역</th><th>회별</th>
+                    <th>참석일자</th><th>참석교통수단</th><th>참석배정유형</th><th>참석버스배정</th>
+                    <th>귀가일자</th><th>귀가교통수단</th><th>귀가배정유형</th><th>귀가버스배정</th>
+                    <th>관리</th>
                   </tr>
                 </thead>
                 <tbody id="bp-table-body"></tbody>
@@ -11132,7 +11132,16 @@ var bpCurrentPage = 1;
 // 서버 반영 없이 화면에만 예약(스테이징)되는 값. 조회/초기화 시 폐기됨.
 var bpStagedArrive = {}; // {id: 예약된 참석교통수단}
 var bpStagedLeave  = {}; // {id: 예약된 귀가교통수단}
+// [v236] 참석/귀가배정유형 콤보도 교통수단과 동일한 스테이징 방식으로 일괄변경 대상에 포함
+var bpStagedArriveAssign = {}; // {id: 예약된 참석배정유형}
+var bpStagedLeaveAssign  = {}; // {id: 예약된 귀가배정유형}
 var bpSelectedIds  = new Set(); // 체크박스로 선택된 행 id (문자열)
+var BP_ASSIGN_TYPES = ['','선발대','본대','직장조','시각선교부','중고등부'];
+function _bpAssignOptionsHtml(selected){
+  return BP_ASSIGN_TYPES.map(function(v){
+    return '<option value="'+v+'"'+(v===(selected||'')?' selected':'')+'>'+(v||'선택')+'</option>';
+  }).join('');
+}
 
 function bpSearchParishChange(){
   var parish=$val('bp-s-parish');
@@ -11180,11 +11189,11 @@ function bpDoSearch(){
            (!sLeaveStatus  || bpBusAssignInfo(r,'leave').status===sLeaveStatus);
   });
   // [v214] 재조회 시 미확정 스테이징 값(배지 클릭으로 예약만 되고 저장은 안 된 값)은 폐기
-  bpStagedArrive = {}; bpStagedLeave = {}; bpSelectedIds.clear();
+  bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {}; bpSelectedIds.clear();
   bpCurrentPage=1; bpRenderTable();
 }
 function bpClearSearch(){
-  bpStagedArrive = {}; bpStagedLeave = {}; bpSelectedIds.clear();
+  bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {}; bpSelectedIds.clear();
   $set('bp-s-name','');
   $set('bp-s-parish','');
   $set('bp-s-district','');
@@ -11228,6 +11237,11 @@ function bpRenderTable(){
     var leaveDisp  = bpStagedLeave.hasOwnProperty(idStr)  ? bpStagedLeave[idStr]  : (r.leaveTransport||'-');
     var arrivePending = bpStagedArrive.hasOwnProperty(idStr);
     var leavePending  = bpStagedLeave.hasOwnProperty(idStr);
+    // [v236] 참석/귀가배정유형 — 교통수단이 버스(스테이징 반영 포함)일 때만 select 활성화
+    var arriveAssignDisp = bpStagedArriveAssign.hasOwnProperty(idStr) ? bpStagedArriveAssign[idStr] : (r.arriveAssignType||'');
+    var leaveAssignDisp  = bpStagedLeaveAssign.hasOwnProperty(idStr)  ? bpStagedLeaveAssign[idStr]  : (r.leaveAssignType||'');
+    var arriveAssignDisabled = (arriveDisp||'').trim() !== '버스';
+    var leaveAssignDisabled  = (leaveDisp||'').trim()  !== '버스';
     var isChecked = bpSelectedIds.has(idStr);
     return '<tr id="bptr-'+esc(idStr)+'">'+
       '<td><input type="checkbox" class="bp-chk-row" data-id="'+esc(idStr)+'" '+(isChecked?'checked':'')+' onchange="bpToggleCheck(&quot;'+esc(idStr)+'&quot;,this.checked)"></td>'+
@@ -11237,16 +11251,16 @@ function bpRenderTable(){
       '<td style="font-size:.79rem">'+esc(r.year||'-')+'</td>'+
       '<td><span class="badge badge-season-'+esc(r.retreatType)+'">'+esc(r.retreatType||'-')+'</span></td>'+
       '<td style="font-size:.79rem">'+esc(r.event||'-')+'</td>'+
-      '<td>'+esc(r.parish||'-')+'</td>'+
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td>'+esc(r.group||'-')+'</td>'+
       '<td style="font-size:.79rem">'+esc(fmtDate(r.arriveDate)||'-')+'</td>'+
       '<td><span class="bp-trans-badge" id="bp-arrive-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(arriveDisp,arrivePending)+'" onclick="bpToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(arriveDisp)+'</span></td>'+
+      '<td><select id="bp-arrive-assign-'+esc(idStr)+'" '+(arriveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(arriveAssignDisabled?'opacity:.5;':'')+'" onchange="bpStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+_bpAssignOptionsHtml(arriveAssignDisp)+'</select></td>'+
       '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
       '<td style="font-size:.79rem">'+esc(fmtDate(r.leaveDate)||'-')+'</td>'+
       '<td><span class="bp-trans-badge" id="bp-leave-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(leaveDisp,leavePending)+'" onclick="bpToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(leaveDisp)+'</span></td>'+
+      '<td><select id="bp-leave-assign-'+esc(idStr)+'" '+(leaveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(leaveAssignDisabled?'opacity:.5;':'')+'" onchange="bpStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+_bpAssignOptionsHtml(leaveAssignDisp)+'</select></td>'+
       '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
-      '<td><span class="badge '+(r.prevAttend==='예'?'badge-y':'badge-n')+'">'+(r.prevAttend==='예'?'전참':'해당없음')+'</span></td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
   }).join('');
@@ -11274,6 +11288,8 @@ function bpToggleCheck(id, checked){
     bpSelectedIds.delete(idStr);
     delete bpStagedArrive[idStr];
     delete bpStagedLeave[idStr];
+    delete bpStagedArriveAssign[idStr];
+    delete bpStagedLeaveAssign[idStr];
     bpRefreshRowBadges(idStr);
   }
   bpUpdateBulkBtnLabel();
@@ -11290,6 +11306,8 @@ function bpToggleAll(cb){
       bpSelectedIds.delete(idStr);
       delete bpStagedArrive[idStr];
       delete bpStagedLeave[idStr];
+      delete bpStagedArriveAssign[idStr];
+      delete bpStagedLeaveAssign[idStr];
       bpRefreshRowBadges(idStr);
     }
   });
@@ -11303,6 +11321,19 @@ function bpRefreshRowBadges(id){
   if(arriveBadge){ arriveBadge.textContent = r.arriveTransport||'-'; arriveBadge.setAttribute('style', bpTransBadgeStyle(r.arriveTransport, false)); }
   var leaveBadge = $id('bp-leave-badge-'+idStr);
   if(leaveBadge){ leaveBadge.textContent = r.leaveTransport||'-'; leaveBadge.setAttribute('style', bpTransBadgeStyle(r.leaveTransport, false)); }
+  // [v236] 배정유형 select도 원본값/활성상태로 복구
+  var arriveAssignSel = $id('bp-arrive-assign-'+idStr);
+  if(arriveAssignSel){
+    arriveAssignSel.value = r.arriveAssignType||'';
+    var isBusA = (r.arriveTransport||'').trim()==='버스';
+    arriveAssignSel.disabled = !isBusA; arriveAssignSel.style.opacity = isBusA?'':'.5';
+  }
+  var leaveAssignSel = $id('bp-leave-assign-'+idStr);
+  if(leaveAssignSel){
+    leaveAssignSel.value = r.leaveAssignType||'';
+    var isBusL = (r.leaveTransport||'').trim()==='버스';
+    leaveAssignSel.disabled = !isBusL; leaveAssignSel.style.opacity = isBusL?'':'.5';
+  }
 }
 // [v215] 일괄변경 버튼 카운트 — "체크된 행 수"가 아닌 "실제 스테이징(변경예약)된 고유 행 수" 기준
 function bpUpdateBulkBtnLabel(){
@@ -11310,8 +11341,20 @@ function bpUpdateBulkBtnLabel(){
   var ids = {};
   Object.keys(bpStagedArrive).forEach(function(k){ ids[k]=true; });
   Object.keys(bpStagedLeave).forEach(function(k){ ids[k]=true; });
+  Object.keys(bpStagedArriveAssign).forEach(function(k){ ids[k]=true; });
+  Object.keys(bpStagedLeaveAssign).forEach(function(k){ ids[k]=true; });
   var n = Object.keys(ids).length;
   btn.textContent = n ? ('🔁 일괄변경 ('+n+')') : '🔁 일괄변경';
+}
+// [v236] 참석/귀가배정유형 select 변경 — 교통수단 배지와 동일하게 서버 저장 없이 화면에만 예약(스테이징)
+function bpStageAssignType(id, kind, value){
+  var idStr = String(id);
+  var staged = kind==='arrive' ? bpStagedArriveAssign : bpStagedLeaveAssign;
+  staged[idStr] = value;
+  bpSelectedIds.add(idStr);
+  var tr = $id('bptr-'+idStr);
+  if(tr){ var chk = tr.querySelector('.bp-chk-row'); if(chk) chk.checked = true; }
+  bpUpdateBulkBtnLabel();
 }
 // [v214] 배지 클릭 — 서버 저장 없이 화면에만 예약(스테이징). "일괄변경" 버튼을 눌러야 실제 저장됨.
 function bpToggleTransport(id, kind){
@@ -11328,6 +11371,18 @@ function bpToggleTransport(id, kind){
     var chk = tr.querySelector('.bp-chk-row'); if(chk) chk.checked = true;
     var badge = $id(kind==='arrive' ? ('bp-arrive-badge-'+idStr) : ('bp-leave-badge-'+idStr));
     if(badge){ badge.textContent = next; badge.setAttribute('style', bpTransBadgeStyle(next, true)); }
+    // [v236] 교통수단이 버스가 아니게 되면 배정유형 select도 잠금+초기화(스테이징 값도 함께 비움)
+    var assignSel = $id(kind==='arrive' ? ('bp-arrive-assign-'+idStr) : ('bp-leave-assign-'+idStr));
+    if(assignSel){
+      var isBus = next==='버스';
+      assignSel.disabled = !isBus;
+      assignSel.style.opacity = isBus ? '' : '.5';
+      if(!isBus){
+        assignSel.value='';
+        var stagedAssign = kind==='arrive' ? bpStagedArriveAssign : bpStagedLeaveAssign;
+        stagedAssign[idStr] = '';
+      }
+    }
   }
   bpUpdateBulkBtnLabel();
 }
@@ -11372,17 +11427,39 @@ function bpApplyTransportChange(r, kind, newValue){
       return {changed:true};
     });
 }
-// [v215] "일괄변경" 버튼 — 체크박스가 아닌 "배지를 실제로 클릭해 스테이징된 필드"만 처리 대상으로 삼는다.
-// 참석교통수단부터 건by건 순차 처리 → 완료되면 귀가교통수단을 건by건 순차 처리.
+// [v236] 참석/귀가배정유형 스테이징 값을 실제 서버(시트)에 반영. 교통수단 변경과 달리
+// 버스팀 카운트/탑승자 시트에는 영향 없음 — 단순 필드 업데이트.
+function bpApplyAssignTypeChange(r, kind, newValue){
+  var prev = ((kind==='arrive' ? r.arriveAssignType : r.leaveAssignType) || '').trim();
+  var next = (newValue||'').trim();
+  if(prev===next) return Promise.resolve({changed:false});
+  if(kind==='arrive') r.arriveAssignType = next; else r.leaveAssignType = next;
+  var idx = retreat.findIndex(function(x){ return String(x.id)===String(r.id); });
+  if(idx!==-1) retreat[idx] = r;
+
+  if(!USE_SHEET()){ return Promise.resolve({changed:true}); }
+  var maskedRow = Object.assign({}, r, {name: maskName(r.name||'')});
+  return apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedRow)))
+    .then(function(res){
+      if(!(res&&res.success)) throw new Error(res&&(res.error||res.message)||'업데이트 실패');
+      return {changed:true};
+    });
+}
+// [v215] "일괄변경" 버튼 — 체크박스가 아닌 "배지/콤보를 실제로 클릭해 스테이징된 필드"만 처리 대상으로 삼는다.
+// 참석교통수단 → 귀가교통수단 → 참석배정유형 → 귀가배정유형 순으로 건by건 순차 처리.
 // (클릭하지 않은 필드는 체크박스가 켜져 있어도 절대 변경하지 않음 — 필드 단위 처리)
 function bpBulkToggleTransport(){
   var arriveIds = Object.keys(bpStagedArrive);
   var leaveIds  = Object.keys(bpStagedLeave);
-  if(!arriveIds.length && !leaveIds.length){ alert('변경 예약(배지 클릭)된 항목이 없습니다.'); return; }
-  if(!confirm('참석 '+arriveIds.length+'건 / 귀가 '+leaveIds.length+'건의 변경사항을 저장하시겠습니까?')) return;
+  var arriveAssignIds = Object.keys(bpStagedArriveAssign);
+  var leaveAssignIds  = Object.keys(bpStagedLeaveAssign);
+  if(!arriveIds.length && !leaveIds.length && !arriveAssignIds.length && !leaveAssignIds.length){
+    alert('변경 예약(배지/콤보 클릭)된 항목이 없습니다.'); return;
+  }
+  if(!confirm('참석교통 '+arriveIds.length+'건 / 귀가교통 '+leaveIds.length+'건 / 참석배정유형 '+arriveAssignIds.length+'건 / 귀가배정유형 '+leaveAssignIds.length+'건의 변경사항을 저장하시겠습니까?')) return;
 
   showLoading(true);
-  var arriveCount=0, leaveCount=0, failCount=0;
+  var arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, failCount=0;
 
   // [단계1] 참석교통수단 — 스테이징된 행만, 건by건 순차 처리
   var chain = arriveIds.reduce(function(p, idStr){
@@ -11408,11 +11485,37 @@ function bpBulkToggleTransport(){
     }, Promise.resolve());
   });
 
+  // [단계3] 참석배정유형 — 스테이징된 행만, 건by건 순차 처리
+  chain = chain.then(function(){
+    return arriveAssignIds.reduce(function(p, idStr){
+      return p.then(function(){
+        var r = retreat.find(function(x){ return String(x.id)===idStr; });
+        if(!r) return;
+        return bpApplyAssignTypeChange(r, 'arrive', bpStagedArriveAssign[idStr])
+          .then(function(res){ if(res && res.changed) arriveAssignCount++; })
+          .catch(function(e){ failCount++; console.warn('[참석배정유형 일괄변경 실패]', r.name, e&&e.message||e); });
+      });
+    }, Promise.resolve());
+  });
+
+  // [단계4] 귀가배정유형 — 스테이징된 행만, 건by건 순차 처리
+  chain = chain.then(function(){
+    return leaveAssignIds.reduce(function(p, idStr){
+      return p.then(function(){
+        var r = retreat.find(function(x){ return String(x.id)===idStr; });
+        if(!r) return;
+        return bpApplyAssignTypeChange(r, 'leave', bpStagedLeaveAssign[idStr])
+          .then(function(res){ if(res && res.changed) leaveAssignCount++; })
+          .catch(function(e){ failCount++; console.warn('[귀가배정유형 일괄변경 실패]', r.name, e&&e.message||e); });
+      });
+    }, Promise.resolve());
+  });
+
   return chain.then(function(){
     save(); updateStats(); updateBusUnassignedBadge();
-    bpStagedArrive = {}; bpStagedLeave = {}; bpSelectedIds.clear();
+    bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {}; bpSelectedIds.clear();
     bpDoSearch();
-    var msg = '✅ 일괄변경 완료 (참석 '+arriveCount+'건 / 귀가 '+leaveCount+'건)'+(failCount?(' · 실패 '+failCount+'건'):'');
+    var msg = '✅ 일괄변경 완료 (참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건)'+(failCount?(' · 실패 '+failCount+'건'):'');
     showToast(msg, failCount ? 'error' : 'success');
   }).finally(function(){
     showLoading(false);
@@ -14447,7 +14550,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'busMainTypeTab','busMainTypeMenuToggle','busMainTypeSelect','busPeopleAutoQuery',
     'bpDoSearch','bpClearSearch','bpSearchParishChange','bpReloadFromSheet','bpGoPage',
     'bpOpenDetail','bpOpenInlineEdit','bpSaveInlineEdit','bpDeleteRow','bpCancelEdit','bpSaveEdit',
-    'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport',
+    'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport','bpStageAssignType',
     'busTeamsSubTab','busAssignSubTab','busSummarySubTab',
     'busLeaderSubTab','busLeaderRender','busLeaderSave',
     'vwReset','vwResetConfirm','vwFilter','vwOnSearch','vwOnArrDateChange',
@@ -14515,7 +14618,7 @@ document.addEventListener('DOMContentLoaded', function() {
     busMainTypeTab:busMainTypeTab, busMainTypeMenuToggle:busMainTypeMenuToggle, busMainTypeSelect:busMainTypeSelect, busPeopleAutoQuery:busPeopleAutoQuery,
     bpDoSearch:bpDoSearch, bpClearSearch:bpClearSearch, bpSearchParishChange:bpSearchParishChange, bpReloadFromSheet:bpReloadFromSheet, bpGoPage:bpGoPage,
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
-    bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport,
+    bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport, bpStageAssignType:bpStageAssignType,
     busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderSave:busLeaderSave,
     vwReset:vwReset, vwResetConfirm:vwResetConfirm, vwFilter:vwFilter,
