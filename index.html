@@ -70,6 +70,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
 .form-group input:focus,.form-group select:focus,.form-group textarea:focus{
   border-color:var(--navy2);box-shadow:0 0 0 3px rgba(26,58,107,.08);}
 .form-group select option{background:var(--white);}
+/* [v246] 배정인원등록 화면 전용 컴팩트 스타일 — 스크롤 최소화를 위해 이 화면에만 적용 */
+#panel-enroll .form-group{margin-bottom:0;}
+#panel-enroll .form-group label{font-size:.71rem;margin-bottom:4px;}
+#panel-enroll .form-group input,
+#panel-enroll .form-group select{padding:7px 10px;font-size:.82rem;}
 .form-group textarea{resize:vertical;min-height:66px;}
 
 /* BUTTONS */
@@ -621,18 +626,35 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <form id="login-form" onsubmit="doLogin(); return false;">
         <div class="form-group">
           <label>아이디</label>
-          <input type="text" id="inp-id" name="username" autocomplete="username" placeholder="아이디 입력">
+          <input type="text" id="inp-id" name="username" autocomplete="username" placeholder="아이디 입력" oninput="onLoginIdInput()">
         </div>
         <div class="form-group">
           <label>비밀번호</label>
           <input type="password" id="inp-pw" name="password" autocomplete="current-password" placeholder="비밀번호 입력">
         </div>
+        <div class="form-group" id="login-parish-district-wrap" style="display:flex;gap:10px;">
+          <div style="flex:1;">
+            <label>교구</label>
+            <select id="login-parish-sel" onchange="onLoginParishChange()" style="width:100%;padding:9px 10px;border:1px solid var(--border2);border-radius:8px;font-size:.9rem;">
+              <option value="전체">전체</option>
+              <option value="1교구">1교구</option>
+              <option value="2교구">2교구</option>
+              <option value="3교구">3교구</option>
+              <option value="4교구">4교구</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label>구역</label>
+            <select id="login-district-sel" style="width:100%;padding:9px 10px;border:1px solid var(--border2);border-radius:8px;font-size:.9rem;">
+              <option value="전체">전체</option>
+            </select>
+          </div>
+        </div>
         <button type="submit" class="btn btn-navy btn-full">로그인</button>
       </form>
       <div class="login-hint">
-        <div><strong>전도인</strong>&nbsp;&nbsp;ID: admin <span style="color:var(--navy2);font-weight:700;">||교구||구역||</span> b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 11구역 → <strong style="color:var(--navy);">admin0111b</strong></span></div>
-        <div style="margin-top:2px;"><strong>교구장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||</span> 00b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 → <strong style="color:var(--navy);">user0100b</strong></span></div>
-        <div style="margin-top:2px;"><strong>구역장</strong>&nbsp;&nbsp;ID: user <span style="color:var(--navy2);font-weight:700;">||교구||구역||</span> b &nbsp;&nbsp;<span style="color:var(--text-dim);">예) 1교구 11구역 → <strong style="color:var(--navy);">user0111b</strong></span></div>
+        <div><strong>교구장/구역장</strong>&nbsp;&nbsp;ID : user</div>
+        <div style="margin-top:2px;"><b>교구장과 구역장님 로그인시 소속 교구와 구역을 선택하여 로그인 해주세요</b></div>
         <div style="margin-top:8px;font-size:.71rem;color:var(--text-dim);white-space:nowrap;">※ 초기 비밀번호는 아이디와 동일합니다. 계정은 관리자 메뉴에서 관리합니다.</div>
       </div>
     </div>
@@ -670,10 +692,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <div class="nav-section">메뉴</div>
         <button class="nav-item active" id="nav-home"     onclick="switchPanel('home')">    <span class="icon">🏠</span> 수양회집계현황</button>
         <button class="nav-item" id="nav-goalstatus" onclick="switchPanel('goalstatus')"><span class="icon">📈</span> 수양회목표달성현황</button>
+        <button class="nav-item" id="nav-roomview" onclick="switchPanel('roomview')"><span class="icon">🛏</span> 숙소 배정 현황</button>
+        <button class="nav-item" id="nav-bus-view" onclick="switchPanel('busview')"><span class="icon">📋</span> 버스 배정 현황</button>
         <button class="nav-item" id="nav-enroll"     onclick="switchPanel('enroll')"    style="display:none"><span class="icon">📝</span> 배정인원등록</button>
         <button class="nav-item"        id="nav-search"   onclick="switchPanel('search')">  <span class="icon">🔍</span> 배정인원현황</button>
-        <button class="nav-item" id="nav-bus-view" onclick="switchPanel('busview')"><span class="icon">📋</span> 버스 배정 현황</button>
-        <button class="nav-item" id="nav-roomview" onclick="switchPanel('roomview')"><span class="icon">🛏</span> 숙소 배정 현황</button>
         <button class="nav-item" id="nav-mypage"   onclick="switchPanel('mypage')"   style="display:none"><span class="icon">🔑</span> 내 계정</button>
         <div class="nav-section" id="admin-section" style="display:none">관리자</div>
         <button class="nav-item" id="nav-goal"     onclick="switchPanel('goal')"     style="display:none"><span class="icon">🎯</span> 교회 목표 관리</button>
@@ -716,8 +738,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
           <div class="topbar-stats">
-            <div class="stat-pill">전체 <strong id="st-total">0</strong></div>
-            <div class="stat-pill">전참자 <strong id="st-prev" style="color:#c89b30">0</strong></div>
+            <div class="stat-pill"><span id="st-total-label">전체</span> <strong id="st-total">0</strong></div>
           </div>
           <button onclick="doLogout()" style="
             display:inline-flex;align-items:center;gap:8px;
@@ -1521,6 +1542,21 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <!-- 구분선 -->
             <div style="width:1px;height:24px;background:var(--border);margin:0 2px;flex-shrink:0;"></div>
 
+            <!-- [v242] 교구/구역 조회 콤보 -->
+            <select id="bv-s-parish"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="">전체</option>
+            </select>
+            <select id="bv-s-district"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="">전체</option>
+            </select>
+
+            <!-- 구분선 -->
+            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;flex-shrink:0;"></div>
+
             <!-- 참석/귀가 탭 -->
             <button id="bvw-tab-arrive"
               onclick="bvwSetType('arrive')"
@@ -1580,13 +1616,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div class="card">
             <div class="card-header">
               <div class="card-title">📝 배정인원등록</div>
-            </div>
-
-            <!-- 수양회접수내역 조회 팝업 / 초기화 / 저장 버튼 (행사명 행 위에 위치) -->
-            <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;max-width:820px;">
-              <button class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;white-space:nowrap;" onclick="enrollHistoryOpen()">📋 수양회접수내역</button>
-              <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="enrollFormReset()">↺ 초기화</button>
-              <button class="btn btn-navy" id="enroll-save-btn" onclick="enrollSave()">💾 저장</button>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;white-space:nowrap;" onclick="enrollHistoryOpen()">📋 수양회접수내역</button>
+                <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="enrollFormReset()">↺ 초기화</button>
+                <button class="btn btn-navy" id="enroll-save-btn" onclick="enrollSave()">💾 저장</button>
+              </div>
             </div>
 
             <!-- 접수ID: 자동생성 값 보관용(화면 비노출) -->
@@ -1595,14 +1629,15 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <input type="text" id="enroll-receipt-id-display" disabled>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;max-width:820px;">
+            <!-- 상단: 연도/수양회종류/회차/교구/구역 (5열) -->
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;">
               <div class="form-group" style="margin:0;">
                 <label>연도</label>
-                <select id="enroll-year"></select>
+                <select id="enroll-year" onchange="enrollEventOptionsRefresh()"></select>
               </div>
               <div class="form-group" style="margin:0;">
                 <label>수양회종류</label>
-                <select id="enroll-retreat-type">
+                <select id="enroll-retreat-type" onchange="enrollEventOptionsRefresh()">
                   <option value="춘계">춘계</option>
                   <option value="하계" selected>하계</option>
                   <option value="추계">추계</option>
@@ -1621,12 +1656,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <option value="7차">7차</option>
                 </select>
               </div>
-            </div>
-
-            <hr style="margin:4px 0 16px;border:none;border-top:1px solid var(--border2);max-width:960px;">
-
-            <!-- 교구/구역 (기존 위치 유지) -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;max-width:560px;">
               <div class="form-group" style="margin:0;">
                 <label>교구</label>
                 <select id="enroll-parish" onchange="enrollParishChange()">
@@ -1641,11 +1670,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
             </div>
 
-            <!-- 성명/회별/구원여부/성별 -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;max-width:960px;">
+            <!-- 상단: 성명/회별/구원여부/성별 (4열) -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
               <div class="form-group" style="margin:0;">
                 <label>성명</label>
-                <input type="text" id="enroll-name" placeholder="홍길동">
+                <input type="text" id="enroll-name" placeholder="홍길동" onkeydown="if(event.key==='Enter'){ event.preventDefault(); enrollNameEnterSearch(); }">
               </div>
               <div class="form-group" style="margin:0;">
                 <label>회별</label>
@@ -1671,23 +1700,41 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
             </div>
 
-            <hr style="margin:4px 0 16px;border:none;border-top:1px solid var(--border2);max-width:960px;">
+            <!-- 중심 구분선 -->
+            <hr style="margin:2px 0 16px;border:none;border-top:2px solid var(--border2);">
 
-            <!-- 참석일자/참석교통수단/참석배정유형 -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;max-width:820px;">
+            <!-- 하단: 참석일자/귀가일자/참석교통수단/귀가교통수단 (4열) -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
               <div class="form-group" style="margin:0;">
                 <label>참석일자</label>
-                <input type="date" id="enroll-arrive-date">
+                <input type="date" id="enroll-arrive-date" onchange="enrollArriveDateChange()">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>귀가일자</label>
+                <input type="date" id="enroll-leave-date">
               </div>
               <div class="form-group" style="margin:0;">
                 <label>참석교통수단</label>
-                <select id="enroll-arrive-transport" onchange="enrollToggleAssignType('arrive')">
+                <select id="enroll-arrive-transport" onchange="enrollArriveTransportChange()">
                   <option value="">선택</option>
                   <option value="버스">버스</option>
                   <option value="자가용">자가용</option>
                   <option value="기타">기타</option>
                 </select>
               </div>
+              <div class="form-group" style="margin:0;">
+                <label>귀가교통수단</label>
+                <select id="enroll-leave-transport" onchange="enrollToggleAssignType('leave')">
+                  <option value="">선택</option>
+                  <option value="버스">버스</option>
+                  <option value="자가용">자가용</option>
+                  <option value="기타">기타</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 하단: 참석배정유형/귀가배정유형/보호자/연락처 (4열) -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
               <div class="form-group" style="margin:0;">
                 <label>참석배정유형</label>
                 <select id="enroll-arrive-assign-type" disabled style="opacity:.5;">
@@ -1697,23 +1744,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <option value="직장조">직장조</option>
                   <option value="시각선교부">시각선교부</option>
                   <option value="중고등부">중고등부</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- 귀가일자/귀가교통수단/귀가배정유형 -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;max-width:820px;">
-              <div class="form-group" style="margin:0;">
-                <label>귀가일자</label>
-                <input type="date" id="enroll-leave-date">
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label>귀가교통수단</label>
-                <select id="enroll-leave-transport" onchange="enrollToggleAssignType('leave')">
-                  <option value="">선택</option>
-                  <option value="버스">버스</option>
-                  <option value="자가용">자가용</option>
-                  <option value="기타">기타</option>
                 </select>
               </div>
               <div class="form-group" style="margin:0;">
@@ -1727,10 +1757,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <option value="중고등부">중고등부</option>
                 </select>
               </div>
-            </div>
-
-            <!-- 보호자/연락처 -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;max-width:560px;">
               <div class="form-group" style="margin:0;">
                 <label>보호자</label>
                 <input type="text" id="enroll-guardian" placeholder="보호자 성명">
@@ -1749,6 +1775,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div class="card-header">
               <div class="card-title">검색 조건</div>
               <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;" onclick="switchPanel('enroll')" title="배정인원등록 페이지로 이동">📝 등록</button>
                 <button class="btn btn-primary btn-sm" onclick="clearSearch()">↺ 초기화</button>
                 <button class="btn btn-sm" id="btn-reload-sheet"
                   onclick="reloadFromSheet()"
@@ -2403,6 +2430,17 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="5차">5차</option>
             <option value="6차">6차</option>
             <option value="7차">7차</option>
+          </select>
+          <!-- [v242] 교구/구역 조회 콤보 -->
+          <select id="rv-s-parish"
+            style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                   font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+            <option value="">전체</option>
+          </select>
+          <select id="rv-s-district"
+            style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                   font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+            <option value="">전체</option>
           </select>
           <button class="btn btn-primary btn-sm" onclick="roomviewSearch()">🔍 조회</button>
         </div>
@@ -7613,6 +7651,53 @@ function _bvwCalcSheetStats(type, summaryRows, rosterRows){
   };
 }
 // 버스배정현황 필터 콤보값 읽기 헬퍼
+// [v242] 버스배정현황: 교구/구역 조회 콤보 — 로그인 계정 기준 기본값·잠금 적용 (패널 진입 시 호출)
+function bvApplyDefaultScope(){
+  var pSel=$id('bv-s-parish'), dSel=$id('bv-s-district');
+  if(!pSel || !dSel || !currentUser) return;
+  var role = currentUser.role;
+  var isAdmin    = role==='admin';
+  var isDistrict = role==='district';
+  var isParish   = role==='parish';
+
+  populateParishSelect('bv-s-parish', '전체');
+  pSel.onchange = function(){ bvParishChange(); };
+  dSel.onchange = function(){ busRenderView(); };
+
+  if(!isAdmin && currentUser.parish){
+    pSel.value = currentUser.parish;
+  }
+  bvParishChange(); // 구역 옵션 갱신(선택값 유지)
+
+  if(isDistrict && currentUser.district){
+    dSel.value = currentUser.district;
+    dSel.disabled = true; dSel.style.opacity = '.7';
+  } else {
+    dSel.disabled = false; dSel.style.opacity = '';
+    // 교구장: 로그인 시 선택했던 구역을 기본값으로만 채워줌(자유선택 정책 유지, 수정 가능)
+    if(isParish && currentUser.loginDistrict) dSel.value = currentUser.loginDistrict;
+  }
+  // 교구 select: 구역장만 잠금, 교구장·관리자는 자유선택 (정책 확정: 교구장은 타 교구 조회 허용)
+  pSel.disabled = isDistrict;
+  pSel.style.opacity = isDistrict ? '.7' : '';
+}
+// 교구 select 변경 시 구역 옵션 재생성 + 화면 갱신 (재조회 없이 클라이언트에서 즉시 필터)
+function bvParishChange(){
+  var pSel=$id('bv-s-parish'), dSel=$id('bv-s-district');
+  if(!pSel || !dSel) return;
+  var parish = pSel.value;
+  var prev = dSel.value;
+  dSel.innerHTML = '<option value="">전체</option>';
+  if(parish){
+    buildDistrictList(parish).forEach(function(d){
+      var opt=document.createElement('option');
+      opt.value=d; opt.textContent=d;
+      if(d===prev) opt.selected=true;
+      dSel.appendChild(opt);
+    });
+  }
+  busRenderView();
+}
 function _busviewGetFilter(){
   return {
     year:   (($id('busview-sel-year')   ||{}).value||'').trim(),
@@ -8116,24 +8201,28 @@ function busRenderView(){
   }
   empty.style.display='none'; content.style.display='';
 
-  // ── 역할별 팀 필터링 ──────────────────────────────────
+  // ── 팀 필터링: [v242] 교구/구역 조회 콤보 선택값 기준 ──────────
+  // (구역장·교구장은 콤보 기본값·잠금이 로그인 계정 기준으로 자동 설정되므로 결과는 기존과 동일,
+  //  관리자·교구장은 추가로 원하는 교구/구역을 직접 선택해 조회 가능)
   var role       = currentUser ? currentUser.role : '';
   var isDistrict = role === 'district';
   var isParish   = role === 'parish';
+  var selParish   = (($id('bv-s-parish')   ||{}).value||'').trim();
+  var selDistrict = (($id('bv-s-district') ||{}).value||'').trim();
 
   var visibleTeamIds = null;
-  if(isParish && currentUser.parish){
-    visibleTeamIds = curTeams
-      .filter(function(t){ return t.name.indexOf(currentUser.parish) >= 0; })
-      .map(function(t){ return t.id; });
-  } else if(isDistrict && currentUser.district){
-    var myLabel = (currentUser.parish||'') + ' ' + (currentUser.district||'');
+  if(selDistrict){
+    var myLabel = (selParish||'') + ' ' + selDistrict;
     visibleTeamIds = curTeams
       .filter(function(t){
-        return t.name === currentUser.district ||
+        return t.name === selDistrict ||
                t.name === myLabel.trim() ||
-               t.name.indexOf(currentUser.district) >= 0;
+               t.name.indexOf(selDistrict) >= 0;
       })
+      .map(function(t){ return t.id; });
+  } else if(selParish){
+    visibleTeamIds = curTeams
+      .filter(function(t){ return (t.parish && t.parish===selParish) || t.name.indexOf(selParish) >= 0; })
       .map(function(t){ return t.id; });
   }
 
@@ -8162,18 +8251,18 @@ function busRenderView(){
     scopeBanner.style.cssText = 'margin-bottom:12px;padding:9px 14px;border-radius:8px;font-size:.8rem;font-weight:600;display:none;';
     if(statsEl && statsEl.parentNode) statsEl.parentNode.insertBefore(scopeBanner, statsEl);
   }
-  if(isParish){
-    scopeBanner.style.display = '';
-    scopeBanner.style.background = '#fdf6e3';
-    scopeBanner.style.border = '1px solid #f0dea0';
-    scopeBanner.style.color = '#8a6300';
-    scopeBanner.textContent = '🟡 교구장 조회: ' + currentUser.parish + ' 소속 팀의 버스 배정 현황만 표시됩니다.';
-  } else if(isDistrict){
+  if(selDistrict){
     scopeBanner.style.display = '';
     scopeBanner.style.background = '#edf7f2';
     scopeBanner.style.border = '1px solid #b8dfc8';
     scopeBanner.style.color = '#1a5a38';
-    scopeBanner.textContent = '🟢 구역장 조회: ' + (currentUser.district||'') + ' 관련 버스 배정 현황만 표시됩니다.';
+    scopeBanner.textContent = '🟢 ' + selDistrict + ' 관련 버스 배정 현황만 표시됩니다.';
+  } else if(selParish){
+    scopeBanner.style.display = '';
+    scopeBanner.style.background = '#fdf6e3';
+    scopeBanner.style.border = '1px solid #f0dea0';
+    scopeBanner.style.color = '#8a6300';
+    scopeBanner.textContent = '🟡 ' + selParish + ' 소속 팀의 버스 배정 현황만 표시됩니다.';
   } else {
     scopeBanner.style.display = 'none';
   }
@@ -8739,7 +8828,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v222_roomview_map_image_update';
+var CACHE_VERSION = 'v248_search_enroll_button';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -9218,10 +9307,40 @@ function updateDataSourceBadge(source, count){
 }
 
 // ── 인증 ──
+// 아이디 입력값에 따라 교구/구역 선택 영역 표시·숨김 (admin은 숨김)
+function onLoginIdInput(){
+  var id = $id('inp-id').value.trim().toLowerCase();
+  var wrap = $id('login-parish-district-wrap');
+  if(!wrap) return;
+  wrap.style.display = (id.indexOf('admin')===0) ? 'none' : 'flex';
+}
+// 로그인 화면 교구 선택 시 구역 목록 갱신 (기본값 "전체" 유지)
+function onLoginParishChange(){
+  var parish = $val('login-parish-sel');
+  var sel = $id('login-district-sel');
+  if(!sel) return;
+  sel.innerHTML = '<option value="전체">전체</option>';
+  if(parish && parish!=='전체' && PARISH_DISTRICTS[parish]){
+    PARISH_DISTRICTS[parish].forEach(function(d){
+      var opt=document.createElement('option');
+      opt.value=d; opt.textContent=d;
+      sel.appendChild(opt);
+    });
+  }
+}
 function doLogin() {
   var id=$id('inp-id').value.trim(), pw=$id('inp-pw').value;
   var err=$id('login-error');
   if(!id||!pw){ if(err) err.style.display='block'; return; }
+
+  // 관리자(admin)가 아닌 계정은 교구/구역 선택이 필수 — 미선택("전체") 시 진행 차단
+  var isAdminId = id.toLowerCase().indexOf('admin') === 0;
+  var loginParish = $val('login-parish-sel');
+  var loginDistrict = $val('login-district-sel');
+  if(!isAdminId && (loginParish==='전체' || loginDistrict==='전체')){
+    alert('구역장님의 교구와 구역을 선택해 주세요.');
+    return;
+  }
 
   function _doCompare(hashedInput){
     var acc = ACCOUNTS.find(function(a){
@@ -9263,8 +9382,32 @@ function doLogin() {
       if(err) err.style.display='block'; return;
     }
 
-    currentUser=acc;
-    try { sessionStorage.setItem('retreat_session', JSON.stringify({id:acc.id,name:acc.name,role:acc.role,parish:acc.parish||'',district:acc.district||'',position:acc.position||''})); } catch(e) {}
+    // 이중검증: admin이 아닌 경우 선택한 교구/구역이 계정 정보와 일치하는지 확인
+    if(!isAdminId){
+      if(acc.parish && loginParish !== acc.parish){
+        if(err) err.style.display='block'; return;
+      }
+      if(acc.district && loginDistrict !== acc.district){
+        if(err) err.style.display='block'; return;
+      }
+    }
+
+    // 계정 원본(ACCOUNTS 배열) 오염 방지를 위해 얕은 복사 후 사용
+    currentUser = Object.assign({}, acc);
+    if(!isAdminId){
+      // [v242] 로그인 화면에서 선택한 교구를 세션의 실제 값으로 사용
+      // — 계정 데이터(계정목록 시트)에 교구가 비어있어도 정상 동작하도록 함
+      currentUser.parish = loginParish;
+      // [v243] currentUser.district는 "고정 배정구역" 의미로 다른 화면(홈 통계, 숙소명단열람 권한 등)의
+      // 권한 로직에서 role 구분 없이 직접 사용되는 곳이 있어, 구역장(district) 계정에만 반영한다.
+      // 교구장은 구역 자유선택 정책이므로 currentUser.district를 채우지 않고,
+      // 로그인화면에서 고른 값은 UI 기본값 표시 전용 필드(loginDistrict)에만 보관한다.
+      if(acc.role === 'district'){
+        currentUser.district = loginDistrict;
+      }
+      currentUser.loginDistrict = loginDistrict;
+    }
+    try { sessionStorage.setItem('retreat_session', JSON.stringify({id:currentUser.id,name:currentUser.name,role:currentUser.role,parish:currentUser.parish||'',district:currentUser.district||'',loginDistrict:currentUser.loginDistrict||'',position:currentUser.position||''})); } catch(e) {}
     if(err) err.style.display='none';
     $id('login-page').style.display='none';
     $id('app-page').style.display='block';
@@ -9290,6 +9433,8 @@ function doLogout() {
   $id('app-page').style.display='none';
   $id('login-page').style.display='flex';
   $set('inp-id',''); $set('inp-pw','');
+  var _lpw=$id('login-parish-district-wrap'); if(_lpw) _lpw.style.display='flex';
+  $set('login-parish-sel','전체'); onLoginParishChange();
 }
 
 // ── 모바일 사이드바 열기·닫기 ──
@@ -9359,31 +9504,24 @@ function initApp() {
   var navBv=$id('nav-bus-view');     if(navBv)       navBv.style.display='';
   var navRv=$id('nav-roomview');     if(navRv)       navRv.style.display='';
   var navGs=$id('nav-goalstatus');   if(navGs)       navGs.style.display='';
-  // 접수인원등록: 관리자 + 구역장 표시 (교구장 제외)
-  var navEnroll=$id('nav-enroll');   if(navEnroll)   navEnroll.style.display=(isAdmin||isDistrict)?'':'none';
-  // T2: 내 계정 메뉴 — 관리자 제외 (구역장/교구장만)
-  var navMp=$id('nav-mypage'); if(navMp) navMp.style.display=isAdmin?'none':'';
+  // 접수인원등록: 관리자 + 구역장 + 교구장 표시 (구역장/교구장은 각각 본인 소속 범위로 등록)
+  var navEnroll=$id('nav-enroll');   if(navEnroll)   navEnroll.style.display=(isAdmin||isDistrict||isParish)?'':'none';
+  // T2: 내 계정 메뉴 — 항상 숨김 처리
+  var navMp=$id('nav-mypage'); if(navMp) navMp.style.display='none';
 
-  // 자료검색 필터 고정 (비관리자)
-  if(!isAdmin){
-    if(currentUser.parish){
-      $set('s-parish', currentUser.parish);
-      var sp=$id('s-parish'); if(sp){ sp.disabled=(!isParish); sp.style.opacity=(!isParish)?'.7':''; }
-      // 교구 연동 구역 select 갱신
-      searchParishChange();
-    }
-    // 구역장: 구역 고정
-    if(isDistrict && currentUser.district){
-      $set('s-district', currentUser.district);
-      var sd=$id('s-district'); if(sd){ sd.disabled=true; sd.style.opacity='.7'; }
-    }
-    // 교구장: 구역 자유
-    if(isParish){
-      var sd2=$id('s-district'); if(sd2){ sd2.disabled=false; sd2.style.opacity=''; }
-    }
+  // 자료검색 필터 고정 (비관리자) — [v242] applySearchDefaultScope()로 통합
+  applySearchDefaultScope();
+
+  // 로그인 계정 기준으로 수양회집계현황·수양회목표달성현황 교구/구역 필터 초기화
+  // (버스배정현황·숙소배정현황은 select 없이 currentUser.parish/district로 내부 자동 스코프 처리됨)
+  if(!isAdmin && currentUser.parish){
+    homeAggParish = currentUser.parish;
+    homeAggDistrict = (isDistrict && currentUser.district) ? currentUser.district : '전체';
+    gsParish = currentUser.parish;
+    gsDistrict = (isDistrict && currentUser.district) ? currentUser.district : '전체';
   } else {
-    var ep=$id('s-parish'); if(ep){ep.disabled=false;ep.style.opacity='';}
-    var ed=$id('s-district'); if(ed){ed.disabled=false;ed.style.opacity='';}
+    homeAggParish = '전체'; homeAggDistrict = '전체';
+    gsParish = '전체'; gsDistrict = '전체';
   }
   $set('f-arrive-date',new Date().toISOString().slice(0,10));
   $set('f-year',String(new Date().getFullYear()));
@@ -9429,8 +9567,8 @@ function switchPanel(name, skipRender) {
   if(isParish && ['register','excel','accounts','bus','room','goal','busbase'].indexOf(name)>=0){
     showToast('교구장은 조회 권한만 있습니다.','error'); return;
   }
-  // 접수인원등록: 관리자 + 구역장만 허용 (교구장 제외)
-  if(name==='enroll' && !(isAdmin||isDistrict)){
+  // 접수인원등록: 관리자 + 구역장 + 교구장 허용
+  if(name==='enroll' && !(isAdmin||isDistrict||isParish)){
     showToast('접근 권한이 없습니다.','error'); return;
   }
   // T2: 내 계정(mypage) — 관리자는 계정관리 패널 사용
@@ -9466,10 +9604,8 @@ function switchPanel(name, skipRender) {
     }
     if(name==='search'){
       initYearSelect();
-      // 구역장: 교구 먼저 설정 후 구역 옵션 생성
-      if(!isAdmin && currentUser && currentUser.parish){
-        $set('s-parish', currentUser.parish);
-      }
+      // [v242] 로그인 계정 기준 교구/구역 기본값 재적용 (s-parish·s-district 공용 함수)
+      applySearchDefaultScope();
       // ── 참석/귀가 버스배정 드롭다운 옵션을 위해 운행버스 목록 확보 (없으면 보강 로드) ──
       if(USE_SHEET() && !busArriveBuses.length && !busLeaveBuses.length){
         busRestore();
@@ -9564,6 +9700,8 @@ function switchPanel(name, skipRender) {
       }
     }
     if(name==='busview'){
+      // [v242] 교구/구역 조회 콤보 기본값·잠금 적용
+      bvApplyDefaultScope();
       // 년도 콤보 동적 생성 (당해년도 ~ +5), 최초 1회
       var bvYrSel = $id('busview-sel-year');
       if(bvYrSel && !bvYrSel.options.length){
@@ -9595,6 +9733,8 @@ function switchPanel(name, skipRender) {
       }
     }
     if(name==='roomview') {
+      // [v242] 교구/구역 조회 콤보 기본값·잠금 적용
+      rvApplyDefaultScope();
       // 년도 콤보 동적 생성 (당해년도 ~ +5), 첫 진입 1회만
       var rvYrSel = $id('roomview-sel-year');
       if(rvYrSel && !rvYrSel.options.length){
@@ -9625,7 +9765,9 @@ function switchPanel(name, skipRender) {
     }
     if(name==='mypage')   mypageRender();
   }
-  var sb=$id('sidebar'); if(sb) sb.classList.remove('open');
+  // [v244] closeSidebar()로 통일 — 오버레이·배경 스크롤 잠금 해제까지 항상 함께 처리되도록 정리
+  // (기존엔 sidebar 클래스만 직접 제거해 특정 경로에서 body 배경 스크롤 잠금이 풀리지 않을 가능성이 있었음)
+  closeSidebar();
 }
 
 // ── 통계 & 홈 ──
@@ -9640,10 +9782,10 @@ function updateStats() {
       return (uP ? r.parish === uP : true) && (uD ? r.district === uD : true);
     });
 
-    // topbar 요약 pill (전체 / 전참자) — 홈 화면에서 실제 표시되는 유일한 값
+    // topbar 요약 pill — [v246] "전체" 라벨을 로그인 계정 기준으로 동적 표시, 전참자 항목은 삭제
     var stTotal=$id('st-total'); if(stTotal) stTotal.textContent=scope.length;
-    var stPrev=$id('st-prev');
-    if(stPrev) stPrev.textContent=scope.filter(function(r){return r.prevAttend==='예';}).length;
+    var stLabel=$id('st-total-label');
+    if(stLabel) stLabel.textContent = isAdmin ? '강서교회 접수현황' : ((uP || '') + ' 접수현황');
   } catch(e) { if(typeof showToast==='function') showToast('통계 오류: '+(e&&e.message||e),'error'); }
 }
 
@@ -9690,11 +9832,15 @@ function initHomeParishSelect(){
     ? ['전체','1교구','2교구','3교구','4교구','기타교구']
     : ['1교구','2교구','3교구','4교구','기타교구'];
   if(!homeAggParish || opts.indexOf(homeAggParish)===-1){
-    homeAggParish = isAdmin ? '전체' : '1교구';
+    homeAggParish = isAdmin ? '전체' : ((currentUser&&currentUser.parish)||'1교구');
   }
   sel.innerHTML = opts.map(function(p){
     return '<option value="'+p+'"'+(p===homeAggParish?' selected':'')+'>'+p+'</option>';
   }).join('');
+  // 구역장: 교구 선택 잠금 / 교구장·관리자: 자유 — 자료검색(s-parish)과 동일한 정책
+  var isParishRole = !!(currentUser && currentUser.role==='parish');
+  sel.disabled = !isAdmin && !isParishRole;
+  sel.style.opacity = sel.disabled ? '.7' : '';
 }
 
 // ── 구역 콤보 옵션 생성 (선택된 교구에 종속) ──────────────
@@ -9725,7 +9871,11 @@ function initHomeDistrictSelect(){
   sel.innerHTML = opts.map(function(d){
     return '<option value="'+d+'"'+(d===homeAggDistrict?' selected':'')+'>'+d+'</option>';
   }).join('');
-  sel.disabled = (homeAggParish==='전체');
+  // 구역장: 구역 선택 잠금(고정) / 교구장·관리자: 자유
+  var isAdmin2 = !!(currentUser && currentUser.role==='admin');
+  var isDistrictRole = !!(currentUser && currentUser.role==='district');
+  sel.disabled = (homeAggParish==='전체') || (!isAdmin2 && isDistrictRole);
+  sel.style.opacity = sel.disabled ? '.7' : '';
 }
 
 // ── 교구 콤보 변경 시: 구역 콤보만 즉시 갱신 (실제 재조회는 [조회] 버튼에서) ──────────────
@@ -10300,6 +10450,39 @@ function populateDistrictSelect(selId, parish, placeholderLabel, selectedValue){
     if(d === selectedValue) opt.selected = true;
     sel.appendChild(opt);
   });
+}
+
+// [v242] 자료검색(s-parish/s-district) 화면의 로그인 계정 기준 기본값·잠금 상태 적용
+// initApp()(로그인 직후)·switchPanel('search')(패널 재진입) 양쪽에서 공용으로 호출한다.
+// (기존엔 두 곳에 유사 로직이 중복돼 있었고, 패널 재진입 시 s-district가 재적용되지 않는 버그가 있었음)
+function applySearchDefaultScope(){
+  if(!currentUser) return;
+  var role = currentUser.role;
+  var isAdmin    = role==='admin';
+  var isDistrict = role==='district';
+  var isParish   = role==='parish';
+
+  if(!isAdmin){
+    if(currentUser.parish){
+      $set('s-parish', currentUser.parish);
+      var sp=$id('s-parish'); if(sp){ sp.disabled=(!isParish); sp.style.opacity=(!isParish)?'.7':''; }
+      // 교구 연동 구역 select 갱신
+      searchParishChange();
+    }
+    // 구역장: 구역 고정
+    if(isDistrict && currentUser.district){
+      $set('s-district', currentUser.district);
+      var sd=$id('s-district'); if(sd){ sd.disabled=true; sd.style.opacity='.7'; }
+    }
+    // 교구장: 구역 자유선택 정책 유지 — 단, 로그인 시 선택했던 구역을 기본값으로만 채워줌(수정 가능)
+    if(isParish){
+      var sd2=$id('s-district'); if(sd2){ sd2.disabled=false; sd2.style.opacity=''; }
+      if(currentUser.loginDistrict) $set('s-district', currentUser.loginDistrict);
+    }
+  } else {
+    var ep=$id('s-parish'); if(ep){ep.disabled=false;ep.style.opacity='';}
+    var ed=$id('s-district'); if(ed){ed.disabled=false;ed.style.opacity='';}
+  }
 }
 
 // ── 교구 선택 시 구역 동적 생성 (retreat 데이터 distinct) ──
@@ -13534,6 +13717,10 @@ function goalStatusInitParishSelect(){
   var opts = isAdmin ? ['전체','1교구','2교구','3교구','4교구','기타교구'] : ['1교구','2교구','3교구','4교구','기타교구'];
   if(!gsParish || opts.indexOf(gsParish)===-1) gsParish = isAdmin ? '전체' : ((currentUser&&currentUser.parish)||'1교구');
   sel.innerHTML = opts.map(function(p){ return '<option value="'+p+'"'+(p===gsParish?' selected':'')+'>'+p+'</option>'; }).join('');
+  // 구역장: 교구 선택 잠금 / 교구장·관리자: 자유
+  var isParishRole = !!(currentUser && currentUser.role==='parish');
+  sel.disabled = !isAdmin && !isParishRole;
+  sel.style.opacity = sel.disabled ? '.7' : '';
 }
 
 function goalStatusInitDistrictSelect(){
@@ -13558,7 +13745,11 @@ function goalStatusInitDistrictSelect(){
   if(!gsDistrict || (list.indexOf(gsDistrict)===-1 && gsDistrict!=='전체')) gsDistrict = '전체';
   var opts = ['전체'].concat(list);
   sel.innerHTML = opts.map(function(d){ return '<option value="'+d+'"'+(d===gsDistrict?' selected':'')+'>'+d+'</option>'; }).join('');
-  sel.disabled = (gsParish==='전체');
+  // 구역장: 구역 선택 잠금(고정) / 교구장·관리자: 자유
+  var isAdmin2 = !!(currentUser && currentUser.role==='admin');
+  var isDistrictRole = !!(currentUser && currentUser.role==='district');
+  sel.disabled = (gsParish==='전체') || (!isAdmin2 && isDistrictRole);
+  sel.style.opacity = sel.disabled ? '.7' : '';
 }
 
 function goalStatusParishChange(){
@@ -14337,6 +14528,51 @@ function roomRenderSummary(){ }
 function roomSelectBuilding(b){ roomCurrentBuilding=b; roomRenderTabs(); }
 // 숙소배정현황 조회 버튼 핸들러
 // 선택된 년도·수양회종류 기준으로 시트 재조회 후 렌더링
+// [v242] 숙소배정현황: 교구/구역 조회 콤보 — 로그인 계정 기준 기본값·잠금 적용 (패널 진입 시 호출)
+function rvApplyDefaultScope(){
+  var pSel=$id('rv-s-parish'), dSel=$id('rv-s-district');
+  if(!pSel || !dSel || !currentUser) return;
+  var role = currentUser.role;
+  var isAdmin    = role==='admin';
+  var isDistrict = role==='district';
+  var isParish   = role==='parish';
+
+  populateParishSelect('rv-s-parish', '전체');
+  pSel.onchange = function(){ rvParishChange(); };
+  dSel.onchange = function(){ roomRenderView(); };
+
+  if(!isAdmin && currentUser.parish){
+    pSel.value = currentUser.parish;
+  }
+  rvParishChange(); // 구역 옵션 갱신(선택값 유지)
+
+  if(isDistrict && currentUser.district){
+    dSel.value = currentUser.district;
+    dSel.disabled = true; dSel.style.opacity = '.7';
+  } else {
+    dSel.disabled = false; dSel.style.opacity = '';
+    // 교구장: 로그인 시 선택했던 구역을 기본값으로만 채워줌(자유선택 정책 유지, 수정 가능)
+    if(isParish && currentUser.loginDistrict) dSel.value = currentUser.loginDistrict;
+  }
+  pSel.disabled = isDistrict;
+  pSel.style.opacity = isDistrict ? '.7' : '';
+}
+function rvParishChange(){
+  var pSel=$id('rv-s-parish'), dSel=$id('rv-s-district');
+  if(!pSel || !dSel) return;
+  var parish = pSel.value;
+  var prev = dSel.value;
+  dSel.innerHTML = '<option value="">전체</option>';
+  if(parish){
+    buildDistrictList(parish).forEach(function(d){
+      var opt=document.createElement('option');
+      opt.value=d; opt.textContent=d;
+      if(d===prev) opt.selected=true;
+      dSel.appendChild(opt);
+    });
+  }
+  roomRenderView();
+}
 function roomviewSearch(){
   if(USE_SHEET()){
     showLoading(true);
@@ -14378,6 +14614,9 @@ function roomRenderView(){
   }
 
   var current = (typeof currentUser!=='undefined'&&currentUser)?currentUser:{};
+  // [v242] 교구/구역 조회 콤보 선택값 (역할별 기본값·잠금은 rvApplyDefaultScope()가 처리)
+  var selParish   = (($id('rv-s-parish')   ||{}).value||'').trim();
+  var selDistrict = (($id('rv-s-district') ||{}).value||'').trim();
 
   // ── 년도·수양회종류·행사명 필터 (조회 콤보 기준) ──
   // [v208 버그수정] baseData를 참조(아래 빈값 체크)보다 반드시 먼저 계산해야 함.
@@ -14395,11 +14634,10 @@ function roomRenderView(){
     return true;
   });
 
-  // 역할별 필터
+  // [v242] 교구/구역 조회 콤보 선택값 기준 필터 (기존 role 강제필터 대체)
   var baseData = yearTypeData.filter(function(d){
-    if(!current.parish && !current.district) return true;
-    if(current.district) return d.district===current.district;
-    if(current.parish)   return d.parish===current.parish;
+    if(selDistrict) return d.district===selDistrict;
+    if(selParish)   return d.parish===selParish;
     return true;
   });
 
@@ -14418,18 +14656,18 @@ function roomRenderView(){
   // ── 역할 배너 ──
   var scopeBanner=$id('roomview-scope-banner');
   if(scopeBanner){
-    if(current.district){
+    if(selDistrict){
       scopeBanner.style.display='';
       scopeBanner.style.background='#edf7f2';
       scopeBanner.style.border='1px solid #b8dfc8';
       scopeBanner.style.color='#1a5a38';
-      scopeBanner.textContent='🟢 구역장 조회: '+esc(current.district)+' 관련 숙소 배정 현황만 표시됩니다.';
-    } else if(current.parish){
+      scopeBanner.textContent='🟢 '+esc(selDistrict)+' 관련 숙소 배정 현황만 표시됩니다.';
+    } else if(selParish){
       scopeBanner.style.display='';
       scopeBanner.style.background='var(--sky)';
       scopeBanner.style.border='1px solid var(--border2)';
       scopeBanner.style.color='var(--navy)';
-      scopeBanner.textContent='🔵 교구장 조회: '+esc(current.parish)+' 관련 숙소 배정 현황만 표시됩니다.';
+      scopeBanner.textContent='🔵 '+esc(selParish)+' 관련 숙소 배정 현황만 표시됩니다.';
     } else {
       scopeBanner.style.display='none';
     }
@@ -14616,7 +14854,7 @@ function rvRosterRender(rows){
 
 document.addEventListener('DOMContentLoaded', function() {
   var _expose = [
-    'doLogin','doLogout','switchPanel',
+    'doLogin','doLogout','onLoginIdInput','onLoginParishChange','switchPanel',
     'renderHome','updateStats','loadData','sheetRowToObj',
     'initHomeYearSelect','initHomeParishSelect','initHomeDistrictSelect','homeAggParishChange','homeAggQuery','homeAggExportCSV',
     'initYearSelect',
@@ -14673,7 +14911,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'goalStatusYearChange','goalStatusQuery','renderGoalStatusPanel','goalStatusExportCSV'
   ];
   var _self = {
-    doLogin:doLogin, doLogout:doLogout, switchPanel:switchPanel,
+    doLogin:doLogin, doLogout:doLogout, onLoginIdInput:onLoginIdInput, onLoginParishChange:onLoginParishChange, switchPanel:switchPanel,
     renderHome:renderHome, updateStats:updateStats, loadData:loadData, sheetRowToObj:sheetRowToObj,
     initHomeYearSelect:initHomeYearSelect, initHomeParishSelect:initHomeParishSelect, initHomeDistrictSelect:initHomeDistrictSelect, homeAggParishChange:homeAggParishChange, homeAggQuery:homeAggQuery, homeAggExportCSV:homeAggExportCSV,
     initYearSelect:initYearSelect,
@@ -14776,7 +15014,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // ACCOUNTS에서 동일 id 계정 찾아 currentUser 복원
     var acc = ACCOUNTS.find(function(a){ return a.id === sess.id; });
     if(!acc) { try{ sessionStorage.removeItem('retreat_session'); }catch(e){} return; }
-    currentUser = acc;
+    currentUser = Object.assign({}, acc);
+    // [v243] 로그인 시점에 저장된 세션의 교구 값을 ACCOUNTS 원본보다 우선 사용
+    // — 새로고침 후에도 로그인 화면에서 선택했던 교구가 유지되도록 함
+    if(sess.parish) currentUser.parish = sess.parish;
+    // district는 "고정 배정구역" 의미로 다른 권한 로직에서 직접 쓰이므로 구역장 세션에만 복원
+    if(acc.role === 'district' && sess.district) currentUser.district = sess.district;
+    // UI 기본값 표시 전용 필드 — 구버전 세션(loginDistrict 없이 district만 저장된 경우) 호환 처리
+    currentUser.loginDistrict = sess.loginDistrict || sess.district || '';
     var lp = $id('login-page'); var ap = $id('app-page');
     if(lp) lp.style.display='none';
     if(ap) ap.style.display='block';
@@ -15228,22 +15473,26 @@ function enrollParishChange(){
 
 function enrollInit(){
   var role = currentUser ? currentUser.role : '';
-  var isDistrict = role === 'district';
+  var isAdmin = role === 'admin';
 
   enrollRenderYearOptions('enroll-year', false);
   populateParishSelect('enroll-parish', '선택');
   populateGroupSelects(); // enroll-group도 함께 채움
+  enrollEventOptionsRefresh(); // [v246] 회차 옵션을 교회목표 시트 행사명 기준으로 갱신
 
   var pSel=$id('enroll-parish'), dSel=$id('enroll-district');
-  if(isDistrict && currentUser.parish && currentUser.district){
-    // 구역장: 교구/구역 고정(수정 불가) — 등록 입력값이자 조회 필터값으로 동시에 사용됨
-    if(pSel){ pSel.value = currentUser.parish; pSel.disabled = true; pSel.style.opacity='.7'; }
-    populateDistrictSelect('enroll-district', currentUser.parish, '선택', currentUser.district);
-    if(dSel){ dSel.disabled = true; dSel.style.opacity='.7'; }
+  // [v245] 구역장·교구장 공통: 로그인 계정 기준 교구/구역을 기본값으로 채우되 항상 수정 가능(잠금 없음).
+  // 관리자는 교구/구역 모두 비워둔 채(전체) 시작 — 매번 직접 선택.
+  if(!isAdmin && currentUser && currentUser.parish){
+    if(pSel) pSel.value = currentUser.parish;
+    var myDistrict = (role === 'district') ? currentUser.district : (currentUser.loginDistrict || '');
+    populateDistrictSelect('enroll-district', currentUser.parish, '선택', myDistrict);
   } else {
-    if(pSel){ pSel.disabled=false; pSel.style.opacity=''; }
-    if(dSel){ dSel.disabled=false; dSel.style.opacity=''; }
+    if(pSel) pSel.value = '';
+    populateDistrictSelect('enroll-district', '', '선택');
   }
+  if(pSel){ pSel.disabled = false; pSel.style.opacity=''; }
+  if(dSel){ dSel.disabled = false; dSel.style.opacity=''; }
 
   enrollFormReset();
   if(USE_SHEET()){
@@ -15264,6 +15513,85 @@ function enrollToggleAssignType(kind){
   typeSel.disabled = !isBus;
   typeSel.style.opacity = isBus ? '' : '.5';
   if(!isBus) typeSel.value = '';
+}
+
+// [v245] 'YYYY-MM-DD' 문자열에 일수를 더한 'YYYY-MM-DD'를 반환. 값이 없거나 형식이 아니면 ''.
+function _enrollAddDays(dateStr, days){
+  if(!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return '';
+  var d = new Date(dateStr+'T00:00:00');
+  if(isNaN(d.getTime())) return '';
+  d.setDate(d.getDate()+days);
+  var mm=('0'+(d.getMonth()+1)).slice(-2), dd=('0'+d.getDate()).slice(-2);
+  return d.getFullYear()+'-'+mm+'-'+dd;
+}
+
+// [v245] 참석일자 입력/변경 시 — 3박4일 기준(참석일+3일)으로 귀가일자를 자동 세팅.
+// 저장을 강제하지 않으므로 이후 필요 시 귀가일자를 직접 수정할 수 있다.
+function enrollArriveDateChange(){
+  var arriveDate = ($id('enroll-arrive-date')||{value:''}).value;
+  var next = _enrollAddDays(arriveDate, 3);
+  if(next) $set('enroll-leave-date', next);
+}
+
+// [v245] 참석교통수단 선택 시 — 귀가교통수단에 동일 값을 기본 세팅(이후 직접 수정 가능).
+function enrollArriveTransportChange(){
+  enrollToggleAssignType('arrive');
+  var arriveTrans = ($id('enroll-arrive-transport')||{value:''}).value;
+  if(arriveTrans){
+    $set('enroll-leave-transport', arriveTrans);
+    enrollToggleAssignType('leave');
+  }
+}
+
+// [v245] 성명 입력 후 Enter — 연도+수양회종류+회차+교구+구역+성명이 일치하는 기존 접수 데이터를
+// 찾아 폼에 불러온다(기존 중복확인 로직 _enrollFindDuplicate 재사용). 없으면 신규 등록으로 안내.
+function enrollNameEnterSearch(){
+  var year        = ($id('enroll-year')          ||{value:''}).value;
+  var retreatType = ($id('enroll-retreat-type')  ||{value:''}).value;
+  var event       = ($id('enroll-event')         ||{value:''}).value;
+  var parish      = ($id('enroll-parish')        ||{value:''}).value;
+  var district    = ($id('enroll-district')      ||{value:''}).value;
+  var name        = ($id('enroll-name')          ||{value:''}).value.trim();
+
+  if(!name){ return; }
+  if(!year||!retreatType||!event||!parish||!district){
+    showToast('연도/수양회종류/회차/교구/구역을 먼저 선택해 주세요.','error'); return;
+  }
+  var found = _enrollFindDuplicate(year, retreatType, event, parish, district, name);
+  if(found){
+    enrollEditRow(found.receiptId);
+    showToast('📋 기존 접수 정보를 불러왔습니다. ('+found.receiptId+')','success');
+  } else {
+    showToast('신규 등록 대상입니다. 나머지 항목을 입력해 주세요.','success');
+  }
+}
+
+// [v246] 회차(enroll-event) 옵션을 '교회목표' 시트의 행사명 기준으로 동적 구성.
+// 연도/수양회종류에 해당하는 행사명이 교회목표 시트에 없으면 기존 기본 목록(1~7차)을 그대로 유지한다.
+function enrollEventOptionsRefresh(){
+  if(!_goalLoaded){
+    if(USE_SHEET() && !_goalLoading){
+      _goalFetchFromSheet(function(){ enrollEventOptionsRefresh(); }, {});
+    }
+    return; // 로딩 완료 후 콜백으로 재호출됨 — 지금은 현재 목록(기본값) 유지
+  }
+  var year  = ($id('enroll-year')||{value:''}).value;
+  var rt    = ($id('enroll-retreat-type')||{value:''}).value;
+  var evSel = $id('enroll-event');
+  if(!evSel) return;
+  var names = [];
+  var seen = {};
+  _goalRows.forEach(function(r){
+    if(year && String(r.year)!==String(year)) return;
+    if(rt && r.retreatType!==rt) return;
+    if(!r.eventName || seen[r.eventName]) return;
+    seen[r.eventName] = true;
+    names.push(r.eventName);
+  });
+  if(!names.length) return; // 교회목표 시트에 해당 연도/종류 데이터가 없으면 기존 목록 유지
+  var prev = evSel.value;
+  evSel.innerHTML = names.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+  evSel.value = (names.indexOf(prev)>=0) ? prev : names[0];
 }
 
 function enrollFormReset(){
@@ -15291,8 +15619,14 @@ function enrollFormReset(){
 // 항상 통과하지만, 만약을 대비해 저장/삭제 직전에 한 번 더 확인한다.
 function _enrollCheckDistrictScope(parish, district){
   var role = currentUser ? currentUser.role : '';
-  if(role !== 'district') return true;
-  return parish === currentUser.parish && district === currentUser.district;
+  if(role === 'district'){
+    return parish === currentUser.parish && district === currentUser.district;
+  }
+  if(role === 'parish'){
+    // [v244] 교구장: 본인 교구 내 데이터면 구역 무관하게 허용
+    return parish === currentUser.parish;
+  }
+  return true; // 관리자
 }
 
 // [v240] 신규 등록 시 연도+수양회종류+행사명(회차)+교구+구역+성명 6개 항목이 모두 일치하는
@@ -15334,7 +15668,7 @@ function enrollSave(){
   if(!name){ showToast('성명을 입력해 주세요.','error'); return; }
   if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
   if(!_enrollCheckDistrictScope(parish, district)){
-    showToast('본인 소속 구역 데이터만 등록할 수 있습니다.','error'); return;
+    showToast('본인 소속 범위(교구/구역)의 데이터만 등록할 수 있습니다.','error'); return;
   }
 
   var isNew = !_enrollEditingId;
@@ -15342,7 +15676,7 @@ function enrollSave(){
   if(!isNew && !existing){ showToast('수정 대상 데이터를 찾을 수 없습니다.','error'); return; }
   // 수정 시에도 대상 레코드의 소속이 구역장 본인 구역인지 재확인
   if(!isNew && !_enrollCheckDistrictScope(existing.parish, existing.district)){
-    showToast('본인 소속 구역 데이터만 수정할 수 있습니다.','error'); return;
+    showToast('본인 소속 범위(교구/구역)의 데이터만 수정할 수 있습니다.','error'); return;
   }
 
   // [v240] 신규 등록 시도 시 — 연도+수양회종류+행사명(회차)+교구+구역+성명이 모두 일치하는
@@ -15353,7 +15687,7 @@ function enrollSave(){
     var dupMatch = _enrollFindDuplicate(year, retreatType, event, parish, district, name);
     if(dupMatch){
       if(!_enrollCheckDistrictScope(dupMatch.parish, dupMatch.district)){
-        showToast('본인 소속 구역 데이터만 수정할 수 있습니다.','error'); return;
+        showToast('본인 소속 범위(교구/구역)의 데이터만 수정할 수 있습니다.','error'); return;
       }
       existing = dupMatch;
       isNew = false;
@@ -15405,7 +15739,7 @@ function enrollEditRow(id){
   var row = retreat.find(function(r){ return String(r.receiptId)===String(id); });
   if(!row){ showToast('데이터를 찾을 수 없습니다.','error'); return; }
   if(!_enrollCheckDistrictScope(row.parish, row.district)){
-    showToast('본인 소속 구역 데이터만 수정할 수 있습니다.','error'); return;
+    showToast('본인 소속 범위(교구/구역)의 데이터만 수정할 수 있습니다.','error'); return;
   }
   _enrollEditingId = row.receiptId;
   $set('enroll-receipt-id-display', row.receiptId);
@@ -15443,6 +15777,7 @@ var _ehRows = []; // 최근 조회 결과 캐시 (더블클릭 시 재조회 없
 function enrollHistoryOpen(){
   var role = currentUser ? currentUser.role : '';
   var isDistrict = role === 'district';
+  var isParish   = role === 'parish';
 
   enrollRenderYearOptions('eh-year', true); // includeAll=true — 조회 필터이므로 '전체' 옵션 필요
   populateParishSelect('eh-parish', '전체');
@@ -15453,6 +15788,11 @@ function enrollHistoryOpen(){
     if(pSel){ pSel.value = currentUser.parish; pSel.disabled = true; pSel.style.opacity='.7'; }
     populateDistrictSelect('eh-district', currentUser.parish, '전체', currentUser.district);
     if(dSel){ dSel.disabled = true; dSel.style.opacity='.7'; }
+  } else if(isParish && currentUser.parish){
+    // [v244] 교구장: 교구 고정, 구역은 자유 선택(로그인 시 선택했던 구역을 기본값으로만 채움)
+    if(pSel){ pSel.value = currentUser.parish; pSel.disabled = true; pSel.style.opacity='.7'; }
+    populateDistrictSelect('eh-district', currentUser.parish, '전체', currentUser.loginDistrict||'');
+    if(dSel){ dSel.disabled = false; dSel.style.opacity=''; }
   } else {
     if(pSel){ pSel.disabled=false; pSel.style.opacity=''; pSel.value=''; }
     if(dSel){ dSel.disabled=false; dSel.style.opacity=''; populateDistrictSelect('eh-district', '', '전체'); }
@@ -15521,7 +15861,7 @@ function enrollHistoryRenderGrid(rows){
 function enrollHistorySelectRow(idx){
   var row = _ehRows[idx]; if(!row) return;
   if(!_enrollCheckDistrictScope(row.parish, row.district)){
-    showToast('본인 소속 구역 데이터만 불러올 수 있습니다.','error'); return;
+    showToast('본인 소속 범위(교구/구역)의 데이터만 불러올 수 있습니다.','error'); return;
   }
   var existingIdx = retreat.findIndex(function(x){ return String(x.receiptId)===String(row.receiptId); });
   if(existingIdx>=0) retreat[existingIdx] = Object.assign({}, retreat[existingIdx], row);
@@ -15535,7 +15875,7 @@ function enrollDeleteRow(id){
   var row = retreat.find(function(r){ return String(r.receiptId)===String(id); });
   if(!row){ showToast('데이터를 찾을 수 없습니다.','error'); return; }
   if(!_enrollCheckDistrictScope(row.parish, row.district)){
-    showToast('본인 소속 구역 데이터만 삭제할 수 있습니다.','error'); return;
+    showToast('본인 소속 범위(교구/구역)의 데이터만 삭제할 수 있습니다.','error'); return;
   }
   if(!confirm(row.name+' ('+row.parish+' '+row.district+') 접수 정보를 삭제하시겠습니까?')) return;
   if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
@@ -15557,6 +15897,7 @@ function enrollDeleteRow(id){
 function _enrollFilteredRows(){
   var role = currentUser ? currentUser.role : '';
   var isDistrict = role === 'district';
+  var isParish   = role === 'parish';
   // 연도/수양회종류/행사명/교구/구역은 등록폼 상단 필드를 조회 조건으로 그대로 재사용한다
   var y  = ($id('enroll-year')          ||{value:''}).value;
   var rt = ($id('enroll-retreat-type')  ||{value:''}).value;
@@ -15569,6 +15910,10 @@ function _enrollFilteredRows(){
     if(isDistrict && currentUser.parish && currentUser.district){
       // 구역장: 본인 교구+구역 데이터만 (필터 콤보값과 무관하게 항상 스코핑)
       if(r.parish !== currentUser.parish || r.district !== currentUser.district) return false;
+    } else if(isParish && currentUser.parish){
+      // [v244] 교구장: 본인 교구 데이터만(구역 무관), 구역 콤보 선택 시 추가로 좁힐 수 있음
+      if(r.parish !== currentUser.parish) return false;
+      if(ds && r.district !== ds) return false;
     } else {
       if(ps && r.parish !== ps) return false;
       if(ds && r.district !== ds) return false;
@@ -15637,6 +15982,11 @@ window.enrollHistoryOpen         = enrollHistoryOpen;
 window.enrollHistoryParishChange = enrollHistoryParishChange;
 window.enrollHistoryQuery        = enrollHistoryQuery;
 window.enrollHistorySelectRow    = enrollHistorySelectRow;
+// [v245] 신규 추가 함수(참석일자 자동계산, 교통수단 동기화, 성명 Enter 조회)도 동일하게 전역 등록
+window.enrollArriveDateChange     = enrollArriveDateChange;
+window.enrollArriveTransportChange = enrollArriveTransportChange;
+window.enrollNameEnterSearch      = enrollNameEnterSearch;
+window.enrollEventOptionsRefresh  = enrollEventOptionsRefresh;
 
 })(); // IIFE 종료
 </script>
