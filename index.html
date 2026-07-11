@@ -104,6 +104,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
   display:flex;flex-direction:column;
   position:fixed;top:0;left:0;bottom:0;z-index:50;transition:transform .25s;
   box-shadow:2px 0 16px rgba(26,58,107,.15);
+  overflow-y:auto;-webkit-overflow-scrolling:touch; /* [v249] 메뉴가 화면 높이를 넘을 때 사이드바 자체 스크롤 */
 }
 .sidebar-brand{
   padding:0 0 0;border-bottom:1px solid rgba(255,255,255,.1);
@@ -8828,7 +8829,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v248_search_enroll_button';
+var CACHE_VERSION = 'v249_sidebar_scroll_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
