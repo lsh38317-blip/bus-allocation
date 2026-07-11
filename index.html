@@ -2423,7 +2423,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               ☁️ 구글시트 저장
             </button>
             <button class="btn btn-primary btn-sm" onclick="roomExportCSV()">⬇️ CSV</button>
-            <button onclick="roomResetConfirm()" style="margin-left:auto;background:transparent;border:1px solid #d94040;color:#d94040;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 초기화</button>
+            <button onclick="roomInputReset()" style="margin-left:auto;background:transparent;border:1px solid var(--border2);color:var(--navy);border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">↺ 입력항목초기화</button>
+            <button onclick="roomSheetResetConfirm()" style="background:transparent;border:1px solid #d94040;color:#d94040;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 숙소배정초기화</button>
           </div>
 
           <!-- 건물(숙소1)별 탭 -->
@@ -8867,7 +8868,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v253_enroll_session_only_grid';
+var CACHE_VERSION = 'v254_room_reset_upsert_save';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -14500,21 +14501,36 @@ function roomSaveToSheet(){
 
   var filter  = _getRoomFilter();
   var headers = ['NO','년도','수양회종류','행사명','접수ID','건물명','배정호','교구','구역','이름'];
-  var rows = roomData.map(function(d){
+  var newRows = roomData.map(function(d){
     return [d.no, d.year||filter.year, d.retreatType||filter.retreatType, d.event||filter.event, d.receiptId||'', d.building, d.room||'', d.parish, d.district, d.name];
   });
-  var emptyRow = headers.map(function(){ return ''; });
-  var payload = {sheetName:'숙소배정내역', mode:'overwrite', headers:headers, rows:rows.length?rows:[emptyRow]};
 
+  // [v254] 현재 연도+수양회종류+행사명(3키) 데이터만 교체하고, 다른 회차 데이터는 보존하는 upsert 방식으로 저장
+  // (기존엔 시트 전체를 현재 화면 데이터로 덮어써서 다른 회차 데이터가 유실되는 문제가 있었음)
   showLoading(true);
-  fetch(API_URL,{method:'POST',headers:_gasHeaders({'Content-Type':'text/plain'}),
-    body:JSON.stringify(payload), redirect:'follow'})
-    .then(function(r){ return r.text(); })
+  apiCall({action:'getAll', sheetName:'숙소배정내역'})
+    .then(function(res){
+      var sheetRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      var otherRows = sheetRows.filter(function(r){
+        var rY  = String(r['년도']||'').trim();
+        var rSs = String(r['수양회종류']||'').trim();
+        var rEv = String(r['행사명']||'').trim();
+        return !(rY===String(filter.year) && rSs===filter.retreatType && rEv===filter.event);
+      }).map(function(r){
+        return [r['NO']||'', r['년도']||'', r['수양회종류']||'', r['행사명']||'', r['접수ID']||'', r['건물명']||'', r['배정호']||'', r['교구']||'', r['구역']||'', r['이름']||''];
+      });
+      var mergedRows = otherRows.concat(newRows).map(function(r,i){ var c=r.slice(); c[0]=i+1; return c; });
+      var emptyRow = headers.map(function(){ return ''; });
+      var payload = {sheetName:'숙소배정내역', mode:'overwrite', headers:headers, rows:mergedRows.length?mergedRows:[emptyRow]};
+      return fetch(API_URL,{method:'POST',headers:_gasHeaders({'Content-Type':'text/plain'}),
+        body:JSON.stringify(payload), redirect:'follow'})
+        .then(function(r){ return r.text(); });
+    })
     .then(function(txt){
       try{
         var j=JSON.parse(txt);
         if(j&&j.success===false){ showToast('⚠️ 저장 실패: '+(j.error||txt.slice(0,80)),'error'); }
-        else { showToast('✅ 숙소배정내역 저장 완료 ('+rows.length+'명)','success'); _clearDirtyBanner('room'); }
+        else { showToast('✅ 숙소배정내역 저장 완료 ('+newRows.length+'명, 다른 회차 데이터 보존됨)','success'); _clearDirtyBanner('room'); }
       } catch(e){ showToast('✅ 숙소배정내역 저장 완료','success'); _clearDirtyBanner('room'); }
     })
     .catch(function(){ showToast('⚠️ 숙소배정내역 저장 오류','error'); })
@@ -14538,19 +14554,56 @@ function roomExportCSV(){
   showToast('숙소 배정 CSV 저장 완료','success');
 }
 
-function roomResetConfirm(){
-  if(roomResetConfirm._timer){
-    clearTimeout(roomResetConfirm._timer);
-    roomResetConfirm._timer=null;
+// [v254] 입력항목초기화 — 화면(로컬)만 초기화, 구글시트는 건드리지 않음. 위험도가 낮아 확인절차 없이 즉시 실행.
+function roomInputReset(){
+  roomData=[]; roomCurrentBuilding='';
+  _ls.remove('room_data');
+  roomRenderTabs();
+  showToast('✅ 화면 입력항목이 초기화되었습니다. (구글시트는 변경되지 않았습니다)','success');
+}
+
+// [v254] 숙소배정초기화 — 구글시트 '숙소배정내역'에서 현재 선택된 연도+수양회종류+행사명 데이터만 삭제(다른 회차는 보존)
+function roomSheetResetConfirm(){
+  if(roomSheetResetConfirm._timer){
+    clearTimeout(roomSheetResetConfirm._timer);
+    roomSheetResetConfirm._timer=null;
     showToast('초기화가 취소되었습니다.','info'); return;
   }
-  showToast('🗑 2초 후 숙소 배정 데이터가 초기화됩니다. 다시 누르면 취소.','info');
-  roomResetConfirm._timer=setTimeout(function(){
-    roomResetConfirm._timer=null;
-    roomData=[]; roomCurrentBuilding='';
-    _ls.remove('room_data');
-    roomRenderTabs();
-    showToast('✅ 숙소 배정 데이터 초기화 완료','success');
+  if(!USE_SHEET()){ showToast('구글 시트 URL이 설정되지 않았습니다.','error'); return; }
+  var filter = _getRoomFilter();
+  showToast('🗑 2초 후 구글시트의 '+filter.year+'년 '+filter.retreatType+' '+filter.event+' 숙소배정내역이 삭제됩니다. 다시 누르면 취소.','info');
+  roomSheetResetConfirm._timer=setTimeout(function(){
+    roomSheetResetConfirm._timer=null;
+    var headers = ['NO','년도','수양회종류','행사명','접수ID','건물명','배정호','교구','구역','이름'];
+    showLoading(true);
+    apiCall({action:'getAll', sheetName:'숙소배정내역'})
+      .then(function(res){
+        var sheetRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+        // 현재 연도+수양회종류+행사명과 일치하는 행만 제외하고 나머지(다른 회차)는 그대로 보존
+        var remain = sheetRows.filter(function(r){
+          var rY  = String(r['년도']||'').trim();
+          var rSs = String(r['수양회종류']||'').trim();
+          var rEv = String(r['행사명']||'').trim();
+          return !(rY===String(filter.year) && rSs===filter.retreatType && rEv===filter.event);
+        }).map(function(r,i){
+          return [i+1, r['년도']||'', r['수양회종류']||'', r['행사명']||'', r['접수ID']||'', r['건물명']||'', r['배정호']||'', r['교구']||'', r['구역']||'', r['이름']||''];
+        });
+        var emptyRow = headers.map(function(){ return ''; });
+        return fetch(API_URL,{method:'POST',headers:_gasHeaders({'Content-Type':'text/plain'}),
+          body:JSON.stringify({sheetName:'숙소배정내역', mode:'overwrite', headers:headers, rows:remain.length?remain:[emptyRow]}), redirect:'follow'})
+          .then(function(r){ return r.text(); });
+      })
+      .then(function(txt){
+        var ok = true;
+        try{ var j=JSON.parse(txt); ok = !(j && j.success===false); }catch(e){}
+        if(!ok){ showToast('⚠️ 숙소배정초기화 실패','error'); return; }
+        roomData=[]; roomCurrentBuilding='';
+        _ls.remove('room_data');
+        roomRenderTabs();
+        showToast('✅ '+filter.year+'년 '+filter.retreatType+' '+filter.event+' 숙소배정내역이 구글시트에서 삭제되었습니다.','success');
+      })
+      .catch(function(){ showToast('⚠️ 숙소배정초기화 중 오류가 발생했습니다.','error'); })
+      .finally(function(){ showLoading(false); });
   },2000);
 }
 
@@ -14934,7 +14987,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'vwSaveToSheet','vwLoadSample','vwBindFileInput',
     'onParishChange','onTransportChange','fldCheck','checkDuplicate',
     'roomTab','roomImportFromRetreat','roomRenderTabs','roomRenderTable','roomSelectBuilding',
-    'roomResetConfirm','roomResetAll','roomSaveToSheet','roomExportCSV','roomRestore','_getRoomFilter',
+    'roomInputReset','roomSheetResetConfirm','roomResetAll','roomSaveToSheet','roomExportCSV','roomRestore','_getRoomFilter',
     'roomAddBuilding','roomAddGroup','roomAutoAssign','roomRenderBuildings','roomRenderView',
     'roomviewSearch',
     'rvOpenRoster','rvRosterRender','rvRosterFilter','rvRosterClose',
@@ -15005,7 +15058,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fldCheck:fldCheck, checkDuplicate:checkDuplicate,
     roomTab:roomTab, roomImportFromRetreat:roomImportFromRetreat,
     roomRenderTabs:roomRenderTabs, roomRenderTable:roomRenderTable, roomSelectBuilding:roomSelectBuilding,
-    roomResetConfirm:roomResetConfirm, roomResetAll:roomResetAll,
+    roomInputReset:roomInputReset, roomSheetResetConfirm:roomSheetResetConfirm, roomResetAll:roomResetAll,
     roomSaveToSheet:roomSaveToSheet, roomExportCSV:roomExportCSV, roomRestore:roomRestore, _getRoomFilter:_getRoomFilter,
     roomAddBuilding:roomAddBuilding, roomAddGroup:roomAddGroup,
     roomAutoAssign:roomAutoAssign, roomRenderBuildings:roomRenderBuildings, roomRenderView:roomRenderView,
