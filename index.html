@@ -1035,7 +1035,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:16px;max-width:760px;">
               <div class="form-group" style="margin:0;">
                 <label>연도</label>
-                <select id="bb-year-sel"></select>
+                <select id="bb-year-sel" onchange="bbEventOptionsRefresh()"></select>
               </div>
               <div class="form-group" style="margin:0;">
                 <label>강서교회회차</label>
@@ -1052,7 +1052,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
               <div class="form-group" style="margin:0;">
                 <label>수양회종류</label>
-                <select id="bb-season-sel"
+                <select id="bb-season-sel" onchange="bbEventOptionsRefresh()"
                   style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
                   <option value="춘계">춘계</option>
                   <option value="하계" selected>하계</option>
@@ -1067,6 +1067,13 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div id="bb-tab-panel-reg">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;max-width:640px;">
                 <div class="form-group" style="margin:0;">
+                  <label>운행방향</label>
+                  <select id="bb-direction" onchange="bbTypeOptionsRefresh()" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
+                    <option value="참석">참석</option>
+                    <option value="귀가">귀가</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;">
                   <label>배정유형</label>
                   <select id="bb-type" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
                     <option value="선발대">선발대</option>
@@ -1074,13 +1081,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <option value="직장조">직장조</option>
                     <option value="시각선교부">시각선교부</option>
                     <option value="중고등부">중고등부</option>
-                  </select>
-                </div>
-                <div class="form-group" style="margin:0;">
-                  <label>운행방향</label>
-                  <select id="bb-direction" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
-                    <option value="참석">참석</option>
-                    <option value="귀가">귀가</option>
                   </select>
                 </div>
               </div>
@@ -1532,6 +1532,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               onchange="busviewReload()"
               style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
                      font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="">전체</option>
               <option value="1차" selected>1차</option>
               <option value="2차">2차</option>
               <option value="3차">3차</option>
@@ -1703,15 +1704,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <!-- 중심 구분선 -->
             <hr style="margin:2px 0 16px;border:none;border-top:2px solid var(--border2);">
 
-            <!-- 하단: 참석일자/귀가일자/참석교통수단/귀가교통수단 (4열) -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
+            <!-- 하단: 참석일자/참석교통수단/참석배정유형 (3열) -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
               <div class="form-group" style="margin:0;">
                 <label>참석일자</label>
                 <input type="date" id="enroll-arrive-date" onchange="enrollArriveDateChange()">
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label>귀가일자</label>
-                <input type="date" id="enroll-leave-date">
               </div>
               <div class="form-group" style="margin:0;">
                 <label>참석교통수단</label>
@@ -1723,19 +1720,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 </select>
               </div>
               <div class="form-group" style="margin:0;">
-                <label>귀가교통수단</label>
-                <select id="enroll-leave-transport" onchange="enrollToggleAssignType('leave')">
-                  <option value="">선택</option>
-                  <option value="버스">버스</option>
-                  <option value="자가용">자가용</option>
-                  <option value="기타">기타</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- 하단: 참석배정유형/귀가배정유형/보호자/연락처 (4열) -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
-              <div class="form-group" style="margin:0;">
                 <label>참석배정유형</label>
                 <select id="enroll-arrive-assign-type" disabled style="opacity:.5;">
                   <option value="">선택</option>
@@ -1746,17 +1730,36 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <option value="중고등부">중고등부</option>
                 </select>
               </div>
+            </div>
+
+            <!-- 하단: 귀가일자/귀가교통수단/귀가배정유형 (3열) -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
+              <div class="form-group" style="margin:0;">
+                <label>귀가일자</label>
+                <input type="date" id="enroll-leave-date">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>귀가교통수단</label>
+                <select id="enroll-leave-transport" onchange="enrollToggleAssignType('leave')">
+                  <option value="">선택</option>
+                  <option value="버스">버스</option>
+                  <option value="자가용">자가용</option>
+                  <option value="기타">기타</option>
+                </select>
+              </div>
               <div class="form-group" style="margin:0;">
                 <label>귀가배정유형</label>
                 <select id="enroll-leave-assign-type" disabled style="opacity:.5;">
                   <option value="">선택</option>
-                  <option value="선발대">선발대</option>
                   <option value="본대">본대</option>
-                  <option value="직장조">직장조</option>
-                  <option value="시각선교부">시각선교부</option>
                   <option value="중고등부">중고등부</option>
+                  <option value="후발대">후발대</option>
                 </select>
               </div>
+            </div>
+
+            <!-- 하단: 보호자/연락처 (2열) -->
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
               <div class="form-group" style="margin:0;">
                 <label>보호자</label>
                 <input type="text" id="enroll-guardian" placeholder="보호자 성명">
@@ -2467,6 +2470,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <select id="roomview-sel-event"
             style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
                    font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+            <option value="">전체</option>
             <option value="1차" selected>1차</option>
             <option value="2차">2차</option>
             <option value="3차">3차</option>
@@ -8872,7 +8876,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v255_bus_apply_rename_admin_only';
+var CACHE_VERSION = 'v258_enroll_layout_leavetype';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -15183,6 +15187,8 @@ function bbRenderYearOptions(){
 
 function bbInit(){
   bbRenderYearOptions();
+  bbEventOptionsRefresh(); // [v257] 강서교회회차 옵션을 교회목표 시트 행사명 기준으로 갱신
+  bbTypeOptionsRefresh();  // [v257] 운행방향(기본값 참석) 기준 배정유형 옵션 초기화
   if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
   showLoading(true);
   Promise.all([
@@ -15248,12 +15254,53 @@ function bbSearchClick(){
 
 function bbFormReset(){
   _bbEditingId = null;
-  $set('bb-type','선발대');
   $set('bb-direction','참석');
+  bbTypeOptionsRefresh(); // [v257] 참석 기준 배정유형 옵션으로 재구성 후 기본값 설정
+  $set('bb-type','선발대');
   $set('bb-date','');
   $set('bb-time','');
   $set('bb-count','');
   var tbody=$id('bb-driver-table-body'); if(tbody) tbody.innerHTML='';
+}
+
+// [v257] 운행방향에 따라 배정유형 옵션을 다르게 구성 — 참석: 선발대/본대/직장조/시각선교부/중고등부, 귀가: 본대/중고등부/후발대
+function bbTypeOptionsRefresh(){
+  var dirSel = $id('bb-direction'), typeSel = $id('bb-type');
+  if(!dirSel || !typeSel) return;
+  var options = (dirSel.value === '귀가')
+    ? ['본대','중고등부','후발대']
+    : ['선발대','본대','직장조','시각선교부','중고등부'];
+  var prev = typeSel.value;
+  typeSel.innerHTML = options.map(function(o){ return '<option value="'+o+'">'+o+'</option>'; }).join('');
+  typeSel.value = (options.indexOf(prev)>=0) ? prev : options[0];
+}
+
+// [v257] 강서교회회차(bb-event-sel) 옵션을 '교회목표' 시트의 행사명 기준으로 동적 구성.
+// 연도/수양회종류에 해당하는 행사명이 없으면 기존 기본 목록(1~7차)을 그대로 유지한다.
+function bbEventOptionsRefresh(){
+  if(!_goalLoaded){
+    if(USE_SHEET() && !_goalLoading){
+      _goalFetchFromSheet(function(){ bbEventOptionsRefresh(); }, {});
+    }
+    return; // 로딩 완료 후 콜백으로 재호출됨 — 지금은 현재 목록(기본값) 유지
+  }
+  var year  = ($id('bb-year-sel')||{value:''}).value;
+  var ss    = ($id('bb-season-sel')||{value:''}).value;
+  var evSel = $id('bb-event-sel');
+  if(!evSel) return;
+  var names = [];
+  var seen = {};
+  _goalRows.forEach(function(r){
+    if(year && String(r.year)!==String(year)) return;
+    if(ss && r.retreatType!==ss) return;
+    if(!r.eventName || seen[r.eventName]) return;
+    seen[r.eventName] = true;
+    names.push(r.eventName);
+  });
+  if(!names.length) return; // 교회목표 시트에 해당 연도/종류 데이터가 없으면 기존 목록 유지
+  var prev = evSel.value;
+  evSel.innerHTML = names.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+  evSel.value = (names.indexOf(prev)>=0) ? prev : names[0];
 }
 
 // 배정대수 입력값에 맞춰 운전자정보 행 수를 자동으로 맞춤 (기존 입력값 보존)
@@ -15512,6 +15559,9 @@ window.bbSave            = bbSave;
 window.bbEditRow         = bbEditRow;
 window.bbDeleteRow       = bbDeleteRow;
 window.bbShowDriverDetail = bbShowDriverDetail;
+// [v257] 신규 추가 함수(배정유형/회차 옵션 동적 갱신)도 전역 등록
+window.bbTypeOptionsRefresh  = bbTypeOptionsRefresh;
+window.bbEventOptionsRefresh = bbEventOptionsRefresh;
 
 // ════════════════════════════════════════════════════════════
 // 접수인원등록 (관리자 + 구역장) — 참석인원명단 시트에 대한
