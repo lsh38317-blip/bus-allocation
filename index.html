@@ -790,6 +790,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <button class="btn btn-sm" onclick="homeAggExportCSV()" style="border:1px solid var(--border2);background:#fff;">📥 엑셀다운</button>
           </div>
 
+          <div id="home-empty-banner" style="display:none;background:#fff8e1;border:1.5px solid #f0d060;border-radius:10px;padding:12px 16px;margin-bottom:14px;align-items:center;gap:10px;">
+            <span style="font-size:1.1rem;">⚠️</span>
+            <span id="home-empty-msg" style="font-size:.83rem;color:#7a5800;font-weight:600;"></span>
+          </div>
+
           <div class="home-agg-row">
             <div class="card">
               <div class="card-header"><div class="card-title">수양회 참석인원</div></div>
@@ -814,6 +819,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           </div>
           <div id="gs-admin-link" style="display:none;font-size:.78rem;color:var(--muted);margin-bottom:12px;">
             구역별 목표값은 <a href="javascript:void(0)" onclick="switchPanel('goal');goalModalSwitchTab('district');" style="color:var(--navy);font-weight:600;">🎯 교회 목표 관리</a> 메뉴에서 CSV로 등록·수정합니다.
+          </div>
+          <div id="gs-empty-banner" style="display:none;background:#fff8e1;border:1.5px solid #f0d060;border-radius:10px;padding:12px 16px;margin-bottom:14px;align-items:center;gap:10px;">
+            <span style="font-size:1.1rem;">⚠️</span>
+            <span id="gs-empty-msg" style="font-size:.83rem;color:#7a5800;font-weight:600;"></span>
           </div>
           <div class="card">
             <div class="table-wrap" id="gs-table-wrap"><div id="gs-table"></div></div>
@@ -1018,122 +1027,205 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
         <!-- BUS BASE INFO (버스배정 기초정보) -->
         <div class="panel" id="panel-busbase">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">🚏 버스배정 기초정보</div>
-            </div>
 
-            <!-- 탭: 등록 / 조회 -->
-            <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1.5px solid var(--border2);">
-              <button class="btn btn-sm" id="bb-tab-btn-reg" onclick="bbSwitchTab('reg')"
-                style="border:none;border-bottom:3px solid var(--navy);border-radius:0;background:none;font-weight:700;padding:8px 14px;">등록</button>
-              <button class="btn btn-sm" id="bb-tab-btn-list" onclick="bbSwitchTab('list')"
-                style="border:none;border-bottom:3px solid transparent;border-radius:0;background:none;color:var(--muted);padding:8px 14px;">조회</button>
-            </div>
+          <!-- 상단 공용 필터 콤보 + 메인 탭 메뉴 (버스배정 페이지와 동일한 스타일, 1줄 flex) -->
+          <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+            <select id="bb-year-sel" onchange="bbEventOptionsRefresh()"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
+            </select>
+            <select id="bb-season-sel" onchange="bbEventOptionsRefresh()"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="춘계">춘계</option>
+              <option value="하계" selected>하계</option>
+              <option value="추계">추계</option>
+              <option value="동계">동계</option>
+            </select>
+            <select id="bb-event-sel"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="1차" selected>1차</option>
+              <option value="2차">2차</option>
+              <option value="3차">3차</option>
+              <option value="4차">4차</option>
+              <option value="5차">5차</option>
+              <option value="6차">6차</option>
+              <option value="7차">7차</option>
+            </select>
+            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;"></div>
+            <button id="bbbase-tab-info"   class="btn btn-navy btn-sm"    onclick="bbMainTab('info')">🚏 버스배정기초정보</button>
+            <button id="bbbase-tab-people" class="btn btn-primary btn-sm" onclick="bbMainTab('people')">📋 버스배정인원관리</button>
+          </div>
 
-            <!-- 연도/회차/종류 (탭 공용 키) -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:16px;max-width:760px;">
-              <div class="form-group" style="margin:0;">
-                <label>연도</label>
-                <select id="bb-year-sel" onchange="bbEventOptionsRefresh()"></select>
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label>강서교회회차</label>
-                <select id="bb-event-sel"
-                  style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
-                  <option value="1차" selected>1차</option>
-                  <option value="2차">2차</option>
-                  <option value="3차">3차</option>
-                  <option value="4차">4차</option>
-                  <option value="5차">5차</option>
-                  <option value="6차">6차</option>
-                  <option value="7차">7차</option>
-                </select>
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label>수양회종류</label>
-                <select id="bb-season-sel" onchange="bbEventOptionsRefresh()"
-                  style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
-                  <option value="춘계">춘계</option>
-                  <option value="하계" selected>하계</option>
-                  <option value="추계">추계</option>
-                  <option value="동계">동계</option>
-                </select>
-              </div>
-              <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="bbFormReset()">↺ 초기화</button>
-            </div>
+          <!-- 탭1: 버스배정기초정보 — 왼쪽 조회 / 오른쪽 등록 -->
+          <div id="bbbase-panel-info">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
 
-            <!-- 탭1: 등록 -->
-            <div id="bb-tab-panel-reg">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;max-width:640px;">
-                <div class="form-group" style="margin:0;">
-                  <label>운행방향</label>
-                  <select id="bb-direction" onchange="bbTypeOptionsRefresh()" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
-                    <option value="참석">참석</option>
-                    <option value="귀가">귀가</option>
+              <!-- 왼쪽: 등록 -->
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title">📝 등록</div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="bbFormReset()">↺ 입력데이터 초기화</button>
+                  <button class="btn btn-sm" style="border:1px solid #d94040;background:#fff;color:#d94040;white-space:nowrap;font-weight:600;" onclick="bbSheetResetConfirm()">🗑 등록데이터 초기화</button>
+                </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                  <div class="form-group" style="margin:0;">
+                    <label>운행방향</label>
+                    <select id="bb-direction" onchange="bbTypeOptionsRefresh()" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
+                      <option value="참석">참석</option>
+                      <option value="귀가">귀가</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>배정유형</label>
+                    <select id="bb-type" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
+                      <option value="선발대(총괄,팀장,TFT)">선발대(총괄,팀장,TFT)</option>
+                      <option value="선발대(봉사자)">선발대(봉사자)</option>
+                      <option value="본대">본대</option>
+                      <option value="직장조">직장조</option>
+                      <option value="시각선교부">시각선교부</option>
+                      <option value="중고등부">중고등부</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:6px;">
+                  <div class="form-group" style="margin:0;">
+                    <label>출발일자</label>
+                    <input type="date" id="bb-date">
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>출발시간</label>
+                    <input type="text" id="bb-time" placeholder="00:00" maxlength="5" oninput="this.value=bbFormatTime(this.value)">
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>배정대수</label>
+                    <input type="number" id="bb-count" min="1" placeholder="1" oninput="bbCountChange()">
+                  </div>
+                </div>
+
+                <hr style="margin:16px 0;border:none;border-top:1px solid var(--border2);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;">
+                  <div class="card-title" style="font-size:.9rem;margin:0;">운전자/승하차위치정보
+                    <span style="font-size:.7rem;color:var(--muted);font-weight:400;">(배정대수만큼 배차별 1명, 승하차위치 개별지정)</span>
+                  </div>
+                  <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="bbDriverAddRow()">➕ 배차 추가</button>
+                </div>
+                <div class="table-wrap agg-compact">
+                  <table>
+                    <thead><tr>
+                      <th style="width:60px;">배차</th><th>이름</th><th>연락처</th><th>승차위치</th><th>하차위치</th><th style="width:50px;"></th>
+                    </tr></thead>
+                    <tbody id="bb-driver-table-body"></tbody>
+                  </table>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+                  <button class="btn btn-navy" id="bb-save-btn" onclick="bbSave()">💾 저장</button>
+                </div>
+              </div>
+
+              <!-- 오른쪽: 조회 -->
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title">🔍 조회</div>
+                  <button class="btn btn-navy btn-sm" style="white-space:nowrap;" onclick="bbSearchClick()">🔍 조회</button>
+                </div>
+                <div class="table-wrap agg-compact">
+                  <table>
+                    <thead><tr>
+                      <th>배정유형</th><th>운행방향</th><th>출발일자</th><th>출발시간</th>
+                      <th>배정대수</th><th style="width:70px;">운전자/승하차정보</th><th style="width:90px;"></th>
+                    </tr></thead>
+                    <tbody id="bb-list-table-body"></tbody>
+                  </table>
+                </div>
+                <div id="bb-list-empty" style="display:none;text-align:center;color:var(--muted);font-size:.82rem;padding:20px 0;">등록된 기초정보가 없습니다.</div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 탭2: 버스배정인원관리 — [버스 배정] 페이지에서 이동됨 -->
+          <div id="bbbase-panel-people" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">검색 조건</div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-primary btn-sm" onclick="bpClearSearch()">↺ 초기화</button>
+                  <button class="btn btn-sm" id="bp-btn-reload-sheet"
+                    onclick="bpReloadFromSheet()"
+                    style="background:#1a6b45;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:.78rem;cursor:pointer;"
+                    title="선택한 조건으로 구글 시트 데이터 조회">
+                    🔍 조회
+                  </button>
+                </div>
+              </div>
+              <div class="search-row">
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                  <label style="white-space:nowrap;margin-bottom:0;">교구</label>
+                  <select id="bp-s-parish" onchange="bpSearchParishChange()" style="flex:1;"><option value="">전체</option></select>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                  <label style="white-space:nowrap;margin-bottom:0;">구역</label>
+                  <select id="bp-s-district" style="flex:1;"><option value="">전체</option></select>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                  <label style="white-space:nowrap;margin-bottom:0;">이름</label>
+                  <input type="text" id="bp-s-name" placeholder="이름 검색" style="flex:1;">
+                </div>
+              </div>
+              <div class="search-row" style="margin-top:8px;">
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                  <label style="white-space:nowrap;margin-bottom:0;">참석버스배정</label>
+                  <select id="bp-s-arrive-status" style="flex:1;">
+                    <option value="">전체</option>
+                    <option value="assigned">배정</option>
+                    <option value="unassigned">미배정</option>
                   </select>
                 </div>
-                <div class="form-group" style="margin:0;">
-                  <label>배정유형</label>
-                  <select id="bb-type" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;width:100%;">
-                    <option value="선발대">선발대</option>
-                    <option value="본대">본대</option>
-                    <option value="직장조">직장조</option>
-                    <option value="시각선교부">시각선교부</option>
-                    <option value="중고등부">중고등부</option>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
+                  <label style="white-space:nowrap;margin-bottom:0;">귀가버스배정</label>
+                  <select id="bp-s-leave-status" style="flex:1;">
+                    <option value="">전체</option>
+                    <option value="assigned">배정</option>
+                    <option value="unassigned">미배정</option>
                   </select>
                 </div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:6px;max-width:640px;">
-                <div class="form-group" style="margin:0;">
-                  <label>출발일자</label>
-                  <input type="date" id="bb-date">
-                </div>
-                <div class="form-group" style="margin:0;">
-                  <label>출발시간</label>
-                  <input type="text" id="bb-time" placeholder="00:00" maxlength="5" oninput="this.value=bbFormatTime(this.value)">
-                </div>
-                <div class="form-group" style="margin:0;">
-                  <label>배정대수</label>
-                  <input type="number" id="bb-count" min="1" placeholder="1" oninput="bbCountChange()">
-                </div>
-              </div>
-
-              <hr style="margin:20px 0;border:none;border-top:1px solid var(--border2);">
-              <div style="display:flex;justify-content:space-between;align-items:flex-end;max-width:900px;margin-bottom:10px;">
-                <div class="card-title" style="font-size:.95rem;margin:0;">운전자/승하차위치정보
-                  <span style="font-size:.72rem;color:var(--muted);font-weight:400;">(배정대수만큼 배차별 1명씩, 배차마다 승하차위치 개별 지정)</span>
-                </div>
-                <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="bbDriverAddRow()">➕ 배차 추가</button>
-              </div>
-              <div class="table-wrap agg-compact" style="max-width:900px;">
-                <table>
-                  <thead><tr>
-                    <th style="width:60px;">배차</th><th>이름</th><th>연락처</th><th>승차위치</th><th>하차위치</th><th style="width:50px;"></th>
-                  </tr></thead>
-                  <tbody id="bb-driver-table-body"></tbody>
-                </table>
-              </div>
-              <div style="display:flex;justify-content:flex-end;max-width:900px;margin-top:8px;">
-                <button class="btn btn-navy" id="bb-save-btn" onclick="bbSave()">💾 저장</button>
+                <div class="form-group" style="flex:1;"></div>
               </div>
             </div>
-
-            <!-- 탭2: 조회 -->
-            <div id="bb-tab-panel-list" style="display:none;">
-              <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-                <button class="btn btn-navy btn-sm" style="white-space:nowrap;" onclick="bbSearchClick()">🔍 조회</button>
+            <div class="card">
+              <div class="toolbar">
+                <div class="toolbar-info">검색결과: <strong id="bp-result-count">0</strong>명</div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span id="bp-data-source-badge" style="font-size:.72rem;padding:2px 9px;border-radius:20px;font-weight:600;"></span>
+                  <button class="btn btn-sm" id="bp-btn-bulk" style="background:#fff3e0;border:1px solid #f0c080;color:#8a5a00;font-weight:700;" onclick="bpBulkToggleTransport()">🔁 일괄변경</button>
+                  <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ CSV 다운로드</button>
+                </div>
               </div>
-              <div class="table-wrap agg-compact">
-                <table>
-                  <thead><tr>
-                    <th>배정유형</th><th>운행방향</th><th>출발일자</th><th>출발시간</th>
-                    <th>배정대수</th><th style="width:70px;">운전자/승하차정보</th><th style="width:90px;"></th>
-                  </tr></thead>
-                  <tbody id="bb-list-table-body"></tbody>
+              <div class="table-wrap">
+                <table style="min-width:760px;">
+                  <thead>
+                    <tr>
+                      <th style="width:32px;"><input type="checkbox" id="bp-chk-all" onchange="bpToggleAll(this)"></th>
+                      <th>#</th>
+                      <th style="display:none;">접수ID</th>
+                      <th>성명</th><th>연도</th><th>수양회종류</th><th>차수</th>
+                      <th>구역</th><th>회별</th>
+                      <th>참석일자</th><th>참석교통수단</th><th>참석배정유형</th><th>참석버스배정</th>
+                      <th>귀가일자</th><th>귀가교통수단</th><th>귀가배정유형</th><th>귀가버스배정</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bp-table-body"></tbody>
                 </table>
+                <div id="bp-empty-list" class="empty-state" style="display:none;">
+                  <div class="icon">📭</div><p>검색 결과가 없습니다.</p>
+                </div>
               </div>
-              <div id="bb-list-empty" style="display:none;text-align:center;color:var(--muted);font-size:.82rem;padding:20px 0;">등록된 기초정보가 없습니다.</div>
+              <div class="pagination" id="bp-pagination"></div>
             </div>
           </div>
         </div>
@@ -1170,9 +1262,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <option value="7차">7차</option>
             </select>
             <!-- 구분선 -->
-            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;"></div>
-            <!-- 버스배정인원관리 (자료검색 완전 독립 복제, 관리자 전용) -->
-            <button id="bus-tab-people" class="btn btn-primary btn-sm" onclick="busTab('people')">📋 버스배정인원관리</button>
             <div style="width:1px;height:24px;background:var(--border);margin:0 2px;"></div>
             <!-- 메인 탭 버튼 -->
             <div style="position:relative;display:inline-block;">
@@ -1422,88 +1511,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </button>
             </div>
           </div>
-
-        <!-- BUS PEOPLE - 버스배정인원관리 (자료검색 완전 독립 복제, 관리자 전용) -->
-        <div id="bus-panel-people" style="display:none;">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">검색 조건</div>
-              <div style="display:flex;gap:6px;">
-                <button class="btn btn-primary btn-sm" onclick="bpClearSearch()">↺ 초기화</button>
-                <button class="btn btn-sm" id="bp-btn-reload-sheet"
-                  onclick="bpReloadFromSheet()"
-                  style="background:#1a6b45;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:.78rem;cursor:pointer;"
-                  title="선택한 조건으로 구글 시트 데이터 조회">
-                  🔍 조회
-                </button>
-              </div>
-            </div>
-            <div class="search-row">
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">교구</label>
-                <select id="bp-s-parish" onchange="bpSearchParishChange()" style="flex:1;"><option value="">전체</option></select>
-              </div>
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">구역</label>
-                <select id="bp-s-district" style="flex:1;"><option value="">전체</option></select>
-              </div>
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">이름</label>
-                <input type="text" id="bp-s-name" placeholder="이름 검색" style="flex:1;">
-              </div>
-            </div>
-            <div class="search-row" style="margin-top:8px;">
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">참석버스배정</label>
-                <select id="bp-s-arrive-status" style="flex:1;">
-                  <option value="">전체</option>
-                  <option value="assigned">배정</option>
-                  <option value="unassigned">미배정</option>
-                </select>
-              </div>
-              <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
-                <label style="white-space:nowrap;margin-bottom:0;">귀가버스배정</label>
-                <select id="bp-s-leave-status" style="flex:1;">
-                  <option value="">전체</option>
-                  <option value="assigned">배정</option>
-                  <option value="unassigned">미배정</option>
-                </select>
-              </div>
-              <div class="form-group" style="flex:1;"></div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="toolbar">
-              <div class="toolbar-info">검색결과: <strong id="bp-result-count">0</strong>명</div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span id="bp-data-source-badge" style="font-size:.72rem;padding:2px 9px;border-radius:20px;font-weight:600;"></span>
-                <button class="btn btn-sm" id="bp-btn-bulk" style="background:#fff3e0;border:1px solid #f0c080;color:#8a5a00;font-weight:700;" onclick="bpBulkToggleTransport()">🔁 일괄변경</button>
-                <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ CSV 다운로드</button>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table style="min-width:760px;">
-                <thead>
-                  <tr>
-                    <th style="width:32px;"><input type="checkbox" id="bp-chk-all" onchange="bpToggleAll(this)"></th>
-                    <th>#</th>
-                    <th style="display:none;">접수ID</th>
-                    <th>성명</th><th>연도</th><th>수양회종류</th><th>행사명</th>
-                    <th>구역</th><th>회별</th>
-                    <th>참석일자</th><th>참석교통수단</th><th>참석배정유형</th><th>참석버스배정</th>
-                    <th>귀가일자</th><th>귀가교통수단</th><th>귀가배정유형</th><th>귀가버스배정</th>
-                    <th>관리</th>
-                  </tr>
-                </thead>
-                <tbody id="bp-table-body"></tbody>
-              </table>
-              <div id="bp-empty-list" class="empty-state" style="display:none;">
-                <div class="icon">📭</div><p>검색 결과가 없습니다.</p>
-              </div>
-            </div>
-            <div class="pagination" id="bp-pagination"></div>
-          </div>
-        </div>
         </div>
 
         <!-- BUS VIEW - 배정 현황 (일반사용자 포함) -->
@@ -1723,7 +1730,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <label>참석배정유형</label>
                 <select id="enroll-arrive-assign-type" disabled style="opacity:.5;">
                   <option value="">선택</option>
-                  <option value="선발대">선발대</option>
+                  <option value="선발대(총괄,팀장,TFT)">선발대(총괄,팀장,TFT)</option>
+                  <option value="선발대(봉사자)">선발대(봉사자)</option>
                   <option value="본대">본대</option>
                   <option value="직장조">직장조</option>
                   <option value="시각선교부">시각선교부</option>
@@ -1752,8 +1760,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <select id="enroll-leave-assign-type" disabled style="opacity:.5;">
                   <option value="">선택</option>
                   <option value="본대">본대</option>
-                  <option value="중고등부">중고등부</option>
                   <option value="후발대">후발대</option>
+                  <option value="중고등부">중고등부</option>
                 </select>
               </div>
             </div>
@@ -1788,21 +1796,21 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <thead>
                   <tr>
                     <th style="display:none;">접수ID</th>
+                    <th>성명</th>
+                    <th>구역</th>
+                    <th>회별</th>
+                    <th>참석일자</th>
+                    <th>참석교통수단</th>
+                    <th>참석배정유형</th>
+                    <th>귀가일자</th>
+                    <th>귀가교통수단</th>
+                    <th>귀가배정유형</th>
                     <th>연도</th>
                     <th>수양회종류</th>
                     <th>회차</th>
                     <th>교구</th>
-                    <th>구역</th>
-                    <th>성명</th>
-                    <th>회별</th>
                     <th>구원여부</th>
                     <th>성별</th>
-                    <th>참석일자</th>
-                    <th>귀가일자</th>
-                    <th>참석교통수단</th>
-                    <th>귀가교통수단</th>
-                    <th>참석배정유형</th>
-                    <th>귀가배정유형</th>
                     <th>보호자</th>
                     <th>연락처</th>
                   </tr>
@@ -1901,12 +1909,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th>#</th>
                     <th style="display:none;">접수ID</th>
                     <th onclick="sortByColumn('name',event.shiftKey)" style="cursor:pointer;user-select:none;">성명 <span id="sort-icon-name" style="font-size:.7rem;"></span></th>
-                    <th onclick="sortByColumn('event',event.shiftKey)" style="cursor:pointer;user-select:none;">행사명 <span id="sort-icon-event" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
-                    <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
                     <th>참석버스배정</th>
                     <th>귀가버스배정</th>
+                    <th onclick="sortByColumn('event',event.shiftKey)" style="cursor:pointer;user-select:none;">회차 <span id="sort-icon-event" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
                     <th>관리</th>
                   </tr>
                 </thead>
@@ -1972,8 +1980,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
             <!-- 뷰어 툴바 -->
             <div class="vw-toolbar">
-              <!-- 입력 바 그룹 -->
-              <div class="vw-inputbar">
+              <!-- 오른쪽 액션 버튼들 -->
+              <div class="vw-actions" style="margin-left:auto;">
+                <!-- [v259] 수양회종류: 파일 업로드 버튼 바로 앞으로 이동 -->
                 <div class="vw-igrp">
                   <span class="vw-lbl">수양회종류</span>
                   <select class="vw-inp" id="inpSeason" onchange="vwRenderTable()">
@@ -1985,51 +1994,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   </select>
                 </div>
                 <div class="vw-sep"></div>
-                <div class="vw-igrp">
-                  <span class="vw-lbl">참석일자</span>
-                  <input type="date" class="vw-inp" id="inpArrDate" onchange="vwOnArrDateChange()">
-                </div>
-                <div class="vw-sep"></div>
-                <div class="vw-igrp">
-                  <span class="vw-lbl">참석교통</span>
-                  <select class="vw-inp" id="inpArrTrans" onchange="vwRenderTable()">
-                    <option value="버스">버스</option>
-                    <option value="자가용">자가용</option>
-                    <option value="기타">기타</option>
-                  </select>
-                </div>
-                <div class="vw-sep"></div>
-                <div class="vw-igrp">
-                  <span class="vw-lbl">귀가일자</span>
-                  <input type="date" class="vw-inp" id="inpDepDate" onchange="vwRenderTable()">
-                </div>
-                <div class="vw-sep"></div>
-                <div class="vw-igrp">
-                  <span class="vw-lbl">귀가교통</span>
-                  <select class="vw-inp" id="inpDepTrans" onchange="vwRenderTable()">
-                    <option value="버스">버스</option>
-                    <option value="자가용">자가용</option>
-                    <option value="기타">기타</option>
-                  </select>
-                </div>
-                <div class="vw-sep"></div>
-                <div class="vw-igrp">
-                  <span class="vw-lbl">전참여부</span>
-                  <select class="vw-inp" id="inpFullAttend" onchange="vwRenderTable()">
-                    <option value="">전체</option>
-                    <option value="예" selected>예</option>
-                    <option value="아니요">아니요</option>
-                  </select>
-                </div>
-                <div class="vw-sep"></div>
-                <div class="vw-igrp">
-                  <span class="vw-lbl">엑셀업로드시간</span>
-                  <span id="vwLastProcTime" style="color:#fff;font-size:.8rem;font-weight:600;">-</span>
-                </div>
-              </div>
-
-              <!-- 오른쪽 액션 버튼들 -->
-              <div class="vw-actions" style="margin-left:auto;">
                 <input type="file" id="vwFileInput" accept=".csv,.tsv,.txt"
                   style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
                 <button class="btn btn-navy btn-sm" onclick="document.getElementById('vwFileInput').click()">
@@ -2042,6 +2006,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 </button>
                 <button class="btn btn-danger btn-sm" onclick="vwClearAllConfirm()">🗑 등록데이터 초기화</button>
                 <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ 등록데이터 CSV</button>
+                <!-- [v260] 엑셀업로드시간: 등록데이터 CSV 버튼 뒤로 이동 -->
+                <div class="vw-sep"></div>
+                <div class="vw-igrp">
+                  <span class="vw-lbl">엑셀업로드시간</span>
+                  <span id="vwLastProcTime" style="color:#fff;font-size:.8rem;font-weight:600;">-</span>
+                </div>
               </div>
             </div>
 
@@ -2840,8 +2810,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           </select>
         </div>
         <div class="form-group">
-          <label>행사명</label>
-          <input type="text" id="bp-e-event" placeholder="예: 하계수양회">
+          <label>차수</label>
+          <input type="text" id="bp-e-event" placeholder="예: 3차">
         </div>
         <div class="form-group">
           <label>교구</label>
@@ -3207,7 +3177,16 @@ var VW_COLS = [
   },
   { key:'year',      label:'연도',       badge:'', aliases:['연도','year','년도','연 도'] },
   { key:'season',    label:'수양회종류', badge:'', input:'inpSeason' },
-  { key:'event',     label:'행사명',     badge:'', aliases:['행사명','행사','event','행 사명'] },
+  { key:'event',     label:'행사명',     badge:'', hidden:true, aliases:['행사명','행사','event','행 사명'] },
+  // [v266] 차수 — 행사명과는 별개 컬럼. CSV의 "참석차수"(또는 "차수") 값에 "차"를 붙여서 표시/저장.
+  // 이미 "차"로 끝나는 값이면 중복으로 붙이지 않음. 행사명과 교구 사이에 위치.
+  { key:'sessionNo', label:'차수',       badge:'', aliases:['참석차수','차수'],
+    transform: function(v){
+      var s = v ? String(v).trim() : '';
+      if(!s) return '';
+      return /차$/.test(s) ? s : s+'차';
+    }
+  },
   { key:'district',  label:'교구',       badge:'dist',
     aliases:['교구/구역','교구구역','district'],
     transform: function(v){ return v ? v.substring(0,1)+'교구' : ''; }
@@ -3238,11 +3217,6 @@ var VW_COLS = [
   { key:'roomCode',label:'숙소코드', badge:'', aliases:['숙소코드','room_code','숙소 코드'] },
   { key:'room1',   label:'숙소1',    badge:'room', aliases:['숙소1','숙소','room1','room','숙소 1'] },
   { key:'room2',   label:'숙소2',    badge:'room', aliases:['숙소2','room2','숙소 2'] },
-  { key:'arrDate',    label:'참석일자',     badge:'', input:'inpArrDate' },
-  { key:'arrTrans',   label:'참석교통수단', badge:'', input:'inpArrTrans' },
-  { key:'depDate',    label:'귀가일자',     badge:'', input:'inpDepDate' },
-  { key:'depTrans',   label:'귀가교통수단', badge:'', input:'inpDepTrans' },
-  { key:'fullAttend', label:'전참여부',     badge:'', input:'inpFullAttend' },
   { key:'salvCode',   label:'구원여부',     badge:'', aliases:['구원여부','salvcode','구원 여부'] },
   // [v207] 연락처: 원본 CSV에서 결측을 "--"로 표기하는 경우가 있어 빈 문자열로 정규화
   { key:'contact', label:'연락처', badge:'', aliases:['연락처','전화번호','휴대폰','휴대폰번호','phone','contact','연 락처'],
@@ -4089,6 +4063,7 @@ function _vwBuildUpdatePayload(item){
     '연도':         v('year','연도'),
     '수양회종류':   er['수양회종류']||'',
     '행사명':       v('event','행사명'),
+    '차수':         v('sessionNo','차수'),
     '교구':         v('district','교구'),
     '구역':         v('zone','구역'),
     '회별':         v('deptCode','회별'),
@@ -5069,7 +5044,7 @@ function busCheckBusCountWarning(){
 // ── 탭 전환 ─────────────────────────────────────────
 function busTab(name){
   busCurrentTab=name;
-  ['teams','assign','summary','leader','people'].forEach(function(t){
+  ['teams','assign','summary','leader'].forEach(function(t){
     var p=$id('bus-panel-'+t); if(p) p.style.display=(t===name)?'':'none';
     var b=$id('bus-tab-'+t);
     if(b) b.className=(t===name)?'btn btn-navy btn-sm':'btn btn-primary btn-sm';
@@ -8876,7 +8851,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v258_enroll_layout_leavetype';
+var CACHE_VERSION = 'v278_bp_unassign_style_bulkbtn_reset';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -9143,9 +9118,11 @@ function sheetRowToObj(r) {
       if(v && /^\d{4}$/.test(v)) return '';
       return v;
     }()),
-    // 행사명: event 키 우선, 구형 캐시에서 parish에 행사명이 들어간 경우 복구
+    // [v270] 차수: 참석인원명단의 "차수" 컬럼을 우선 사용(참석인원관리/계정관리 제외 전체 반영).
+    // 차수가 비어있으면 기존 "행사명" 컬럼으로 폴백(과거 데이터·참석인원관리 CSV 업로드분 호환).
     event:          (function(){
-      var v = g('event','행사명');
+      var v = g('sessionNo','차수');
+      if(!v) v = g('event','행사명');
       // 구형 캐시: parish에 행사명(ex. '4차', '시각선교부')이 들어간 경우 복구
       if(!v && r['parish'] && !/교구$/.test(String(r['parish']||''))) {
         var possible = String(r['parish']||'');
@@ -9212,7 +9189,8 @@ function toSheetObj(r){
     '성명':       r.name      || '',
     '연도':       r.year      || '',
     '수양회종류': r.retreatType|| '',
-    '행사명':     r.event     || '',
+    // [v270] 행사명 대신 차수 컬럼에 저장 (참석인원관리 CSV 업로드는 자체 로직이라 영향 없음)
+    '차수':       r.event     || '',
     '교구':       r.parish    || '',
     '구역':       r.district  || '',
     '회별':       r.group     || '',
@@ -9644,6 +9622,7 @@ function switchPanel(name, skipRender) {
     }
     if(name==='busbase'){
       bbInit();
+      bbMainTab('info'); // [v262] 버스배정기초정보/버스배정인원관리 중 기본 탭
     }
     if(name==='enroll'){
       enrollInit();
@@ -9736,16 +9715,16 @@ function switchPanel(name, skipRender) {
       if(_goalLoaded){
         _busApplyGoalEvent('bus-sel-event', 'bus-sel-year');
         _doRestoreAfterGoal();
-        busPeopleAutoQuery();
+        busTab('teams'); // [v262] 버스배정인원관리가 busbase로 이동해 기본 탭을 구역관리로 변경
       } else if(USE_SHEET()){
         _goalFetchFromSheet(function(){
           _busApplyGoalEvent('bus-sel-event', 'bus-sel-year');
           _doRestoreAfterGoal();
-          busPeopleAutoQuery();
+          busTab('teams');
         }, {});
       } else {
         _doRestoreAfterGoal();
-        busPeopleAutoQuery();
+        busTab('teams');
       }
     }
     if(name==='busview'){
@@ -10007,7 +9986,7 @@ function fmtRate(rate){
 
 // ── 집계 테이블 DOM 렌더 ──────────────────────────
 // rateCfg: {goalTotal:목표총량, districtsCount:구역수} — 달성율 계산용 (없으면 전부 0%)
-function renderAggregateTableDOM(containerId, table, rateCfg){
+function renderAggregateTableDOM(containerId, table, rateCfg, headerOnly){
   var el = $id(containerId);
   if(!el) return;
   rateCfg = rateCfg || {};
@@ -10021,6 +10000,13 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
   var thGroups = GROUP_KEYS.map(function(g){ return '<th>'+GROUP_DISPLAY_SHORT[g]+'</th>'; }).join('');
   // [v188] 화면 전용 — "교구" 컬럼 제거(구역만 표시), CSV(homeAggExportCSV)는 변경 없음
   var html = '<table><thead><tr><th>구역</th>'+(showRate?'<th>달성율</th>':'')+'<th>합</th>'+thGroups+'</tr></thead><tbody>';
+
+  // [v269] 참석인원 데이터가 없을 때(headerOnly) — 헤더만 표시, 데이터 행(0으로 채워진 구역 목록)은 생략
+  if(headerOnly){
+    html += '</tbody></table>';
+    el.innerHTML = html;
+    return;
+  }
 
   // [v204] 총계를 그리드 헤더 바로 아래(최상단)로 이동
   if(table.grand){
@@ -10077,8 +10063,26 @@ function renderAggregateTableDOM(containerId, table, rateCfg){
 // ── 홈 / 대시보드 — 수양회접수현황집계 메인 렌더 ──────────
 // retreat(전역, 참석인원명단 시트 기반) 데이터를 선택 연도/권한 스코프로 필터링해
 // 표1(수양회 참석인원)·표2(전도: 구원여부 in N/P/-) 두 집계표를 그린다.
+// [v268] 수양회집계현황·수양회목표달성현황 공용 — 참석인원 데이터 0건일 때 역할별 안내 문구
+function _retreatEmptyMsg(){
+  var isAdmin = !!(currentUser && currentUser.role === 'admin');
+  return isAdmin
+    ? '수양회 참석인원 내역이 없습니다. 참석인원 관리를 확인해주세요'
+    : '수양회 참석인원 정보가 없습니다.';
+}
+
 function renderHome(filter) {
   updateStats();
+  // [v268] 참석인원 데이터가 없을 때 화면에 안내 배너 표시(관리자/비관리자 문구 분리)
+  var homeEmptyBanner = $id('home-empty-banner'), homeEmptyMsg = $id('home-empty-msg');
+  if(homeEmptyBanner && homeEmptyMsg){
+    if(!retreat.length){
+      homeEmptyMsg.textContent = _retreatEmptyMsg();
+      homeEmptyBanner.style.display = 'flex';
+    } else {
+      homeEmptyBanner.style.display = 'none';
+    }
+  }
   // 관리자: 버스 재배정 알림 뱃지 갱신
   // rosterIndex 미로드 상태(loadRosterIndex 비동기 미완료)에서는 배지 숨김
   // → loadRosterIndex 완료 후 updateBusUnassignedBadge가 자동 재호출되어 정확한 값 표시
@@ -10147,8 +10151,8 @@ function renderHome(filter) {
 
   homeAggCurrent = { year:year, table1:table1, table2:table2, rateCfg1:rateCfg1, rateCfg2:rateCfg2 };
 
-  renderAggregateTableDOM('home-table1', table1, rateCfg1);
-  renderAggregateTableDOM('home-table2', table2, rateCfg2);
+  renderAggregateTableDOM('home-table1', table1, rateCfg1, !retreat.length);
+  renderAggregateTableDOM('home-table2', table2, rateCfg2, !retreat.length);
 
   // ── 달성율 계산용 교회목표 백그라운드 자동 로드 (미로딩 시 1회) ──
   // switchPanel의 skipRender 여부와 무관하게 항상 동작하도록 renderHome() 자체에 둠
@@ -10708,12 +10712,12 @@ function renderTable() {
       '<td style="color:var(--text-dim);font-size:.74rem">'+((currentPage-1)*SEARCH_PAGE_SIZE+i+1)+'</td>'+
       '<td style="display:none;">'+esc(rid||'—')+'</td>'+
       '<td><strong>'+maskName(r.name)+'</strong></td>'+
-      '<td style="font-size:.79rem">'+esc(r.event||'-')+'</td>'+
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td>'+esc(r.group||'-')+'</td>'+
-      '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
       '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
       '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
+      '<td style="font-size:.79rem">'+esc(r.event||'-')+'</td>'+
+      '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
   }).join('');
@@ -11466,10 +11470,18 @@ var bpStagedLeave  = {}; // {id: 예약된 귀가교통수단}
 // [v236] 참석/귀가배정유형 콤보도 교통수단과 동일한 스테이징 방식으로 일괄변경 대상에 포함
 var bpStagedArriveAssign = {}; // {id: 예약된 참석배정유형}
 var bpStagedLeaveAssign  = {}; // {id: 예약된 귀가배정유형}
+// [v273] 참석/귀가일자도 동일한 스테이징 방식으로 일괄변경 대상에 포함
+var bpStagedArriveDate = {}; // {id: 예약된 참석일자(YYYY-MM-DD)}
+var bpStagedLeaveDate  = {}; // {id: 예약된 귀가일자(YYYY-MM-DD)}
 var bpSelectedIds  = new Set(); // 체크박스로 선택된 행 id (문자열)
-var BP_ASSIGN_TYPES = ['','선발대','본대','직장조','시각선교부','중고등부'];
-function _bpAssignOptionsHtml(selected){
-  return BP_ASSIGN_TYPES.map(function(v){
+// [v272] 참석/귀가 배정유형 — 버스배정기초정보/버스신청/버스배정인원관리 3개 화면 공용(단일 소스)
+var ASSIGN_TYPES_ARRIVE = ['선발대(총괄,팀장,TFT)','선발대(봉사자)','본대','직장조','시각선교부','중고등부'];
+var ASSIGN_TYPES_LEAVE  = ['본대','후발대','중고등부'];
+
+var BP_ASSIGN_TYPES = ['','선발대','본대','직장조','시각선교부','중고등부']; // (구버전 호환용, 더 이상 미사용)
+function _bpAssignOptionsHtml(selected, kind){
+  var list = ['' ].concat(kind==='leave' ? ASSIGN_TYPES_LEAVE : ASSIGN_TYPES_ARRIVE);
+  return list.map(function(v){
     return '<option value="'+v+'"'+(v===(selected||'')?' selected':'')+'>'+(v||'선택')+'</option>';
   }).join('');
 }
@@ -11492,18 +11504,35 @@ function bpSearchParishChange(){
 // [v180] 참석/귀가 버스배정 상태 판정 공용 함수 — bpDoSearch(필터)와 bpRenderTable(표시)이
 // 동일 로직을 공유하도록 단일화 (이중 로직으로 인한 판정 불일치 버그 방지)
 // 반환: {value: 화면표시용 문자열, status: 'assigned'|'unassigned'|null(버스 대상 아님)}
-function bpBusAssignInfo(r, kind){
+// [v278] 3번째 인자 assignedTeamsSet: 해당 kind(참석/귀가)에서 이미 실제 버스자리를 배정받은
+// 사람이 1명 이상 있는 팀(busGetTeamKey 기준) 집합. 미배정인 사람이 이 집합에 속한 팀 소속이면
+// "팀은 이미 배정을 진행했는데 이 사람만 누락된 이상현상"으로 판단해 anomaly:true를 반환하고,
+// 팀 전체가 아직 배정을 진행한 적이 없으면(정상 대기상태) anomaly:false를 반환한다.
+function bpBusAssignInfo(r, kind, assignedTeamsSet){
   var transport = kind==='arrive' ? r.arriveTransport : r.leaveTransport;
-  if((transport||'').trim() !== '버스') return {value:'-', status:null};
+  if((transport||'').trim() !== '버스') return {value:'-', status:null, anomaly:false};
   var rid = r.receiptId||'';
   var assignedVal = rid ? (kind==='arrive' ? _rosterFullArr[rid] : _rosterFullLv[rid]) : '';
-  return assignedVal ? {value:assignedVal, status:'assigned'} : {value:'미배정', status:'unassigned'};
+  if(assignedVal) return {value:assignedVal, status:'assigned', anomaly:false};
+  var anomaly = assignedTeamsSet ? !!assignedTeamsSet[busGetTeamKey(r)] : false;
+  return {value:'미배정', status:'unassigned', anomaly:anomaly};
+}
+// [v278] kind별로 이미 실제 버스자리를 배정받은 사람이 1명이라도 있는 팀의 집합을 계산.
+// bpRenderTable에서 페이지 렌더 시작 전 1회만 호출해 재사용한다(행마다 재계산 방지).
+function bpComputeAssignedTeams(kind){
+  var idx = kind==='arrive' ? _rosterFullArr : _rosterFullLv;
+  var teams = {};
+  retreat.forEach(function(r){
+    var rid = r.receiptId||'';
+    if(rid && idx[rid]) teams[busGetTeamKey(r)] = true;
+  });
+  return teams;
 }
 function bpDoSearch(){
-  // [v180] 검색조건 전용 콤보 대신 상단 공용 콤보(연도/수양회종류/행사명) 값을 조회 시점에 직접 사용
-  var sYear=$val('bus-sel-year').trim();
-  var sRType=$val('bus-sel-season');
-  var sEvent=$val('bus-sel-event').trim();
+  // [v262] 버스배정인원관리가 busbase 페이지로 이동하면서 상단 공용 콤보도 bb-* 로 변경됨
+  var sYear=$val('bb-year-sel').trim();
+  var sRType=$val('bb-season-sel');
+  var sEvent=$val('bb-event-sel').trim();
   var sName=$val('bp-s-name').trim();
   var parish=$val('bp-s-parish').trim();
   var district=$val('bp-s-district').trim();
@@ -11520,11 +11549,16 @@ function bpDoSearch(){
            (!sLeaveStatus  || bpBusAssignInfo(r,'leave').status===sLeaveStatus);
   });
   // [v214] 재조회 시 미확정 스테이징 값(배지 클릭으로 예약만 되고 저장은 안 된 값)은 폐기
-  bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {}; bpSelectedIds.clear();
+  bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {};
+  bpStagedArriveDate = {}; bpStagedLeaveDate = {}; // [v273]
+  bpSelectedIds.clear();
   bpCurrentPage=1; bpRenderTable();
+  bpUpdateBulkBtnLabel(); // [v278] 일괄변경 완료/재조회 시 스테이징이 초기화됐으므로 버튼 건수도 즉시 반영
 }
 function bpClearSearch(){
-  bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {}; bpSelectedIds.clear();
+  bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {};
+  bpStagedArriveDate = {}; bpStagedLeaveDate = {}; // [v273]
+  bpSelectedIds.clear();
   $set('bp-s-name','');
   $set('bp-s-parish','');
   $set('bp-s-district','');
@@ -11550,6 +11584,9 @@ function bpRenderTable(){
   var slice=bpFiltered.slice((bpCurrentPage-1)*PAGE_SIZE,bpCurrentPage*PAGE_SIZE);
   if(!bpFiltered.length){ body.innerHTML=''; if(empty) empty.style.display=''; bpRenderPagination(0); return; }
   if(empty) empty.style.display='none';
+  // [v278] 미배정 "이상현상" 판단용 — 팀(교구+구역) 단위로 이미 배정이력이 있는지 페이지 렌더 전 1회 계산
+  var _bpArriveTeams = bpComputeAssignedTeams('arrive');
+  var _bpLeaveTeams  = bpComputeAssignedTeams('leave');
   body.innerHTML=slice.map(function(r,i){
     var actionBtns =
       '<button class="btn btn-primary btn-sm" onclick="bpOpenDetail(&quot;'+esc(String(r.id))+'&quot;)">상세</button>'+
@@ -11557,12 +11594,15 @@ function bpRenderTable(){
       ' <button class="btn btn-danger btn-sm" onclick="bpDeleteRow(&quot;'+esc(String(r.id))+'&quot;)">삭제</button>';
     var rid=r.receiptId||'';
     var idStr = String(r.id);
-    var arriveInfo = bpBusAssignInfo(r,'arrive');
-    var leaveInfo  = bpBusAssignInfo(r,'leave');
+    var arriveInfo = bpBusAssignInfo(r,'arrive', _bpArriveTeams);
+    var leaveInfo  = bpBusAssignInfo(r,'leave', _bpLeaveTeams);
     var arriveBusAssign = arriveInfo.value;
     var leaveBusAssign  = leaveInfo.value;
-    var arriveBusStyle = arriveInfo.status==='unassigned' ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
-    var leaveBusStyle  = leaveInfo.status==='unassigned'  ? 'color:#d94040;font-size:.78rem;font-weight:600;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
+    // [v278] anomaly(팀은 이미 배정이력 있는데 이 사람만 누락)만 경고색·굵게, 그 외 미배정은 회색·일반텍스트
+    var arriveBusStyle = arriveInfo.anomaly ? 'color:#d94040;font-size:.78rem;font-weight:600;'
+      : (arriveInfo.status==='unassigned' ? 'color:var(--muted);font-size:.78rem;font-weight:400;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;');
+    var leaveBusStyle  = leaveInfo.anomaly ? 'color:#d94040;font-size:.78rem;font-weight:600;'
+      : (leaveInfo.status==='unassigned' ? 'color:var(--muted);font-size:.78rem;font-weight:400;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;');
     // [v214] 배지 표시값 — 미확정 스테이징 값이 있으면 그 값을 우선 표시(예약중)
     var arriveDisp = bpStagedArrive.hasOwnProperty(idStr) ? bpStagedArrive[idStr] : (r.arriveTransport||'-');
     var leaveDisp  = bpStagedLeave.hasOwnProperty(idStr)  ? bpStagedLeave[idStr]  : (r.leaveTransport||'-');
@@ -11573,6 +11613,13 @@ function bpRenderTable(){
     var leaveAssignDisp  = bpStagedLeaveAssign.hasOwnProperty(idStr)  ? bpStagedLeaveAssign[idStr]  : (r.leaveAssignType||'');
     var arriveAssignDisabled = (arriveDisp||'').trim() !== '버스';
     var leaveAssignDisabled  = (leaveDisp||'').trim()  !== '버스';
+    // [v273] 참석/귀가일자 표시값 — 미확정 스테이징 값이 있으면 그 값을 우선 표시(예약중)
+    var arriveDateRaw = bpStagedArriveDate.hasOwnProperty(idStr) ? bpStagedArriveDate[idStr] : (r.arriveDate||'');
+    var leaveDateRaw  = bpStagedLeaveDate.hasOwnProperty(idStr)  ? bpStagedLeaveDate[idStr]  : (r.leaveDate||'');
+    var arriveDateDisp = fmtDate(arriveDateRaw) || '-';
+    var leaveDateDisp  = fmtDate(leaveDateRaw)  || '-';
+    var arriveDatePending = bpStagedArriveDate.hasOwnProperty(idStr);
+    var leaveDatePending  = bpStagedLeaveDate.hasOwnProperty(idStr);
     var isChecked = bpSelectedIds.has(idStr);
     return '<tr id="bptr-'+esc(idStr)+'">'+
       '<td><input type="checkbox" class="bp-chk-row" data-id="'+esc(idStr)+'" '+(isChecked?'checked':'')+' onchange="bpToggleCheck(&quot;'+esc(idStr)+'&quot;,this.checked)"></td>'+
@@ -11584,13 +11631,13 @@ function bpRenderTable(){
       '<td style="font-size:.79rem">'+esc(r.event||'-')+'</td>'+
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td>'+esc(r.group||'-')+'</td>'+
-      '<td style="font-size:.79rem">'+esc(fmtDate(r.arriveDate)||'-')+'</td>'+
+      '<td id="bp-arrive-date-cell-'+esc(idStr)+'"><span class="bp-date-badge" id="bp-arrive-date-badge-'+esc(idStr)+'" style="'+bpDateBadgeStyle(arriveDatePending)+'" onclick="bpEditDate(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;)" title="클릭하면 날짜를 변경 예약할 수 있습니다">'+esc(arriveDateDisp)+'</span></td>'+
       '<td><span class="bp-trans-badge" id="bp-arrive-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(arriveDisp,arrivePending)+'" onclick="bpToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(arriveDisp)+'</span></td>'+
-      '<td><select id="bp-arrive-assign-'+esc(idStr)+'" '+(arriveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(arriveAssignDisabled?'opacity:.5;':'')+'" onchange="bpStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+_bpAssignOptionsHtml(arriveAssignDisp)+'</select></td>'+
+      '<td><select id="bp-arrive-assign-'+esc(idStr)+'" '+(arriveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(arriveAssignDisabled?'opacity:.5;':'')+'" onchange="bpStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+_bpAssignOptionsHtml(arriveAssignDisp,'arrive')+'</select></td>'+
       '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
-      '<td style="font-size:.79rem">'+esc(fmtDate(r.leaveDate)||'-')+'</td>'+
+      '<td id="bp-leave-date-cell-'+esc(idStr)+'"><span class="bp-date-badge" id="bp-leave-date-badge-'+esc(idStr)+'" style="'+bpDateBadgeStyle(leaveDatePending)+'" onclick="bpEditDate(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;)" title="클릭하면 날짜를 변경 예약할 수 있습니다">'+esc(leaveDateDisp)+'</span></td>'+
       '<td><span class="bp-trans-badge" id="bp-leave-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(leaveDisp,leavePending)+'" onclick="bpToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(leaveDisp)+'</span></td>'+
-      '<td><select id="bp-leave-assign-'+esc(idStr)+'" '+(leaveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(leaveAssignDisabled?'opacity:.5;':'')+'" onchange="bpStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+_bpAssignOptionsHtml(leaveAssignDisp)+'</select></td>'+
+      '<td><select id="bp-leave-assign-'+esc(idStr)+'" '+(leaveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(leaveAssignDisabled?'opacity:.5;':'')+'" onchange="bpStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+_bpAssignOptionsHtml(leaveAssignDisp,'leave')+'</select></td>'+
       '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
@@ -11607,6 +11654,65 @@ function bpTransBadgeStyle(v, pending){
     : 'background:#fdecd8;color:#a15c00;border:1.5px solid '+(pending?'#a15c00':'#f0c98a')+';';
   return base + colorStyle + (pending ? 'border-style:dashed;' : '');
 }
+// [v273] 참석/귀가일자 배지 스타일 — 예약중(pending)이면 점선 테두리로 강조, 평시엔 무채색 텍스트형 배지
+function bpDateBadgeStyle(pending){
+  var base = 'display:inline-block;padding:2px 8px;border-radius:12px;font-size:.79rem;cursor:pointer;user-select:none;border:1.5px solid ';
+  return base + (pending ? '#8a5a00;border-style:dashed;background:#fff3e0;color:#8a5a00;font-weight:700;' : 'transparent;color:var(--text);');
+}
+// [v273] 참석/귀가일자 배지 클릭 — 서버 저장 없이 인라인 date input으로 전환해 날짜 선택 UI 표시.
+// 값 선택(change) 시 bpStageDate()가 스테이징하고 배지로 되돌린다. 선택 없이 포커스를 잃으면 배지로 원복(취소).
+function bpEditDate(id, kind){
+  var idStr = String(id);
+  var cell = $id((kind==='arrive'?'bp-arrive-date-cell-':'bp-leave-date-cell-')+idStr);
+  if(!cell) return;
+  var staged = kind==='arrive' ? bpStagedArriveDate : bpStagedLeaveDate;
+  var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
+  var curValRaw = staged.hasOwnProperty(idStr) ? staged[idStr] : ((kind==='arrive'?r.arriveDate:r.leaveDate)||'');
+  var curVal = fmtDate(curValRaw); if(curVal==='-') curVal='';
+  var inputId = (kind==='arrive'?'bp-arrive-date-input-':'bp-leave-date-input-')+idStr;
+  cell.innerHTML = '<input type="date" id="'+esc(inputId)+'" value="'+esc(curVal)+'" style="font-size:.79rem;padding:2px 4px;border:1.5px solid #8a5a00;border-radius:6px;" onchange="bpStageDate(&quot;'+esc(idStr)+'&quot;,&quot;'+kind+'&quot;,this.value)" onblur="bpCancelDateEdit(&quot;'+esc(idStr)+'&quot;,&quot;'+kind+'&quot;)">';
+  var inputEl = $id(inputId);
+  if(inputEl){
+    inputEl.focus();
+    if(inputEl.showPicker){ try{ inputEl.showPicker(); }catch(e){} }
+  }
+}
+// [v273] 날짜 선택 확정 — 스테이징 저장 후 배지로 복귀. 참석일자 변경 시 귀가일자를 +3일로 자동 계산해
+// 함께 스테이징한다(v245 상세폼 로직과 동일 정책). 사용자가 이후 귀가일자를 직접 클릭해 수정하면 그 값이 우선된다.
+function bpStageDate(id, kind, value){
+  var idStr = String(id);
+  if(!value){ bpCancelDateEdit(idStr, kind); return; }
+  var staged = kind==='arrive' ? bpStagedArriveDate : bpStagedLeaveDate;
+  staged[idStr] = value;
+  bpSelectedIds.add(idStr);
+  var tr = $id('bptr-'+idStr);
+  if(tr){ var chk = tr.querySelector('.bp-chk-row'); if(chk) chk.checked = true; }
+  bpRedrawDateBadge(idStr, kind);
+  if(kind==='arrive'){
+    var nextLeave = _enrollAddDays(value, 3);
+    if(nextLeave){
+      bpStagedLeaveDate[idStr] = nextLeave;
+      bpRedrawDateBadge(idStr, 'leave');
+    }
+  }
+  bpUpdateBulkBtnLabel();
+}
+// [v273] 날짜 입력 취소(값 미선택 상태로 포커스 이탈) — 배지로 원복. 이미 스테이징된 값이 있으면 그대로 유지.
+function bpCancelDateEdit(id, kind){
+  bpRedrawDateBadge(String(id), kind);
+}
+// [v273] 날짜 배지를 현재 스테이징/원본 상태 기준으로 다시 렌더 (input → span 복귀 공용)
+function bpRedrawDateBadge(idStr, kind){
+  var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
+  var staged = kind==='arrive' ? bpStagedArriveDate : bpStagedLeaveDate;
+  var pending = staged.hasOwnProperty(idStr);
+  var val = pending ? staged[idStr] : ((kind==='arrive'?r.arriveDate:r.leaveDate)||'');
+  var disp = fmtDate(val) || '-';
+  var cell = $id((kind==='arrive'?'bp-arrive-date-cell-':'bp-leave-date-cell-')+idStr);
+  if(!cell) return;
+  var badgeId = (kind==='arrive'?'bp-arrive-date-badge-':'bp-leave-date-badge-')+idStr;
+  cell.innerHTML = '<span class="bp-date-badge" id="'+esc(badgeId)+'" style="'+bpDateBadgeStyle(pending)+'" onclick="bpEditDate(&quot;'+esc(idStr)+'&quot;,&quot;'+kind+'&quot;)" title="클릭하면 날짜를 변경 예약할 수 있습니다">'+esc(disp)+'</span>';
+}
 // [v215] 체크박스 선택 상태 관리
 // 체크 해제 시: 해당 행의 스테이징(예약)값을 전부 취소하고 배지를 원상복구한다.
 // (배지 클릭 없이 값이 바뀌는 걸 막기 위해 — 체크박스는 "스테이징된 행"의 부산물 표시일 뿐,
@@ -11621,6 +11727,8 @@ function bpToggleCheck(id, checked){
     delete bpStagedLeave[idStr];
     delete bpStagedArriveAssign[idStr];
     delete bpStagedLeaveAssign[idStr];
+    delete bpStagedArriveDate[idStr];
+    delete bpStagedLeaveDate[idStr];
     bpRefreshRowBadges(idStr);
   }
   bpUpdateBulkBtnLabel();
@@ -11639,6 +11747,8 @@ function bpToggleAll(cb){
       delete bpStagedLeave[idStr];
       delete bpStagedArriveAssign[idStr];
       delete bpStagedLeaveAssign[idStr];
+      delete bpStagedArriveDate[idStr];
+      delete bpStagedLeaveDate[idStr];
       bpRefreshRowBadges(idStr);
     }
   });
@@ -11665,6 +11775,9 @@ function bpRefreshRowBadges(id){
     var isBusL = (r.leaveTransport||'').trim()==='버스';
     leaveAssignSel.disabled = !isBusL; leaveAssignSel.style.opacity = isBusL?'':'.5';
   }
+  // [v273] 참석/귀가일자 배지도 원본값/실선 테두리로 즉시 원상복구
+  bpRedrawDateBadge(idStr, 'arrive');
+  bpRedrawDateBadge(idStr, 'leave');
 }
 // [v215] 일괄변경 버튼 카운트 — "체크된 행 수"가 아닌 "실제 스테이징(변경예약)된 고유 행 수" 기준
 function bpUpdateBulkBtnLabel(){
@@ -11674,6 +11787,8 @@ function bpUpdateBulkBtnLabel(){
   Object.keys(bpStagedLeave).forEach(function(k){ ids[k]=true; });
   Object.keys(bpStagedArriveAssign).forEach(function(k){ ids[k]=true; });
   Object.keys(bpStagedLeaveAssign).forEach(function(k){ ids[k]=true; });
+  Object.keys(bpStagedArriveDate).forEach(function(k){ ids[k]=true; });
+  Object.keys(bpStagedLeaveDate).forEach(function(k){ ids[k]=true; });
   var n = Object.keys(ids).length;
   btn.textContent = n ? ('🔁 일괄변경 ('+n+')') : '🔁 일괄변경';
 }
@@ -11776,32 +11891,78 @@ function bpApplyAssignTypeChange(r, kind, newValue){
       return {changed:true};
     });
 }
+// [v273] 참석/귀가일자 스테이징 값을 실제 서버(시트)에 반영. busGetTeamKey는 날짜를 사용하지 않으므로
+// 배정유형 변경과 마찬가지로 버스팀 카운트/탑승자 시트에는 영향 없음 — 단순 필드 업데이트.
+function bpApplyDateChange(r, kind, newValue){
+  var prev = ((kind==='arrive' ? r.arriveDate : r.leaveDate) || '').trim();
+  var next = (newValue||'').trim();
+  if(prev===next) return Promise.resolve({changed:false});
+  if(kind==='arrive') r.arriveDate = next; else r.leaveDate = next;
+  var idx = retreat.findIndex(function(x){ return String(x.id)===String(r.id); });
+  if(idx!==-1) retreat[idx] = r;
+
+  if(!USE_SHEET()){ return Promise.resolve({changed:true}); }
+  var maskedRow = Object.assign({}, r, {name: maskName(r.name||'')});
+  return apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedRow)))
+    .then(function(res){
+      if(!(res&&res.success)) throw new Error(res&&(res.error||res.message)||'업데이트 실패');
+      return {changed:true};
+    });
+}
 // [v215] "일괄변경" 버튼 — 체크박스가 아닌 "배지/콤보를 실제로 클릭해 스테이징된 필드"만 처리 대상으로 삼는다.
-// 참석교통수단 → 귀가교통수단 → 참석배정유형 → 귀가배정유형 순으로 건by건 순차 처리.
+// [v273] 참석일자 → 귀가일자 → 참석교통수단 → 귀가교통수단 → 참석배정유형 → 귀가배정유형 순으로 건by건 순차 처리.
 // (클릭하지 않은 필드는 체크박스가 켜져 있어도 절대 변경하지 않음 — 필드 단위 처리)
 function bpBulkToggleTransport(){
+  var arriveDateIds = Object.keys(bpStagedArriveDate);
+  var leaveDateIds  = Object.keys(bpStagedLeaveDate);
   var arriveIds = Object.keys(bpStagedArrive);
   var leaveIds  = Object.keys(bpStagedLeave);
   var arriveAssignIds = Object.keys(bpStagedArriveAssign);
   var leaveAssignIds  = Object.keys(bpStagedLeaveAssign);
-  if(!arriveIds.length && !leaveIds.length && !arriveAssignIds.length && !leaveAssignIds.length){
-    alert('변경 예약(배지/콤보 클릭)된 항목이 없습니다.'); return;
+  if(!arriveDateIds.length && !leaveDateIds.length && !arriveIds.length && !leaveIds.length && !arriveAssignIds.length && !leaveAssignIds.length){
+    alert('변경 예약(배지/콤보/날짜 클릭)된 항목이 없습니다.'); return;
   }
-  if(!confirm('참석교통 '+arriveIds.length+'건 / 귀가교통 '+leaveIds.length+'건 / 참석배정유형 '+arriveAssignIds.length+'건 / 귀가배정유형 '+leaveAssignIds.length+'건의 변경사항을 저장하시겠습니까?')) return;
+  if(!confirm('참석일자 '+arriveDateIds.length+'건 / 귀가일자 '+leaveDateIds.length+'건 / 참석교통 '+arriveIds.length+'건 / 귀가교통 '+leaveIds.length+'건 / 참석배정유형 '+arriveAssignIds.length+'건 / 귀가배정유형 '+leaveAssignIds.length+'건의 변경사항을 저장하시겠습니까?')) return;
 
   showLoading(true);
-  var arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, failCount=0;
+  var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, failCount=0;
 
-  // [단계1] 참석교통수단 — 스테이징된 행만, 건by건 순차 처리
-  var chain = arriveIds.reduce(function(p, idStr){
+  // [단계0-1] 참석일자 — 스테이징된 행만, 건by건 순차 처리 (일자 변경은 버스팀/탑승자시트에 영향 없어 가장 먼저 처리)
+  var chain = arriveDateIds.reduce(function(p, idStr){
     return p.then(function(){
       var r = retreat.find(function(x){ return String(x.id)===idStr; });
       if(!r) return;
-      return bpApplyTransportChange(r, 'arrive', bpStagedArrive[idStr])
-        .then(function(res){ if(res && res.changed) arriveCount++; })
-        .catch(function(e){ failCount++; console.warn('[참석교통수단 일괄변경 실패]', r.name, e&&e.message||e); });
+      return bpApplyDateChange(r, 'arrive', bpStagedArriveDate[idStr])
+        .then(function(res){ if(res && res.changed) arriveDateCount++; })
+        .catch(function(e){ failCount++; console.warn('[참석일자 일괄변경 실패]', r.name, e&&e.message||e); });
     });
   }, Promise.resolve());
+
+  // [단계0-2] 귀가일자 — 스테이징된 행만, 건by건 순차 처리
+  chain = chain.then(function(){
+    return leaveDateIds.reduce(function(p, idStr){
+      return p.then(function(){
+        var r = retreat.find(function(x){ return String(x.id)===idStr; });
+        if(!r) return;
+        return bpApplyDateChange(r, 'leave', bpStagedLeaveDate[idStr])
+          .then(function(res){ if(res && res.changed) leaveDateCount++; })
+          .catch(function(e){ failCount++; console.warn('[귀가일자 일괄변경 실패]', r.name, e&&e.message||e); });
+      });
+    }, Promise.resolve());
+  });
+
+  // [단계1] 참석교통수단 — 스테이징된 행만, 건by건 순차 처리
+  chain = chain.then(function(){
+    return arriveIds.reduce(function(p, idStr){
+      return p.then(function(){
+        var r = retreat.find(function(x){ return String(x.id)===idStr; });
+        if(!r) return;
+        return bpApplyTransportChange(r, 'arrive', bpStagedArrive[idStr])
+          .then(function(res){ if(res && res.changed) arriveCount++; })
+          .catch(function(e){ failCount++; console.warn('[참석교통수단 일괄변경 실패]', r.name, e&&e.message||e); });
+      });
+    }, Promise.resolve());
+  });
 
   // [단계2] 참석 전체 완료 후 → 귀가교통수단, 스테이징된 행만 건by건 순차 처리
   chain = chain.then(function(){
@@ -11844,9 +12005,11 @@ function bpBulkToggleTransport(){
 
   return chain.then(function(){
     save(); updateStats(); updateBusUnassignedBadge();
-    bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {}; bpSelectedIds.clear();
+    bpStagedArrive = {}; bpStagedLeave = {}; bpStagedArriveAssign = {}; bpStagedLeaveAssign = {};
+    bpStagedArriveDate = {}; bpStagedLeaveDate = {}; // [v273]
+    bpSelectedIds.clear();
     bpDoSearch();
-    var msg = '✅ 일괄변경 완료 (참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건)'+(failCount?(' · 실패 '+failCount+'건'):'');
+    var msg = '✅ 일괄변경 완료 (참석일자 '+arriveDateCount+'건 / 귀가일자 '+leaveDateCount+'건 / 참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건)'+(failCount?(' · 실패 '+failCount+'건'):'');
     showToast(msg, failCount ? 'error' : 'success');
   }).finally(function(){
     showLoading(false);
@@ -11919,7 +12082,7 @@ function bpOpenDetail(id){
     ['성명', maskName(r.name)||'-'],
     ['연도', r.year||'-'],
     ['수양회 종류', r.retreatType||'-'],
-    ['행사명', r.event||'-'],
+    ['차수', r.event||'-'],
     ['교구', r.parish||'-'],
     ['구역', r.district||'-'],
     ['회별', r.group||'-'],
@@ -13890,7 +14053,7 @@ function buildGoalStatusTable(rows, goalMap, scopeParishes, selDistrict){
   return result;
 }
 
-function renderGoalStatusTableDOM(containerId, table){
+function renderGoalStatusTableDOM(containerId, table, headerOnly){
   var el = $id(containerId); if(!el) return;
   function rowHtml(label, d, styleAttr, isGrand){
     var memberGoalRaw = _gsMemberGoalRaw(d, isGrand);
@@ -13914,6 +14077,12 @@ function renderGoalStatusTableDOM(containerId, table){
     + '<th>성도목표(제적의70%)</th><th>목표달성율</th>'
     + '<th>전도목표</th><th>전도접수</th><th>달성율</th>'
     + '</tr></thead><tbody>';
+  // [v269] 참석인원 데이터가 없을 때(headerOnly) — 헤더만 표시, 데이터 행은 생략
+  if(headerOnly){
+    html += '</tbody></table>';
+    el.innerHTML = html;
+    return;
+  }
   html += rowHtml('총계', table.grand, 'font-weight:900;', true);
   table.parishes.forEach(function(p){
     p.districts.forEach(function(d){ html += rowHtml(d.district, d, '', false); });
@@ -13929,6 +14098,16 @@ function renderGoalStatusTableDOM(containerId, table){
 }
 
 function renderGoalStatusPanel(){
+  // [v268] 참석인원 데이터가 없을 때 화면에 안내 배너 표시(관리자/비관리자 문구 분리)
+  var gsEmptyBanner = $id('gs-empty-banner'), gsEmptyMsg = $id('gs-empty-msg');
+  if(gsEmptyBanner && gsEmptyMsg){
+    if(!retreat.length){
+      gsEmptyMsg.textContent = _retreatEmptyMsg();
+      gsEmptyBanner.style.display = 'flex';
+    } else {
+      gsEmptyBanner.style.display = 'none';
+    }
+  }
   var year = gsYear || String(new Date().getFullYear());
   var isAdmin = !!(currentUser && currentUser.role==='admin');
   var selParish   = gsParish   || (isAdmin ? '전체' : ((currentUser&&currentUser.parish)||'1교구'));
@@ -13965,7 +14144,7 @@ function renderGoalStatusPanel(){
 
   var table = buildGoalStatusTable(scopedRows, goalMap, scopeParishes, selDistrict);
   gsCurrent = { year:year, table:table };
-  renderGoalStatusTableDOM('gs-table', table);
+  renderGoalStatusTableDOM('gs-table', table, !retreat.length);
 }
 
 function goalStatusExportCSV(){
@@ -14365,7 +14544,8 @@ function roomImportFromRetreat(){
     rows.forEach(function(r){
       var rYear  = String(r['년도']  ||r.year        ||'').trim();
       var rType  = String(r['수양회종류']||r.retreatType||'').trim();
-      var rEvent = String(r['행사명'] ||r.event       ||'').trim();
+      // [v270] 참석인원명단의 "차수" 컬럼을 우선 사용, 없으면 기존 "행사명"으로 폴백
+      var rEvent = String(r['차수'] || r['행사명'] || r.event || '').trim();
       // 행사명 빈값 행 제외 + 3-key 엄격 매칭
       if(!rEvent)              return;
       if(rYear  !== filter.year)        return;
@@ -14989,6 +15169,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'bpDoSearch','bpClearSearch','bpSearchParishChange','bpReloadFromSheet','bpGoPage',
     'bpOpenDetail','bpOpenInlineEdit','bpSaveInlineEdit','bpDeleteRow','bpCancelEdit','bpSaveEdit',
     'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport','bpStageAssignType',
+    'bpEditDate','bpStageDate','bpCancelDateEdit',
     'busTeamsSubTab','busAssignSubTab','busSummarySubTab',
     'busLeaderSubTab','busLeaderRender','busLeaderSave',
     'vwReset','vwResetConfirm','vwFilter','vwOnSearch','vwOnArrDateChange',
@@ -15057,6 +15238,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bpDoSearch:bpDoSearch, bpClearSearch:bpClearSearch, bpSearchParishChange:bpSearchParishChange, bpReloadFromSheet:bpReloadFromSheet, bpGoPage:bpGoPage,
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
     bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport, bpStageAssignType:bpStageAssignType,
+    bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit,
     busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderSave:busLeaderSave,
     vwReset:vwReset, vwResetConfirm:vwResetConfirm, vwFilter:vwFilter,
@@ -15146,26 +15328,59 @@ var _bbEditingId  = null; // 현재 등록폼이 가리키는 등록ID (null=신
 
 function bbGenId(){ return 'BB'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 
-// 출발시간(입력 중 실시간 마스킹): 숫자만 받아 뒤 2자리를 분으로, 나머지를 시로 해석
-// (예: "930"→09:30, "0930"→09:30) — 앞 2자리를 시로 고정하면 3자리 입력 시
-// "93:0"처럼 어긋나므로 뒤에서부터 자르는 방식으로 통일
-function bbFormatTime(v){
-  var d = String(v||'').replace(/\D/g,'').slice(0,4);
-  if(d.length<=2) return d;
-  var mm = d.slice(-2);
-  var hh = d.slice(0, d.length-2);
-  return hh.padStart(2,'0')+':'+mm;
+// [v277] GAS 응답으로 받은 출발시간을 항상 깨끗한 "HH:MM" 문자열로 정규화한다.
+// (원인) 구글시트 출발시간 셀이 TIME 서식일 때 GAS가 Date 객체를 그대로 반환하는 경우
+// JSON 직렬화 시 "1899-12-30T14:00:00.000Z" 같은 ISO 문자열로 깨져 전달될 수 있고,
+// 이 값을 입력마스킹 전용 함수(bbFormatTime)로 재해석하면 여러 행이 동일한 값으로
+// 잘못 표시되는 문제가 있었다. GAS(v36)에서 근본 수정했지만, 배포 버전 차이나 과거
+// 오염 데이터에도 안전하도록 클라이언트에서도 한 번 더 방어적으로 정규화한다.
+// - 이미 "H:MM"/"HH:MM" 형태면 그대로(0패딩만) 반환
+// - "...T14:00:00.000Z" 형태(ISO)면 그 시:분을 그대로 "HH:MM"으로 추출
+//   (구글시트 TIME 셀은 항상 1899-12-30 기준일이므로, 셀에 입력된 시:분 값 자체가
+//    그대로 UTC 시:분으로 직렬화되어 나오기 때문에 별도 시간대 보정이 필요 없음)
+// - 그 외 알 수 없는 형식은 빈 값 처리(무효한 시각을 그럴듯하게 보여주는 것보다 안전)
+function bbNormalizeTimeFromSheet(v){
+  var s = String(v||'').trim();
+  if(!s) return '';
+  var mSimple = s.match(/^(\d{1,2}):(\d{2})$/);
+  if(mSimple) return mSimple[1].padStart(2,'0')+':'+mSimple[2];
+  var mIso = s.match(/T(\d{2}):(\d{2}):\d{2}/);
+  if(mIso) return mIso[1]+':'+mIso[2];
+  return '';
 }
-// 출발시간(저장 직전 최종 정규화): 항상 "HH:MM"(00:00) 완전한 형태로 맞춘다.
-// 1~2자리만 입력된 상태로 저장되면 분이 비어있는 이상한 값이 남으므로,
-// 시만 입력된 경우 분은 00으로 채운다. 빈 값은 그대로 빈 값 유지(선택 입력).
+// [v276] 출발시간(실시간 마스킹): 자릿수별로 유효범위를 벗어나는 숫자는 입력 자체를 무시한다.
+// 1번째(시 십의자리): 0~2 / 2번째(시 일의자리): 1번째가 '2'면 0~3, 아니면 0~9(시 00~23 보장)
+// 3번째(분 십의자리): 0~5 / 4번째(분 일의자리): 0~9(분 00~59 보장)
+// → 화면에는 항상 00:00~23:59 범위의 유효한 시각만 존재할 수 있음("18:99" 같은 값이 만들어지지 않음).
+// (구버전의 "930"→"09:30" 단축입력은 자릿수별 범위검증과 양립할 수 없어 제거 — 4자리(HHMM) 순차입력으로 통일)
+function bbFormatTime(v){
+  var raw = String(v||'').replace(/\D/g,'');
+  var digits = [];
+  for(var i=0; i<raw.length && digits.length<4; i++){
+    var ch = raw[i];
+    var pos = digits.length;
+    if(pos===0){
+      if(ch>='0' && ch<='2') digits.push(ch);
+    } else if(pos===1){
+      if(digits[0]==='2'){ if(ch>='0' && ch<='3') digits.push(ch); }
+      else { digits.push(ch); }
+    } else if(pos===2){
+      if(ch>='0' && ch<='5') digits.push(ch);
+    } else {
+      digits.push(ch);
+    }
+  }
+  if(digits.length<=2) return digits.join('');
+  return digits.slice(0,2).join('')+':'+digits.slice(2).join('');
+}
+// 출발시간(저장 직전 최종 정규화): 화면 마스킹(bbFormatTime)과 동일한 자릿수 범위검증을 그대로 재사용해
+// 화면표시값=저장값이 항상 일치하도록 단일 소스로 통합(WYSIWYG 보장). 시만 입력된(1~2자리) 상태로 저장되면
+// 분이 비어있는 이상한 값이 남으므로, 시만 입력된 경우 분은 00으로 채운다. 빈 값은 그대로 빈 값 유지(선택 입력).
 function bbNormalizeTimeForSave(v){
-  var d = String(v||'').replace(/\D/g,'').slice(0,4);
-  if(!d) return '';
-  if(d.length<=2) return d.padStart(2,'0')+':00';
-  var mm = d.slice(-2);
-  var hh = d.slice(0, d.length-2);
-  return hh.padStart(2,'0')+':'+mm;
+  var masked = bbFormatTime(v);
+  if(!masked) return '';
+  if(masked.indexOf(':')===-1) return masked.padStart(2,'0')+':00';
+  return masked;
 }
 // 연락처: 숫자만 입력받아 000-0000-0000 형태로 자동 포맷
 function bbFormatPhone(v){
@@ -15198,6 +15413,7 @@ function bbInit(){
     var baseRes = results[0], drvRes = results[1];
     _bbRows       = (baseRes && baseRes.success) ? (baseRes.data||baseRes.rows||[]) : [];
     _bbDriverRows = (drvRes  && drvRes.success)  ? (drvRes.data ||drvRes.rows ||[]) : [];
+    _bbRows.forEach(function(r){ r['출발시간'] = bbNormalizeTimeFromSheet(r['출발시간']); }); // [v277]
     bbFormReset();
     bbRenderList();
   }).catch(function(e){
@@ -15205,7 +15421,18 @@ function bbInit(){
   }).finally(function(){ showLoading(false); });
 }
 
-// 탭 전환: 'reg'(등록) | 'list'(조회)
+// [v262] 버스배정기초정보 페이지 메인 탭 전환: 'info'(기초정보 등록/조회) | 'people'(버스배정인원관리, 이식됨)
+function bbMainTab(name){
+  ['info','people'].forEach(function(t){
+    var p=$id('bbbase-panel-'+t); if(p) p.style.display=(t===name)?'':'none';
+    var b=$id('bbbase-tab-'+t);
+    if(b) b.className=(t===name)?'btn btn-navy btn-sm':'btn btn-primary btn-sm';
+  });
+  if(name==='people'){
+    bpReloadFromSheet(); // 진입 시 상단 공용 콤보(bb-year/season/event) 기준으로 조회
+  }
+}
+// 구버전 호환용(더 이상 호출되지 않음) — 등록/조회가 좌우 배치로 통합되며 미사용
 function bbSwitchTab(tab){
   var regBtn=$id('bb-tab-btn-reg'), listBtn=$id('bb-tab-btn-list');
   var regPanel=$id('bb-tab-panel-reg'), listPanel=$id('bb-tab-panel-list');
@@ -15245,6 +15472,7 @@ function bbSearchClick(){
     var baseRes = results[0], drvRes = results[1];
     _bbRows       = (baseRes && baseRes.success) ? (baseRes.data||baseRes.rows||[]) : [];
     _bbDriverRows = (drvRes  && drvRes.success)  ? (drvRes.data ||drvRes.rows ||[]) : [];
+    _bbRows.forEach(function(r){ r['출발시간'] = bbNormalizeTimeFromSheet(r['출발시간']); }); // [v277]
     bbSwitchTab('list');
     bbRenderList();
   }).catch(function(e){
@@ -15255,21 +15483,21 @@ function bbSearchClick(){
 function bbFormReset(){
   _bbEditingId = null;
   $set('bb-direction','참석');
-  bbTypeOptionsRefresh(); // [v257] 참석 기준 배정유형 옵션으로 재구성 후 기본값 설정
-  $set('bb-type','선발대');
+  bbTypeOptionsRefresh(); // [v257] 참석 기준 배정유형 옵션으로 재구성 후 기본값(1번째 항목) 자동 세팅
+  // [v274] 레거시 하드코딩 '선발대' 값 제거 — v272에서 '선발대(총괄,팀장,TFT)'/'선발대(봉사자)'로 세분화되어
+  // 더 이상 일치하는 옵션이 없어 배정유형이 빈 값으로 표시되던 버그 수정. bbTypeOptionsRefresh()가 이미
+  // ASSIGN_TYPES_ARRIVE[0]('선발대(총괄,팀장,TFT)')을 세팅하므로 별도 지정 불필요.
   $set('bb-date','');
   $set('bb-time','');
   $set('bb-count','');
   var tbody=$id('bb-driver-table-body'); if(tbody) tbody.innerHTML='';
 }
 
-// [v257] 운행방향에 따라 배정유형 옵션을 다르게 구성 — 참석: 선발대/본대/직장조/시각선교부/중고등부, 귀가: 본대/중고등부/후발대
+// [v272] 운행방향에 따라 배정유형 옵션을 다르게 구성 — 공용 상수(ASSIGN_TYPES_ARRIVE/LEAVE) 사용(버스신청/버스배정인원관리와 동일 소스)
 function bbTypeOptionsRefresh(){
   var dirSel = $id('bb-direction'), typeSel = $id('bb-type');
   if(!dirSel || !typeSel) return;
-  var options = (dirSel.value === '귀가')
-    ? ['본대','중고등부','후발대']
-    : ['선발대','본대','직장조','시각선교부','중고등부'];
+  var options = (dirSel.value === '귀가') ? ASSIGN_TYPES_LEAVE : ASSIGN_TYPES_ARRIVE;
   var prev = typeSel.value;
   typeSel.innerHTML = options.map(function(o){ return '<option value="'+o+'">'+o+'</option>'; }).join('');
   typeSel.value = (options.indexOf(prev)>=0) ? prev : options[0];
@@ -15418,8 +15646,10 @@ function bbSave(){
     if(!results[0]||!results[0].success) throw new Error(results[0]&&results[0].error||'기초정보 저장 실패');
     if(!results[1]||!results[1].success) throw new Error(results[1]&&results[1].error||'운전자정보 저장 실패');
     showToast('✅ 버스배정 기초정보 '+(isNew?'등록':'수정')+' 완료','success');
-    _bbEditingId = id;
-    bbRenderList();
+    // [v275] 저장 완료 후 처리 순서: ① 입력데이터 초기화 → ② 조회(구글시트 재조회로 저장결과 반영 확인)
+    // 신규등록/기존수정 저장 모두 동일 적용. 실패(catch) 시에는 폼을 그대로 유지해 재시도할 수 있도록 미실행.
+    bbFormReset();
+    bbSearchClick();
   }).catch(function(e){
     showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error');
   }).finally(function(){ showLoading(false); });
@@ -15435,7 +15665,7 @@ function bbEditRow(id){
   $set('bb-type',      row['배정유형']);
   $set('bb-direction', row['운행방향']);
   $set('bb-date',      row['출발일자']);
-  $set('bb-time',      bbFormatTime(row['출발시간']));
+  $set('bb-time',      row['출발시간']);
   $set('bb-count',     row['배정대수']);
   var tbody=$id('bb-driver-table-body'); if(tbody) tbody.innerHTML='';
   _bbDriverRows.filter(function(r){ return String(r['등록ID'])===String(id); })
@@ -15468,6 +15698,46 @@ function bbDeleteRow(id){
   }).finally(function(){ showLoading(false); });
 }
 
+// [v264] 등록데이터 초기화 — 구글시트 '버스배정_기초정보'·'버스배정_운전자정보'에서
+// 현재 연도+수양회종류+행사명 데이터만 삭제(다른 회차는 보존). 숙소배정초기화와 동일한 방식.
+function bbSheetResetConfirm(){
+  if(bbSheetResetConfirm._timer){
+    clearTimeout(bbSheetResetConfirm._timer);
+    bbSheetResetConfirm._timer=null;
+    showToast('초기화가 취소되었습니다.','info'); return;
+  }
+  if(!USE_SHEET()){ showToast('구글 시트 URL이 설정되지 않았습니다.','error'); return; }
+  var y  = ($id('bb-year-sel')  ||{value:''}).value;
+  var ev = ($id('bb-event-sel') ||{value:''}).value;
+  var ss = ($id('bb-season-sel')||{value:''}).value;
+  if(!y||!ev||!ss){ showToast('연도/강서교회회차/수양회종류를 선택해 주세요.','error'); return; }
+  showToast('🗑 2초 후 '+y+'년 '+ss+' '+ev+' 버스배정 기초정보·운전자정보가 삭제됩니다. 다시 누르면 취소.','info');
+  bbSheetResetConfirm._timer=setTimeout(function(){
+    bbSheetResetConfirm._timer=null;
+    // 현재 3키(연도+수양회종류+행사명)에 해당하는 등록ID들을 먼저 식별
+    var removeIds = _bbRows.filter(function(r){
+      return String(r['년도'])===String(y) && r['수양회종류']===ss && r['행사명']===ev;
+    }).map(function(r){ return String(r['등록ID']); });
+    _bbRows       = _bbRows.filter(function(r){ return removeIds.indexOf(String(r['등록ID']))===-1; });
+    _bbDriverRows = _bbDriverRows.filter(function(r){ return removeIds.indexOf(String(r['등록ID']))===-1; });
+
+    var payloads = _bbBuildSheetPayloads();
+    showLoading(true);
+    Promise.all([
+      apiCall({action:'overwrite', sheetName:'버스배정_기초정보',   headers:payloads.baseHdr, rows:payloads.baseRows}),
+      apiCall({action:'overwrite', sheetName:'버스배정_운전자정보', headers:payloads.drvHdr,  rows:payloads.drvRows})
+    ]).then(function(results){
+      if(!results[0]||!results[0].success) throw new Error(results[0]&&results[0].error||'초기화 실패');
+      if(!results[1]||!results[1].success) throw new Error(results[1]&&results[1].error||'초기화 실패');
+      showToast('✅ '+y+'년 '+ss+' '+ev+' 등록데이터가 삭제되었습니다. (다른 회차 데이터는 보존됨)','success');
+      bbFormReset();
+      bbRenderList();
+    }).catch(function(e){
+      showToast('⚠️ 등록데이터 초기화 실패: '+(e&&e.message||e),'error');
+    }).finally(function(){ showLoading(false); });
+  }, 2000);
+}
+
 // 공용 리스트 렌더러 — 조회탭 그리드(bb-list-*)에 사용. 대상 tbody/empty id를 인자로 받아 재사용한다.
 function _bbRenderRowsInto(tbodyId, emptyId, rows){
   var tbody=$id(tbodyId); if(!tbody) return;
@@ -15484,7 +15754,7 @@ function _bbRenderRowsInto(tbodyId, emptyId, rows){
       '<td>'+esc(r['배정유형']||'')+'</td>'+
       '<td>'+esc(r['운행방향']||'')+'</td>'+
       '<td>'+esc(r['출발일자']||'')+'</td>'+
-      '<td>'+esc(bbFormatTime(r['출발시간']||''))+'</td>'+
+      '<td>'+esc(r['출발시간']||'')+'</td>'+
       '<td>'+esc(r['배정대수']||'')+'</td>'+
       '<td><button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;padding:2px 8px;white-space:nowrap;" onclick="bbShowDriverDetail(\''+id+'\')">상세</button></td>'+
       '<td style="white-space:nowrap;">'+
@@ -15522,7 +15792,7 @@ function _bbRenderDriverModal(baseRows, modalTitle){
     tbody.innerHTML = baseRows.map(function(r){
       var id = r['등록ID'];
       var groupHeader = '<tr><td colspan="5" style="background:var(--sky);font-weight:700;color:var(--navy);">'+
-        esc(r['배정유형']||'')+'('+esc(r['운행방향']||'')+') · '+esc(r['출발일자']||'')+' '+esc(bbFormatTime(r['출발시간']||''))+
+        esc(r['배정유형']||'')+'('+esc(r['운행방향']||'')+') · '+esc(r['출발일자']||'')+' '+esc(r['출발시간']||'')+
         ' · 배정대수 '+esc(r['배정대수']||'')+'</td></tr>';
       var drivers = _bbDriverRows.filter(function(d){ return String(d['등록ID'])===String(id); });
       var driverRows = drivers.length
@@ -15549,6 +15819,8 @@ function bbShowDriverDetail(id){
 
 // onclick 인라인 핸들러가 (스코프와 무관하게) 항상 찾을 수 있도록 전역(window)에도 명시 등록
 window.bbInit            = bbInit;
+window.bbMainTab         = bbMainTab; // [v262]
+window.bbSheetResetConfirm = bbSheetResetConfirm; // [v264]
 window.bbSwitchTab       = bbSwitchTab;
 window.bbSearchClick     = bbSearchClick;
 window.bbFormReset       = bbFormReset;
@@ -16098,21 +16370,21 @@ function enrollRenderList(){
   tbody.innerHTML = rows.map(function(r){
     return '<tr onclick="enrollEditRow(\''+esc(r.receiptId)+'\')" style="cursor:pointer;" title="클릭하면 위 등록폼에 이 내역이 불러와집니다(저장 시 수정 처리)">'+
       '<td style="display:none;">'+esc(r.receiptId||'')+'</td>'+
+      '<td>'+esc(r.name||'')+'</td>'+
+      '<td>'+esc(r.district||'')+'</td>'+
+      '<td>'+esc(r.group||'')+'</td>'+
+      '<td>'+esc(fmtDate(r.arriveDate)||'')+'</td>'+
+      '<td>'+esc(r.arriveTransport||'')+'</td>'+
+      '<td>'+esc(r.arriveAssignType||'')+'</td>'+
+      '<td>'+esc(fmtDate(r.leaveDate)||'')+'</td>'+
+      '<td>'+esc(r.leaveTransport||'')+'</td>'+
+      '<td>'+esc(r.leaveAssignType||'')+'</td>'+
       '<td>'+esc(r.year||'')+'</td>'+
       '<td>'+esc(r.retreatType||'')+'</td>'+
       '<td>'+esc(r.event||'')+'</td>'+
       '<td>'+esc(r.parish||'')+'</td>'+
-      '<td>'+esc(r.district||'')+'</td>'+
-      '<td>'+esc(r.name||'')+'</td>'+
-      '<td>'+esc(r.group||'')+'</td>'+
       '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
       '<td>'+esc(_enrollGenderLabel(r.gender))+'</td>'+
-      '<td>'+esc(fmtDate(r.arriveDate)||'')+'</td>'+
-      '<td>'+esc(fmtDate(r.leaveDate)||'')+'</td>'+
-      '<td>'+esc(r.arriveTransport||'')+'</td>'+
-      '<td>'+esc(r.leaveTransport||'')+'</td>'+
-      '<td>'+esc(r.arriveAssignType||'')+'</td>'+
-      '<td>'+esc(r.leaveAssignType||'')+'</td>'+
       '<td>'+esc(r.guardian||'')+'</td>'+
       '<td>'+esc(r.contact||'')+'</td>'+
     '</tr>';
