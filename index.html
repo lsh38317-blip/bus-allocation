@@ -75,6 +75,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
 #panel-enroll .form-group label{font-size:.71rem;margin-bottom:4px;}
 #panel-enroll .form-group input,
 #panel-enroll .form-group select{padding:7px 10px;font-size:.82rem;}
+#panel-enroll .table-wrap tbody tr:hover{background:var(--sky);}
 .form-group textarea{resize:vertical;min-height:66px;}
 
 /* BUTTONS */
@@ -1768,6 +1769,43 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
             </div>
 
+          </div>
+
+          <!-- [v251] 등록된 접수 내역 그리드 — 저장 시 enrollSave()가 자동으로 enrollRenderList()를 호출해 즉시 갱신됨 -->
+          <div class="card" style="margin-top:14px;">
+            <div class="card-header">
+              <div class="card-title">📋 등록된 접수 내역</div>
+            </div>
+            <div class="table-wrap">
+              <table style="width:100%;">
+                <thead>
+                  <tr>
+                    <th style="display:none;">접수ID</th>
+                    <th>연도</th>
+                    <th>수양회종류</th>
+                    <th>회차</th>
+                    <th>교구</th>
+                    <th>구역</th>
+                    <th>성명</th>
+                    <th>회별</th>
+                    <th>구원여부</th>
+                    <th>성별</th>
+                    <th>참석일자</th>
+                    <th>귀가일자</th>
+                    <th>참석교통수단</th>
+                    <th>귀가교통수단</th>
+                    <th>참석배정유형</th>
+                    <th>귀가배정유형</th>
+                    <th>보호자</th>
+                    <th>연락처</th>
+                  </tr>
+                </thead>
+                <tbody id="enroll-list-table-body"></tbody>
+              </table>
+              <div id="enroll-list-empty" class="empty-state" style="display:none;">
+                <div class="icon">📭</div><p>등록된 접수 내역이 없습니다.</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -8829,7 +8867,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v249_sidebar_scroll_fix';
+var CACHE_VERSION = 'v252_enroll_row_click_edit';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -15769,6 +15807,10 @@ function enrollEditRow(id){
   enrollToggleAssignType('arrive');
   enrollToggleAssignType('leave');
   enrollRenderList();
+  // [v252] 그리드 행 클릭 등 여러 경로에서 호출되므로, 상단 등록폼으로 스크롤 + 안내를 여기서 공통 처리
+  var formCard = document.querySelector('#panel-enroll .card');
+  if(formCard && formCard.scrollIntoView) formCard.scrollIntoView({behavior:'smooth', block:'start'});
+  showToast('📋 '+(row.name||'')+' ('+row.receiptId+') 정보를 불러왔습니다. 수정 후 저장하세요.','success');
 }
 
 // ── [v238] 수양회접수내역 조회 팝업 ──
@@ -15939,22 +15981,25 @@ function enrollRenderList(){
   }
   if(empty) empty.style.display = 'none';
   tbody.innerHTML = rows.map(function(r){
-    return '<tr>'+
-      '<td>'+esc(r.receiptId||'')+'</td>'+
-      '<td>'+esc(r.name||'')+'</td>'+
+    return '<tr onclick="enrollEditRow(\''+esc(r.receiptId)+'\')" style="cursor:pointer;" title="클릭하면 위 등록폼에 이 내역이 불러와집니다(저장 시 수정 처리)">'+
+      '<td style="display:none;">'+esc(r.receiptId||'')+'</td>'+
+      '<td>'+esc(r.year||'')+'</td>'+
+      '<td>'+esc(r.retreatType||'')+'</td>'+
+      '<td>'+esc(r.event||'')+'</td>'+
       '<td>'+esc(r.parish||'')+'</td>'+
       '<td>'+esc(r.district||'')+'</td>'+
+      '<td>'+esc(r.name||'')+'</td>'+
       '<td>'+esc(r.group||'')+'</td>'+
-      '<td>'+esc(fmtDate(r.arriveDate)||'')+'</td>'+
-      '<td>'+esc(r.arriveTransport||'')+'</td>'+
-      '<td>'+esc(fmtDate(r.leaveDate)||'')+'</td>'+
-      '<td>'+esc(r.leaveTransport||'')+'</td>'+
       '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
       '<td>'+esc(_enrollGenderLabel(r.gender))+'</td>'+
-      '<td style="white-space:nowrap;">'+
-        '<button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;padding:2px 8px;" onclick="enrollEditRow(\''+esc(r.receiptId)+'\')">수정</button> '+
-        '<button class="btn btn-sm" style="border:1px solid #f5c0c0;background:#fff;color:#d94040;padding:2px 8px;" onclick="enrollDeleteRow(\''+esc(r.receiptId)+'\')">삭제</button>'+
-      '</td>'+
+      '<td>'+esc(fmtDate(r.arriveDate)||'')+'</td>'+
+      '<td>'+esc(fmtDate(r.leaveDate)||'')+'</td>'+
+      '<td>'+esc(r.arriveTransport||'')+'</td>'+
+      '<td>'+esc(r.leaveTransport||'')+'</td>'+
+      '<td>'+esc(r.arriveAssignType||'')+'</td>'+
+      '<td>'+esc(r.leaveAssignType||'')+'</td>'+
+      '<td>'+esc(r.guardian||'')+'</td>'+
+      '<td>'+esc(r.contact||'')+'</td>'+
     '</tr>';
   }).join('');
 }
