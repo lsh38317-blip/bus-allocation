@@ -1803,7 +1803,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <tbody id="enroll-list-table-body"></tbody>
               </table>
               <div id="enroll-list-empty" class="empty-state" style="display:none;">
-                <div class="icon">📭</div><p>등록된 접수 내역이 없습니다.</p>
+                <div class="icon">📭</div><p>저장 후 등록한 내역이 이 화면에 표시됩니다.</p>
               </div>
             </div>
           </div>
@@ -8867,7 +8867,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v252_enroll_row_click_edit';
+var CACHE_VERSION = 'v253_enroll_session_only_grid';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -15462,6 +15462,9 @@ window.bbShowDriverDetail = bbShowDriverDetail;
 // 구역장: 교구/구역이 본인 소속으로 고정되고, 조회 그리드도 본인 구역만 표시.
 // ════════════════════════════════════════════════════════════
 var _enrollEditingId = null; // 수정 중인 접수ID (신규 등록 시 null)
+// [v253] "등록된 접수 내역" 그리드 전용 — 페이지 진입 시 기존 데이터 전체를 불러오지 않고,
+// 이 화면에서 저장(신규/수정)한 건만 최신순으로 누적 표시한다. 새로고침/재로그인 시 초기화됨.
+var _enrollSessionRows = [];
 
 // 접수ID 자동 채번: 9900001부터 +1 (retreat 전체에서 9900000보다 큰 최댓값 탐색)
 function enrollGenId(){
@@ -15767,6 +15770,9 @@ function enrollSave(){
           : ('✅ '+name+' 수정 완료'), 'success');
       }
       try{ _ls.set('retreat_data', JSON.stringify(retreat)); }catch(e){}
+      // [v253] 이 화면에서 저장한 건만 그리드에 최신순으로 누적 표시
+      var sIdx = _enrollSessionRows.findIndex(function(r){ return String(r.receiptId)===String(row.receiptId); });
+      if(sIdx>=0) _enrollSessionRows[sIdx] = row; else _enrollSessionRows.unshift(row);
       enrollFormReset();
       enrollRenderList();
     })
@@ -15970,7 +15976,8 @@ function _enrollFilteredRows(){
 }
 
 function enrollRenderList(){
-  var rows = _enrollFilteredRows();
+  // [v253] 페이지 진입 시 전체 기존 데이터를 불러오지 않고, 이 화면에서 저장한 건만 표시
+  var rows = _enrollSessionRows;
   var tbody = $id('enroll-list-table-body');
   var empty = $id('enroll-list-empty');
   if(!tbody) return;
