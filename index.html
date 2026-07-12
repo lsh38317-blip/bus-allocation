@@ -1091,10 +1091,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     </select>
                   </div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:6px;">
+                <div style="display:grid;grid-template-columns:1.3fr 1fr 0.8fr;gap:12px;margin-bottom:6px;">
                   <div class="form-group" style="margin:0;">
                     <label>출발일자</label>
-                    <input type="date" id="bb-date">
+                    <input type="date" id="bb-date" style="padding-right:6px;">
                   </div>
                   <div class="form-group" style="margin:0;">
                     <label>출발시간</label>
@@ -1116,7 +1116,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <div class="table-wrap agg-compact">
                   <table>
                     <thead><tr>
-                      <th style="width:60px;">배차</th><th>이름</th><th>연락처</th><th>승차위치</th><th>하차위치</th><th style="width:50px;"></th>
+                      <th style="width:60px;">배차</th><th>이름</th><th>연락처</th><th>차량번호</th><th>승차위치</th><th>하차위치</th><th style="width:50px;"></th>
                     </tr></thead>
                     <tbody id="bb-driver-table-body"></tbody>
                   </table>
@@ -1272,9 +1272,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
             </div>
             <div style="width:1px;height:24px;background:var(--border);margin:0 2px;"></div>
+            <!-- [v283] 배정유형 필터 — 버스배정기초정보와 동일한 옵션 구성, 기본값 "전체" -->
+            <select id="bus-sel-assigntype" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+              <option value="">배정유형: 전체</option>
+            </select>
+            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;"></div>
+            <button id="bus-tab-leader"  class="btn btn-primary btn-sm" onclick="busTab('leader')" style="display:none;">🎯 선탑자 지정</button>
             <button id="bus-tab-teams"   class="btn btn-navy btn-sm"   onclick="busTab('teams')">👥 구역관리</button>
             <button id="bus-tab-assign"  class="btn btn-primary btn-sm" onclick="busTab('assign')">🚌 버스 배정</button>
-            <button id="bus-tab-leader"  class="btn btn-primary btn-sm" onclick="busTab('leader')" style="display:none;">🎯 선탑자 지정</button>
             <button id="bus-tab-summary" class="btn btn-primary btn-sm" onclick="busTab('summary')">📋 배정 현황</button>
           </div>
 
@@ -3128,9 +3133,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <div class="modal-title" id="bb-driver-modal-title">운전자/승하차정보</div>
       <button class="modal-close" onclick="closeModal('bb-driver-modal')">✕</button>
     </div>
+    <div id="bb-driver-modal-info"></div>
     <div class="table-wrap agg-compact">
       <table>
-        <thead><tr><th style="width:60px;">배차</th><th>이름</th><th>연락처</th><th>승차위치</th><th>하차위치</th></tr></thead>
+        <thead><tr><th style="width:60px;">배차</th><th>이름</th><th>연락처</th><th>차량번호</th><th>승차위치</th><th>하차위치</th></tr></thead>
         <tbody id="bb-driver-modal-body"></tbody>
       </table>
     </div>
@@ -4906,7 +4912,8 @@ function _busGetFilter(){
   var fromDom = {
     year:   panelReady ? (yrSel.value||'').trim() : '',
     season: (($id('bus-sel-season') ||{}).value||'').trim(),
-    event:  panelReady ? (($id('bus-sel-event')||{}).value||'').trim() : ''
+    event:  panelReady ? (($id('bus-sel-event')||{}).value||'').trim() : '',
+    assignType: (($id('bus-sel-assigntype')||{}).value||'').trim() // [v283]
   };
   // [v134] 콤보 DOM 미초기화(year 또는 event 빈값)이고 교회목표가 로드된 경우
   // → 교회목표 당해 최신 {year, season, event}로 fallback
@@ -4917,7 +4924,8 @@ function _busGetFilter(){
     return {
       year:   fromDom.year   || goalFilter.year   || '',
       season: fromDom.season || goalFilter.season || '',
-      event:  fromDom.event  || goalFilter.event  || ''
+      event:  fromDom.event  || goalFilter.event  || '',
+      assignType: fromDom.assignType || '' // [v283]
     };
   }
   return fromDom;
@@ -5259,11 +5267,23 @@ function busMainTypeTab(type){
   busMainType = type;
   var trig=$id('bus-main-type-trigger');
   if(trig) trig.textContent = (type==='arrive' ? '🚌 참석 관리 ▾' : '🏠 귀가 관리 ▾');
+  busAssignTypeOptionsRefresh(); // [v283] 참석/귀가 전환 시 배정유형 옵션도 해당 모드 기준으로 갱신
   // 현재 열려있는 Lv2 메뉴만 새 타입 기준으로 재렌더링 (다른 메뉴로 강제 이동하지 않음)
   if(busCurrentTab==='teams')   busTeamsSubTab(type);
   if(busCurrentTab==='assign')  busAssignSubTab(type);
   if(busCurrentTab==='summary') busSummarySubTab(type);
   if(busCurrentTab==='leader')  busLeaderSubTab(type);
+}
+// [v283] 배정유형(bus-sel-assigntype) 옵션을 현재 모드(참석/귀가)에 맞게 구성.
+// 버스배정기초정보의 ASSIGN_TYPES_ARRIVE/ASSIGN_TYPES_LEAVE와 동일한 목록을 그대로 재사용해
+// 두 화면의 배정유형 값 체계를 항상 일치시킨다. "전체"(빈값) 옵션은 항상 최상단에 유지.
+function busAssignTypeOptionsRefresh(){
+  var sel = $id('bus-sel-assigntype'); if(!sel) return;
+  var prev = sel.value;
+  var list = (busMainType==='leave') ? ASSIGN_TYPES_LEAVE : ASSIGN_TYPES_ARRIVE;
+  sel.innerHTML = '<option value="">배정유형: 전체</option>' +
+    list.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+  sel.value = (list.indexOf(prev)>=0) ? prev : '';
 }
 function busMainTypeMenuToggle(){
   var m=$id('bus-main-type-menu'); if(!m) return;
@@ -5472,7 +5492,9 @@ function _busImportBuildUI(rows){
 
   // 집계
   var busMap = {};
-  rows.filter(function(r){ return (r[transportKey]||'').trim()==='버스' && !isBusExcluded(r); }).forEach(function(r){
+  rows.filter(function(r){
+    return (r[transportKey]||'').trim()==='버스' && !isBusExcluded(r) && _busMatchesAssignType(r, type, bf); // [v283]
+  }).forEach(function(r){
     var key;
     if(isJuniorHighBus(r)){
       key = '중고등부';
@@ -6447,16 +6469,19 @@ function calcBusUnassignedCounts(filterOverride){
   var _src = filterOverride
     ? _busFilterRowsWithFilter(retreat, filterOverride)
     : _busFilterRows(retreat);  // 필터 적용된 retreat 서브셋
+  var _bfForAssign = filterOverride || _busGetFilter(); // [v283] filterOverride 경로는 assignType 없음(전체로 처리)
   var arriveCnt = (busArriveTeams && busArriveTeams.length > 0
                    && busArriveBuses && busArriveBuses.length > 0)
     ? _src.filter(function(r){
-        return (r.arriveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterArriveIndex[r.receiptId]);
+        return (r.arriveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterArriveIndex[r.receiptId])
+          && _busMatchesAssignType(r, 'arrive', _bfForAssign); // [v283]
       }).length
     : 0;
   var leaveCnt = (busLeaveTeams && busLeaveTeams.length > 0
                   && busLeaveBuses && busLeaveBuses.length > 0)
     ? _src.filter(function(r){
-        return (r.leaveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterLeaveIndex[r.receiptId]);
+        return (r.leaveTransport||'').trim()==='버스' && !isBusExcluded(r) && !(r.receiptId && rosterLeaveIndex[r.receiptId])
+          && _busMatchesAssignType(r, 'leave', _bfForAssign); // [v283]
       }).length
     : 0;
   return {arrive: arriveCnt, leave: leaveCnt};
@@ -6471,6 +6496,14 @@ function _busFilterRowsWithFilter(rows, f){
     if(f.event  && String(r.event      ||r['행사명'] ||'').trim() !== f.event)  return false;
     return true;
   });
+}
+// [v283] 배정유형 필터 매칭 공용 헬퍼 — bf.assignType이 비어있으면(전체) 항상 통과(기존 동작 유지).
+// kind='arrive'면 참석배정유형, 'leave'면 귀가배정유형 필드를 비교. 사용처: _busImportBuildUI(팀집계),
+// calcBusUnassignedCounts(미배정 카운트 배지), busReassignDiff(미배정 재배정) — 세 곳 모두 동일 기준 적용.
+function _busMatchesAssignType(r, kind, bf){
+  if(!bf || !bf.assignType) return true;
+  var val = kind==='leave' ? r.leaveAssignType : r.arriveAssignType;
+  return (val||'').trim() === bf.assignType;
 }
 
 // ── 재배정알림 표시 — 홈 화면 배지 + 버스배정 페이지(참석/귀가 탭별) 배지 ──
@@ -6550,7 +6583,8 @@ function busReassignDiff(type){
     });
 
     var diffPeople = people.filter(function(r){
-      return r.receiptId && (r[field]||'').trim()==='버스' && !isBusExcluded(r) && !assignedIds[r.receiptId];
+      return r.receiptId && (r[field]||'').trim()==='버스' && !isBusExcluded(r) && !assignedIds[r.receiptId]
+        && _busMatchesAssignType(r, type, _bf); // [v283]
     });
 
     if (!diffPeople.length) {
@@ -8851,7 +8885,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v279_room_save_strict_filter';
+var CACHE_VERSION = 'v283_bus_assigntype_filter_tab_reorder';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -9699,6 +9733,7 @@ function switchPanel(name, skipRender) {
           busYrSel.appendChild(bOpt);
         }
       }
+      busAssignTypeOptionsRefresh(); // [v283] 패널 진입 시 배정유형 옵션(현재 모드 기준) 초기화
       // ── 교회목표 행사명 자동 적용 후 버스배정 복원 + rosterIndex 로드 ──
       // 중요: _busApplyGoalEvent 완료 후 실행해야 bus-sel-event='3차'(정확한 값)로 필터 적용됨
       //       loadRosterIndex 도 반드시 ApplyGoalEvent 이후 실행
@@ -11827,6 +11862,24 @@ function bpToggleTransport(id, kind){
         assignSel.value='';
         var stagedAssign = kind==='arrive' ? bpStagedArriveAssign : bpStagedLeaveAssign;
         stagedAssign[idStr] = '';
+      }
+    }
+  }
+  // [v282] 참석교통수단을 클릭하면 동일 값을 귀가교통수단에도 자동 반영(예약). 사용자가 이후
+  // 귀가교통수단 배지를 직접 클릭해 수정하면 그 값이 우선(v273 참석일자→귀가일자 자동계산과 동일 정책).
+  // 귀가교통수단을 클릭하는 경우는 기존과 동일하게 참석 쪽에 영향 없음(단방향).
+  if(kind==='arrive'){
+    bpStagedLeave[idStr] = next;
+    var leaveBadge = $id('bp-leave-badge-'+idStr);
+    if(leaveBadge){ leaveBadge.textContent = next; leaveBadge.setAttribute('style', bpTransBadgeStyle(next, true)); }
+    var leaveAssignSel = $id('bp-leave-assign-'+idStr);
+    if(leaveAssignSel){
+      var leaveIsBus = next==='버스';
+      leaveAssignSel.disabled = !leaveIsBus;
+      leaveAssignSel.style.opacity = leaveIsBus ? '' : '.5';
+      if(!leaveIsBus){
+        leaveAssignSel.value='';
+        bpStagedLeaveAssign[idStr] = '';
       }
     }
   }
@@ -15411,23 +15464,28 @@ function bbRenderYearOptions(){
 
 function bbInit(){
   bbRenderYearOptions();
-  bbEventOptionsRefresh(); // [v257] 강서교회회차 옵션을 교회목표 시트 행사명 기준으로 갱신
   bbTypeOptionsRefresh();  // [v257] 운행방향(기본값 참석) 기준 배정유형 옵션 초기화
-  if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
-  showLoading(true);
-  Promise.all([
-    apiCall({action:'getAll', sheetName:'버스배정_기초정보'}),
-    apiCall({action:'getAll', sheetName:'버스배정_운전자정보'})
-  ]).then(function(results){
-    var baseRes = results[0], drvRes = results[1];
-    _bbRows       = (baseRes && baseRes.success) ? (baseRes.data||baseRes.rows||[]) : [];
-    _bbDriverRows = (drvRes  && drvRes.success)  ? (drvRes.data ||drvRes.rows ||[]) : [];
-    _bbRows.forEach(function(r){ r['출발시간'] = bbNormalizeTimeFromSheet(r['출발시간']); }); // [v277]
-    bbFormReset();
-    bbRenderList();
-  }).catch(function(e){
-    showToast('⚠️ 버스배정 기초정보 조회 실패: '+(e&&e.message||e),'error');
-  }).finally(function(){ showLoading(false); });
+  // [v280] 회차(bb-event-sel)가 교회목표 시트 기준으로 최종 확정된 뒤에만 버스배정 데이터를
+  // 조회·렌더하도록 순서를 고정한다. (이전엔 두 작업이 병렬 실행되어, 세션 중 교회목표가 아직
+  // 로드되지 않은 상태로 이 페이지에 처음 들어오면 매핑 완료 전 옛 회차값 기준으로 먼저 렌더되는
+  // race condition이 있었음)
+  bbEventOptionsRefresh(function(){
+    if(!USE_SHEET()){ showToast('Google Sheets URL이 설정되지 않았습니다.','error'); return; }
+    showLoading(true);
+    Promise.all([
+      apiCall({action:'getAll', sheetName:'버스배정_기초정보'}),
+      apiCall({action:'getAll', sheetName:'버스배정_운전자정보'})
+    ]).then(function(results){
+      var baseRes = results[0], drvRes = results[1];
+      _bbRows       = (baseRes && baseRes.success) ? (baseRes.data||baseRes.rows||[]) : [];
+      _bbDriverRows = (drvRes  && drvRes.success)  ? (drvRes.data ||drvRes.rows ||[]) : [];
+      _bbRows.forEach(function(r){ r['출발시간'] = bbNormalizeTimeFromSheet(r['출발시간']); }); // [v277]
+      bbFormReset();
+      bbRenderList();
+    }).catch(function(e){
+      showToast('⚠️ 버스배정 기초정보 조회 실패: '+(e&&e.message||e),'error');
+    }).finally(function(){ showLoading(false); });
+  });
 }
 
 // [v262] 버스배정기초정보 페이지 메인 탭 전환: 'info'(기초정보 등록/조회) | 'people'(버스배정인원관리, 이식됨)
@@ -15514,17 +15572,21 @@ function bbTypeOptionsRefresh(){
 
 // [v257] 강서교회회차(bb-event-sel) 옵션을 '교회목표' 시트의 행사명 기준으로 동적 구성.
 // 연도/수양회종류에 해당하는 행사명이 없으면 기존 기본 목록(1~7차)을 그대로 유지한다.
-function bbEventOptionsRefresh(){
+// [v280] cb(선택): 회차 옵션이 최종 확정된 시점(동기/비동기 무관)에 항상 1회 호출된다.
+// bbInit()이 "회차 매핑 완료 → 데이터 조회" 순서를 보장하기 위해 사용.
+function bbEventOptionsRefresh(cb){
   if(!_goalLoaded){
     if(USE_SHEET() && !_goalLoading){
-      _goalFetchFromSheet(function(){ bbEventOptionsRefresh(); }, {});
+      _goalFetchFromSheet(function(){ bbEventOptionsRefresh(cb); }, {});
+      return;
     }
-    return; // 로딩 완료 후 콜백으로 재호출됨 — 지금은 현재 목록(기본값) 유지
+    if(cb) cb(); // 교회목표를 불러올 수 없는 상황(시트 미사용 등)에도 후속 로직은 진행되어야 함
+    return;
   }
   var year  = ($id('bb-year-sel')||{value:''}).value;
   var ss    = ($id('bb-season-sel')||{value:''}).value;
   var evSel = $id('bb-event-sel');
-  if(!evSel) return;
+  if(!evSel){ if(cb) cb(); return; }
   var names = [];
   var seen = {};
   _goalRows.forEach(function(r){
@@ -15534,10 +15596,12 @@ function bbEventOptionsRefresh(){
     seen[r.eventName] = true;
     names.push(r.eventName);
   });
-  if(!names.length) return; // 교회목표 시트에 해당 연도/종류 데이터가 없으면 기존 목록 유지
-  var prev = evSel.value;
-  evSel.innerHTML = names.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
-  evSel.value = (names.indexOf(prev)>=0) ? prev : names[0];
+  if(names.length){
+    var prev = evSel.value;
+    evSel.innerHTML = names.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+    evSel.value = (names.indexOf(prev)>=0) ? prev : names[0];
+  } // 교회목표 시트에 해당 연도/종류 데이터가 없으면 기존 목록 유지
+  if(cb) cb();
 }
 
 // 배정대수 입력값에 맞춰 운전자정보 행 수를 자동으로 맞춤 (기존 입력값 보존)
@@ -15553,21 +15617,45 @@ function bbCountChange(){
   }
 }
 
-function bbDriverRowHtml(baeNum, name, phone, board, alight){
+// [v281] 배차값을 항상 "N호" 형식으로 통일. 숫자만 있으면(과거 저장분 포함) "호"를 붙이고,
+// 이미 "호"가 붙어있으면 그대로 둔다(중복 부착 방지). 숫자가 아닌 값(자유 텍스트)은 그대로 둔다.
+function bbNormalizeBaeLabel(v){
+  var s = String(v||'').trim();
+  if(!s) return '';
+  if(/^\d+$/.test(s)) return s+'호';
+  return s;
+}
+function bbDriverRowHtml(baeNum, name, phone, vehicle, board, alight){
   return '<tr>'+
-    '<td><input type="text" class="bb-drv-bae" value="'+esc(baeNum||'')+'" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
+    '<td><input type="text" class="bb-drv-bae" value="'+esc(bbNormalizeBaeLabel(baeNum))+'" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
     '<td><input type="text" class="bb-drv-name" value="'+esc(name||'')+'" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
     '<td><input type="text" class="bb-drv-phone" value="'+esc(bbFormatPhone(phone||''))+'" placeholder="010-0000-0000" maxlength="13" oninput="this.value=bbFormatPhone(this.value)" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
-    '<td><input type="text" class="bb-drv-board" value="'+esc(board||'')+'" placeholder="예: 본당 앞" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
-    '<td><input type="text" class="bb-drv-alight" value="'+esc(alight||'')+'" placeholder="예: 수양관 정문" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
+    // [v281] 연락처 뒤에 차량번호 컬럼 신규 추가
+    '<td><input type="text" class="bb-drv-vehicle" value="'+esc(vehicle||'')+'" placeholder="예: 12가3456" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
+    // [v281] 1행에서 입력 시 아래 빈 행에만 자동 복사되도록 oninput에 bbDriverFillDown 연결
+    '<td><input type="text" class="bb-drv-board" value="'+esc(board||'')+'" placeholder="예: 본당 앞" oninput="bbDriverFillDown(this,\'board\')" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
+    '<td><input type="text" class="bb-drv-alight" value="'+esc(alight||'')+'" placeholder="예: 수양관 정문" oninput="bbDriverFillDown(this,\'alight\')" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 6px;"></td>'+
     '<td style="text-align:center;"><button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;padding:2px 8px;" onclick="bbDriverRemoveRow(this)">✕</button></td>'+
   '</tr>';
+}
+// [v281] 1행(첫 번째 배차행)의 승차위치/하차위치 입력 시, 아래 행 중 해당 필드가 비어있는 행에만
+// 동일 값을 자동 복사한다. 이미 값이 입력된 행은 건드리지 않는다.
+function bbDriverFillDown(inputEl, field){
+  var tbody = $id('bb-driver-table-body'); if(!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  if(!rows.length || rows[0] !== inputEl.closest('tr')) return; // 1행에서 입력한 경우에만 하위 전파
+  var val = inputEl.value;
+  var cls = field==='board' ? '.bb-drv-board' : '.bb-drv-alight';
+  for(var i=1; i<rows.length; i++){
+    var target = rows[i].querySelector(cls);
+    if(target && !target.value) target.value = val;
+  }
 }
 
 function bbDriverAddRow(presetBae){
   var tbody=$id('bb-driver-table-body'); if(!tbody) return;
   var nextBae = presetBae || (tbody.querySelectorAll('tr').length + 1);
-  tbody.insertAdjacentHTML('beforeend', bbDriverRowHtml(nextBae,'','','',''));
+  tbody.insertAdjacentHTML('beforeend', bbDriverRowHtml(nextBae,'','','','',''));
   var cnt=$id('bb-count'); if(cnt) cnt.value = tbody.querySelectorAll('tr').length;
 }
 
@@ -15582,12 +15670,13 @@ function bbCollectFormDrivers(){
   var tbody=$id('bb-driver-table-body'); if(!tbody) return [];
   var out=[];
   tbody.querySelectorAll('tr').forEach(function(tr){
-    var bae    = (tr.querySelector('.bb-drv-bae')   ||{value:''}).value.trim();
-    var name   = (tr.querySelector('.bb-drv-name')  ||{value:''}).value.trim();
-    var phone  = bbFormatPhone((tr.querySelector('.bb-drv-phone') ||{value:''}).value.trim());
-    var board  = (tr.querySelector('.bb-drv-board') ||{value:''}).value.trim();
-    var alight = (tr.querySelector('.bb-drv-alight')||{value:''}).value.trim();
-    if(bae || name || phone || board || alight) out.push({bae:bae, name:name, phone:phone, board:board, alight:alight});
+    var bae     = (tr.querySelector('.bb-drv-bae')    ||{value:''}).value.trim();
+    var name    = (tr.querySelector('.bb-drv-name')   ||{value:''}).value.trim();
+    var phone   = bbFormatPhone((tr.querySelector('.bb-drv-phone') ||{value:''}).value.trim());
+    var vehicle = (tr.querySelector('.bb-drv-vehicle')||{value:''}).value.trim(); // [v281]
+    var board   = (tr.querySelector('.bb-drv-board')  ||{value:''}).value.trim();
+    var alight  = (tr.querySelector('.bb-drv-alight') ||{value:''}).value.trim();
+    if(bae || name || phone || vehicle || board || alight) out.push({bae:bae, name:name, phone:phone, vehicle:vehicle, board:board, alight:alight});
   });
   return out;
 }
@@ -15599,9 +15688,9 @@ function _bbBuildSheetPayloads(){
             r['배정유형']||'', r['운행방향']||'', r['출발일자']||'', r['출발시간']||'',
             r['배정대수']||'', r['등록일']||'', r['등록자']||''];
   });
-  var drvHdr = ['NO','등록ID','배차','이름','연락처','승차위치','하차위치'];
+  var drvHdr = ['NO','등록ID','배차','이름','연락처','차량번호','승차위치','하차위치'];
   var drvRows = _bbDriverRows.map(function(r,i){
-    return [i+1, r['등록ID']||'', r['배차']||'', r['이름']||'', r['연락처']||'', r['승차위치']||'', r['하차위치']||''];
+    return [i+1, r['등록ID']||'', r['배차']||'', r['이름']||'', r['연락처']||'', r['차량번호']||'', r['승차위치']||'', r['하차위치']||''];
   });
   return { baseHdr:baseHdr, baseRows:baseRows, drvHdr:drvHdr, drvRows:drvRows };
 }
@@ -15643,7 +15732,7 @@ function bbSave(){
   // 해당 등록건의 기존 운전자행을 지우고 폼의 현재 내용으로 교체
   _bbDriverRows = _bbDriverRows.filter(function(r){ return String(r['등록ID'])!==id; });
   drivers.forEach(function(d){
-    _bbDriverRows.push({'등록ID':id, '배차':d.bae, '이름':d.name, '연락처':d.phone, '승차위치':d.board, '하차위치':d.alight});
+    _bbDriverRows.push({'등록ID':id, '배차':d.bae, '이름':d.name, '연락처':d.phone, '차량번호':d.vehicle, '승차위치':d.board, '하차위치':d.alight});
   });
 
   var payloads = _bbBuildSheetPayloads();
@@ -15678,7 +15767,7 @@ function bbEditRow(id){
   $set('bb-count',     row['배정대수']);
   var tbody=$id('bb-driver-table-body'); if(tbody) tbody.innerHTML='';
   _bbDriverRows.filter(function(r){ return String(r['등록ID'])===String(id); })
-    .forEach(function(d){ tbody.insertAdjacentHTML('beforeend', bbDriverRowHtml(d['배차'], d['이름'], d['연락처'], d['승차위치'], d['하차위치'])); });
+    .forEach(function(d){ tbody.insertAdjacentHTML('beforeend', bbDriverRowHtml(d['배차'], d['이름'], d['연락처'], d['차량번호'], d['승차위치'], d['하차위치'])); });
   bbSwitchTab('reg');
 }
 
@@ -15793,29 +15882,38 @@ function bbRenderList(){
 function _bbRenderDriverModal(baseRows, modalTitle){
   var titleEl = $id('bb-driver-modal-title');
   if(titleEl) titleEl.textContent = modalTitle || '운전자/승하차정보';
+  var infoEl = $id('bb-driver-modal-info');
   var tbody = $id('bb-driver-modal-body');
   if(!tbody) return;
   if(!baseRows.length){
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);">일치하는 기초정보가 없습니다.</td></tr>';
+    if(infoEl) infoEl.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);">일치하는 기초정보가 없습니다.</td></tr>';
   } else {
+    // [v280] 안내문구(배정유형/운행방향/출발일자/출발시간/배정대수)를 그리드헤더보다 먼저 보이도록
+    // 표 바깥의 전용 영역에 그룹별로 렌더링. tbody에는 더 이상 안내문구 행을 섞지 않고 운전자 행만 담는다.
+    if(infoEl){
+      infoEl.innerHTML = baseRows.map(function(r){
+        return '<div style="background:var(--sky);font-weight:700;color:var(--navy);padding:8px 12px;border-radius:8px;margin:0 0 8px;">'+
+          esc(r['배정유형']||'')+'('+esc(r['운행방향']||'')+') · '+esc(r['출발일자']||'')+' '+esc(r['출발시간']||'')+
+          ' · 배정대수 '+esc(r['배정대수']||'')+
+        '</div>';
+      }).join('');
+    }
     tbody.innerHTML = baseRows.map(function(r){
       var id = r['등록ID'];
-      var groupHeader = '<tr><td colspan="5" style="background:var(--sky);font-weight:700;color:var(--navy);">'+
-        esc(r['배정유형']||'')+'('+esc(r['운행방향']||'')+') · '+esc(r['출발일자']||'')+' '+esc(r['출발시간']||'')+
-        ' · 배정대수 '+esc(r['배정대수']||'')+'</td></tr>';
       var drivers = _bbDriverRows.filter(function(d){ return String(d['등록ID'])===String(id); });
-      var driverRows = drivers.length
+      return drivers.length
         ? drivers.map(function(d){
             return '<tr>'+
-              '<td>'+esc(d['배차']||'')+'</td>'+
+              '<td>'+esc(bbNormalizeBaeLabel(d['배차']||''))+'</td>'+
               '<td>'+esc(d['이름']||'')+'</td>'+
               '<td>'+esc(bbFormatPhone(d['연락처']||''))+'</td>'+
+              '<td>'+esc(d['차량번호']||'')+'</td>'+
               '<td>'+esc(d['승차위치']||'')+'</td>'+
               '<td>'+esc(d['하차위치']||'')+'</td>'+
             '</tr>';
           }).join('')
-        : '<tr><td colspan="5" style="text-align:center;color:var(--muted);">등록된 운전자 정보가 없습니다.</td></tr>';
-      return groupHeader + driverRows;
+        : '<tr><td colspan="6" style="text-align:center;color:var(--muted);">등록된 운전자 정보가 없습니다.</td></tr>';
     }).join('');
   }
   var modal=$id('bb-driver-modal'); if(modal) modal.classList.add('show');
