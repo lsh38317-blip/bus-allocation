@@ -8851,7 +8851,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v278_bp_unassign_style_bulkbtn_reset';
+var CACHE_VERSION = 'v279_room_save_strict_filter';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -14690,7 +14690,16 @@ function roomSaveToSheet(){
 
   var filter  = _getRoomFilter();
   var headers = ['NO','년도','수양회종류','행사명','접수ID','건물명','배정호','교구','구역','이름'];
-  var newRows = roomData.map(function(d){
+  // [v279] roomData가 항상 "현재 필터(회차)만" 담고 있다고 가정하지 않고, 저장 직전 3키(년도+수양회종류+
+  // 행사명)로 한 번 더 엄격히 걸러낸다. roomImportFromRetreat()는 항상 필터링된 값만 넣지만, roomRestore()
+  // (로그인 시/숙소배정현황 조회 시 호출)는 시트 전체를 무필터로 roomData에 채우므로, 그 상태에서 곧바로
+  // 저장하면 다른 회차 데이터까지 newRows에 섞여 들어가 기존 보존분과 중복 저장되는 문제가 있었다.
+  var newRows = roomData.filter(function(d){
+    var dY = String(d.year||filter.year).trim();
+    var dT = String(d.retreatType||filter.retreatType).trim();
+    var dE = String(d.event||filter.event).trim();
+    return dY===String(filter.year) && dT===filter.retreatType && dE===filter.event;
+  }).map(function(d){
     return [d.no, d.year||filter.year, d.retreatType||filter.retreatType, d.event||filter.event, d.receiptId||'', d.building, d.room||'', d.parish, d.district, d.name];
   });
 
