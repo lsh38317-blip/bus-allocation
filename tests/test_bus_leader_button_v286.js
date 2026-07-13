@@ -15,7 +15,7 @@ async function run() {
   const { window } = dom;
 
   const baseInfoRows = [
-    { 'NO':'1', '등록ID':'BB1', '년도':'2026', '수양회종류':'하계', '행사명':'1차', '배정유형':'본대', '운행방향':'참석', '배정대수':'2' },
+    { 'NO':'1', '등록ID':'BB1', '년도':'2026', '수양회종류':'하계', '행사명':'1차', '배정유형':'본대(참석자)', '운행방향':'참석', '배정대수':'2' },
   ];
   let fetchCount = { baseInfo: 0 };
 
@@ -61,7 +61,7 @@ async function run() {
   console.log('▶ 테스트2: 배정유형 변경만으로는 자동 조회되지 않고 안내상태로 리셋됨');
   const curYear = $('bus-sel-year') ? $('bus-sel-year').value : '';
   baseInfoRows[0]['년도'] = curYear;
-  $('bus-sel-assigntype').value = '본대';
+  $('bus-sel-assigntype').value = '본대(참석자)';
   // onchange 이벤트를 발생시켜 실제 브라우저 동작 재현
   const changeEvent = new window.Event('change', { bubbles: true });
   $('bus-sel-assigntype').dispatchEvent(changeEvent);

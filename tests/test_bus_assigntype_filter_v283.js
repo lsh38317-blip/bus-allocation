@@ -45,9 +45,9 @@ async function run() {
   const { window } = dom;
 
   const rosterSheetRows = [
-    { 'NO':'1', '접수ID':'R1', '성명':'홍길동', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'본대' },
-    { 'NO':'2', '접수ID':'R2', '성명':'김철수', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'직장조' },
-    { 'NO':'3', '접수ID':'R3', '성명':'이영희', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'본대' },
+    { 'NO':'1', '접수ID':'R1', '성명':'홍길동', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'본대(참석자)' },
+    { 'NO':'2', '접수ID':'R2', '성명':'김철수', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'직장조(참석자)' },
+    { 'NO':'3', '접수ID':'R3', '성명':'이영희', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'본대(참석자)' },
   ];
   window.fetch = (url) => {
     const u = String(url);
@@ -83,26 +83,26 @@ async function run() {
   assert(!!assignSel, 'bus-sel-assigntype 셀렉트가 존재함');
   const optionValues = Array.from(assignSel.options).map((o) => o.value);
   assert(optionValues[0] === '', '첫 옵션은 "전체"(빈값)');
-  assert(optionValues.includes('본대'), '참석 모드 옵션에 "본대" 포함');
-  assert(optionValues.includes('선발대(봉사자)'), '참석 모드 옵션에 "선발대(봉사자)" 포함');
+  assert(optionValues.includes('본대(참석자)'), '참석 모드 옵션에 "본대(참석자)" 포함');
+  assert(optionValues.includes('본대(봉사자)'), '참석 모드 옵션에 "본대(봉사자)" 포함');
 
   console.log('▶ 테스트3: 귀가 모드로 전환 시 배정유형 옵션도 귀가 목록으로 갱신');
   window.busMainTypeSelect('leave');
   const leaveOptionValues = Array.from(assignSel.options).map((o) => o.value);
   assert(leaveOptionValues.includes('후발대'), '귀가 모드 옵션에 "후발대" 포함');
-  assert(!leaveOptionValues.includes('직장조'), '귀가 모드 옵션에는 참석전용 값("직장조")이 없음');
+  assert(!leaveOptionValues.includes('직장조(참석자)'), '귀가 모드 옵션에는 참석전용 값("직장조(참석자)")이 없음');
   window.busMainTypeSelect('arrive'); // 이후 테스트를 위해 참석 모드로 복귀
 
   console.log('▶ 테스트4: _busImportBuildUI — 배정유형 필터 선택 시 해당 유형만 팀 집계에 포함');
   const curYear = $('bus-sel-year') ? $('bus-sel-year').value : '';
   // 교회목표 미로드 시 _busGetFilter()의 홈배지 폴백이 기본값(하계/1차)으로 귀결되므로 동일하게 맞춤
   rosterSheetRows.forEach((r) => { r['연도'] = curYear; r['수양회종류'] = '하계'; r['행사명'] = '1차'; });
-  assignSel.value = '본대';
+  assignSel.value = '본대(참석자)';
   window.busImportFromRetreat();
   await new Promise((r) => setTimeout(r, 100));
   const resultArea = $('bus-import-arrive-result');
   const resultText = resultArea ? resultArea.textContent : '';
-  assert(resultText.indexOf('2명') !== -1 || resultText.indexOf('2') !== -1, '배정유형=본대 필터 시 2명만 집계됨(직장조 1명 제외) — 실제 표시: ' + resultText.slice(0,200));
+  assert(resultText.indexOf('2명') !== -1 || resultText.indexOf('2') !== -1, '배정유형=본대(참석자) 필터 시 2명만 집계됨(직장조(참석자) 1명 제외) — 실제 표시: ' + resultText.slice(0,200));
 
   console.log('\n──────────────────────');
   console.log(`총 ${pass + fail}건 중 성공 ${pass}건 / 실패 ${fail}건`);

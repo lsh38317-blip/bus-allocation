@@ -1,4 +1,5 @@
-// [v285] 선탑자 지정 — 버스배정기초정보 배정대수 기준 입력칸 생성 + 교구/구역/이름 매칭 저장 회귀테스트
+// [v285→v41] 선탑자 지정 — 버스배정기초정보 배정대수 기준 입력칸 생성 + 교구/구역/이름 매칭 저장 회귀테스트
+// [v41] 저장 대상이 버스배정_참석요약 → 버스배정_운전자정보(등록ID+배차)로 변경됨에 따라 갱신
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
 
@@ -15,27 +16,38 @@ async function run() {
   const { window } = dom;
 
   const baseInfoRows = [
-    { 'NO':'1', '등록ID':'BB1', '년도':'2026', '수양회종류':'하계', '행사명':'1차', '배정유형':'본대', '운행방향':'참석', '배정대수':'2' },
+    { 'NO':'1', '등록ID':'BB1', '년도':'2026', '수양회종류':'하계', '행사명':'1차', '배정유형':'본대(참석자)', '운행방향':'참석', '배정대수':'2' },
+  ];
+  // [v41] 운전자정보는 배정대수만큼 미리 생성돼 있는 게 정상 흐름(배차="1호"/"2호")
+  const driverRows = [
+    { 'NO':'1', '등록ID':'BB1', '배차':'1호', '이름':'', '연락처':'', '차량번호':'', '승차위치':'', '하차위치':'', '선탑자ID':'' },
+    { 'NO':'2', '등록ID':'BB1', '배차':'2호', '이름':'', '연락처':'', '차량번호':'', '승차위치':'', '하차위치':'', '선탑자ID':'' },
   ];
   const rosterRows = [
-    { 'NO':'1', '접수ID':'R1', '성명':'홍길동', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'본대', '연도':'2026', '수양회종류':'하계', '행사명':'1차' },
-    { 'NO':'2', '접수ID':'R2', '성명':'김철수', '교구':'3교구', '구역':'32구역', '참석교통수단':'버스', '참석배정유형':'본대', '연도':'2026', '수양회종류':'하계', '행사명':'1차' },
+    { 'NO':'1', '접수ID':'R1', '성명':'홍길동', '교구':'3교구', '구역':'31구역', '참석교통수단':'버스', '참석배정유형':'본대(참석자)', '연도':'2026', '수양회종류':'하계', '행사명':'1차' },
+    { 'NO':'2', '접수ID':'R2', '성명':'김철수', '교구':'3교구', '구역':'32구역', '참석교통수단':'버스', '참석배정유형':'본대(참석자)', '연도':'2026', '수양회종류':'하계', '행사명':'1차' },
   ];
-  let summarySavedRows = null; // 저장 시 전송된 rows를 캡처
+  let driverSavedRows = null;   // [v41] 운전자정보 저장 요청 캡처
+  let summaryPostSent = false;  // [v41] 요약시트로는 절대 POST가 가면 안 됨(placeholder 방지 핵심 확인)
 
   window.fetch = (url, opts) => {
     const u = String(url);
     if (opts && opts.method === 'POST') {
-      // 선탑자 저장(overwrite) 요청
       const body = JSON.parse(opts.body);
-      if (body.sheetName === '버스배정_참석요약') {
-        summarySavedRows = body.rows;
+      if (body.sheetName === '버스배정_운전자정보') {
+        driverSavedRows = body.rows;
+      }
+      if (body.sheetName === '버스배정_참석요약' || body.sheetName === '버스배정_귀가요약') {
+        summaryPostSent = true;
       }
       return Promise.resolve({ text: () => Promise.resolve(JSON.stringify({ success: true })) });
     }
     const decoded = decodeURIComponent(u);
-    if (decoded.indexOf('sheetName=버스배정_기초정보') !== -1 || decoded.indexOf('버스배정_기초정보') !== -1) {
+    if (decoded.indexOf('버스배정_기초정보') !== -1) {
       return Promise.resolve({ json: () => Promise.resolve({ success: true, data: baseInfoRows }) });
+    }
+    if (decoded.indexOf('버스배정_운전자정보') !== -1) {
+      return Promise.resolve({ json: () => Promise.resolve({ success: true, data: driverRows }) });
     }
     if (decoded.indexOf('참석인원명단') !== -1) {
       return Promise.resolve({ json: () => Promise.resolve({ success: true, data: rosterRows }) });
@@ -74,7 +86,7 @@ async function run() {
   const curYear = $('bus-sel-year') ? $('bus-sel-year').value : '';
   baseInfoRows[0]['년도'] = curYear;
   rosterRows.forEach((r) => { r['연도'] = curYear; });
-  $('bus-sel-assigntype').value = '본대';
+  $('bus-sel-assigntype').value = '본대(참석자)';
   window.busLeaderRender();
   await new Promise((r) => setTimeout(r, 150));
   listEl = $('bus-leader-list');
@@ -82,7 +94,7 @@ async function run() {
   assert(!!$('leader-in-parish-2'), '2번째 입력칸(교구select) 생성됨');
   assert(!$('leader-in-parish-3'), '배정대수(2)를 초과하는 3번째 입력칸은 생성되지 않음');
 
-  console.log('▶ 테스트3: 교구/구역/이름 입력 후 저장 시 접수ID를 찾아 시트에 upsert 요청됨');
+  console.log('▶ 테스트3: 교구/구역/이름 입력 후 저장 시 접수ID를 찾아 [v41]버스배정_운전자정보에 upsert 요청됨');
   $('leader-in-parish-1').value = '3교구';
   window.busLeaderParishChange(1);
   await new Promise((r) => setTimeout(r, 20));
@@ -92,11 +104,12 @@ async function run() {
   window.busLeaderSave();
   await new Promise((r) => setTimeout(r, 200));
 
-  assert(summarySavedRows !== null, '버스배정_참석요약 저장 요청이 실제로 전송됨');
-  const savedRow1 = summarySavedRows.find((r) => r[4] === '1호'); // [년도,종류,행사명,배정유형,버스명,...]
-  assert(!!savedRow1, '1호 버스에 대한 저장 행이 생성됨');
-  assert(savedRow1 && savedRow1[3] === '본대', '저장된 행의 배정유형이 "본대"로 기록됨 (실제: ' + (savedRow1 && savedRow1[3]) + ')');
-  assert(savedRow1 && savedRow1[savedRow1.length-1] === 'R1', '저장된 행의 선탑자ID가 교구/구역/이름으로 찾은 접수ID(R1)와 일치');
+  assert(driverSavedRows !== null, '[v41] 버스배정_운전자정보 저장 요청이 실제로 전송됨');
+  assert(summaryPostSent === false, '[v41 핵심] 버스배정_참석요약/귀가요약으로는 어떤 POST도 전송되지 않음(placeholder 행 생성 방지)');
+  // drvHdr = ['NO','등록ID','배차','이름','연락처','차량번호','승차위치','하차위치','선탑자ID']
+  const savedRow1 = driverSavedRows && driverSavedRows.find((r) => r[2] === '1호');
+  assert(!!savedRow1, '[v41] 1호 배차에 대한 운전자정보 저장 행이 존재함');
+  assert(savedRow1 && savedRow1[8] === 'R1', '[v41] 저장된 행의 선탑자ID(9번째 컬럼)가 교구/구역/이름으로 찾은 접수ID(R1)와 일치');
 
   console.log('\n──────────────────────');
   console.log(`총 ${pass + fail}건 중 성공 ${pass}건 / 실패 ${fail}건`);

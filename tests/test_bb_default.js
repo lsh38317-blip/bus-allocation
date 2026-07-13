@@ -46,7 +46,7 @@ mod.bbFormReset();
 const dirSel = document.getElementById('bb-direction');
 const typeSel = document.getElementById('bb-type');
 assert(dirSel.value === '참석', '운행방향 기본값 = 참석 (실제: ' + dirSel.value + ')');
-assert(typeSel.value === '선발대(총괄,팀장,TFT)', '배정유형 기본값 = 목록 1번째 항목 (실제: "' + typeSel.value + '")');
+assert(typeSel.value === '선발대', '배정유형 기본값 = 목록 1번째 항목 (실제: "' + typeSel.value + '")');
 assert(typeSel.selectedIndex === 0, '배정유형 select의 selectedIndex가 0(빈값 아님)');
 
 console.log('▶ 테스트: 운행방향을 귀가로 바꾸면 귀가용 목록의 1번째 항목으로 갱신');
