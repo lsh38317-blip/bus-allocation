@@ -1414,7 +1414,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
               <!-- [v327] 전체배정현황보기 — 상단 배정유형 선택과 무관하게 전체 조합 조회(버스 배정 현황 화면과 동일 스타일) -->
               <button id="btn-bus-summary-showall" onclick="busSummaryShowAll()" style="background:transparent;border:1px solid var(--navy);color:var(--navy);border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;">🗂️ 전체배정현황보기</button>
-              <button id="btn-bus-summary-showsingle" onclick="busSummaryShowSingle()" style="display:none;background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;">↩️ 배정유형별로 보기</button>
+              <button id="btn-bus-summary-showsingle" onclick="busSummaryShowSingle()" style="background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;">↩️ 배정유형별로 보기</button>
               <button id="btn-bus-summary-export"
                 onclick="busSummaryExportCSV()"
                 style="background:#fff;color:#1a6b45;border:1.5px solid #1a6b45;border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;">
@@ -5325,6 +5325,7 @@ function busSummarySubTab(type){
   // 배차표 다운로드 버튼 라벨도 현재 서브탭(참석/귀가)에 맞춰 갱신
   var expLbl = $id('btn-bus-summary-export-label');
   if(expLbl) expLbl.textContent = (type==='leave' ? '귀가' : '참석') + ' 배차표 다운로드';
+  _busSummaryUpdateToggleBtnStyle(); // [v329] 전체보기/배정유형별 보기 버튼 강조 상태 동기화
   // [v327] 전체보기 모드에서는 참석/귀가 전환 시에도 전체보기 렌더러를 사용
   if(_busSummaryViewMode === 'all') busSummaryRenderAllForType(type);
   else busRenderSummary(type);
@@ -8076,9 +8077,7 @@ var _busSummaryAllCache = {arrive:{buses:[],teams:[]}, leave:{buses:[],teams:[]}
 function busSummaryShowAll(){
   if(!USE_SHEET()){ showToast('⚠️ Google Sheets URL이 설정되지 않았습니다.','error'); return; }
   _busSummaryViewMode = 'all';
-  var btnAll=$id('btn-bus-summary-showall'), btnSingle=$id('btn-bus-summary-showsingle');
-  if(btnAll) btnAll.style.display='none';
-  if(btnSingle) btnSingle.style.display='';
+  _busSummaryUpdateToggleBtnStyle();
 
   showLoading(true);
   var sheetNames = ['버스배정_참석요약','버스배정_귀가요약','버스배정_기초정보','버스배정_운전자정보'];
@@ -8124,10 +8123,17 @@ function busSummaryShowAll(){
 // 요약 시트를 다시 조회하고 전역 상태(busArriveTeams 등)를 복원한다(전체보기가 덮어썼던 것을 되돌림).
 function busSummaryShowSingle(){
   _busSummaryViewMode = 'single';
-  var btnAll=$id('btn-bus-summary-showall'), btnSingle=$id('btn-bus-summary-showsingle');
-  if(btnAll) btnAll.style.display='';
-  if(btnSingle) btnSingle.style.display='none';
+  _busSummaryUpdateToggleBtnStyle();
   busTab('summary');
+}
+// [v329] "전체배정현황보기"/"배정유형별로 보기" 두 버튼을 항상 나란히 표시하고(숨김 없음),
+// 현재 모드에 해당하는 버튼만 강조 스타일로 구분한다. 순서는 [전체배정현황보기][배정유형별로 보기][배차표 다운로드].
+function _busSummaryUpdateToggleBtnStyle(){
+  var btnAll=$id('btn-bus-summary-showall'), btnSingle=$id('btn-bus-summary-showsingle');
+  var activeStyle   = 'background:var(--navy);border:1px solid var(--navy);color:#fff;border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;';
+  var inactiveStyle = 'background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;';
+  if(btnAll)    btnAll.style.cssText    = (_busSummaryViewMode==='all')    ? activeStyle : inactiveStyle;
+  if(btnSingle) btnSingle.style.cssText = (_busSummaryViewMode==='single') ? activeStyle : inactiveStyle;
 }
 
 // [v327] 전체보기 모드 렌더링 — busRenderSummary()와 동일한 통계/카드 마크업을, 전역 상태 대신
@@ -9650,7 +9656,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v328_summary_showall_roster_btn_fix';
+var CACHE_VERSION = 'v329_summary_toggle_buttons_always_visible';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
