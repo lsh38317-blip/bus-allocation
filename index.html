@@ -1412,6 +1412,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div id="bus-panel-summary" style="display:none;">
             <!-- 배차표 다운로드 -->
             <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+              <!-- [v327] 전체배정현황보기 — 상단 배정유형 선택과 무관하게 전체 조합 조회(버스 배정 현황 화면과 동일 스타일) -->
+              <button id="btn-bus-summary-showall" onclick="busSummaryShowAll()" style="background:transparent;border:1px solid var(--navy);color:var(--navy);border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;">🗂️ 전체배정현황보기</button>
+              <button id="btn-bus-summary-showsingle" onclick="busSummaryShowSingle()" style="display:none;background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;">↩️ 배정유형별로 보기</button>
               <button id="btn-bus-summary-export"
                 onclick="busSummaryExportCSV()"
                 style="background:#fff;color:#1a6b45;border:1.5px solid #1a6b45;border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;">
@@ -4736,11 +4739,15 @@ function _busRowsToBuses(rows, driverMap, opts){
         if(!m) return;
         var tName = m[1].trim();
         var tCount = parseInt(m[2])||0;
-        var team = teams.find(function(t){ return t.name===tName; });
+        // [v327] prefixMode(전체보기)에서는 배정유형+이름을 함께 키로 써서, 서로 다른 배정유형의
+        // 동명 팀(예: "3교구 31구역"이 선발대·본대에 동시 존재)이 하나로 잘못 합쳐지지 않도록 한다.
+        // 병합되면 분산배정 여부(여러 버스에 나뉘었는지) 판정이 배정유형을 넘나들며 뒤섞여 부정확해짐.
+        var teamKey = prefixMode ? (atype+'|'+tName) : tName;
+        var team = teams.find(function(t){ return t._teamKey===teamKey; });
         if(!team){
           var _pp = _busParseParish(tName);
           team = {id:busUid(), name:tName, count:tCount, color:'#4a7fc1',
-                  parish:_pp.parish, isJH:(tName==='중고등부')};
+                  parish:_pp.parish, isJH:(tName==='중고등부'), assignType:atype, _teamKey:teamKey};
           teams.push(team);
         }
         if(!bus.slots.find(function(s){ return s.teamId===team.id; })){
@@ -5318,7 +5325,9 @@ function busSummarySubTab(type){
   // 배차표 다운로드 버튼 라벨도 현재 서브탭(참석/귀가)에 맞춰 갱신
   var expLbl = $id('btn-bus-summary-export-label');
   if(expLbl) expLbl.textContent = (type==='leave' ? '귀가' : '참석') + ' 배차표 다운로드';
-  busRenderSummary(type);
+  // [v327] 전체보기 모드에서는 참석/귀가 전환 시에도 전체보기 렌더러를 사용
+  if(_busSummaryViewMode === 'all') busSummaryRenderAllForType(type);
+  else busRenderSummary(type);
 }
 // onclick 속성에서 직접 호출되는 래퍼 — busSummarySub은 IIFE 내부 변수라 전역(onclick)에서 직접 참조 불가하므로
 // 인자 없이 호출되면 이 함수가 클로저 안에서 busSummarySub을 읽어 bvwExportBusSchedule에 넘겨줌
@@ -5420,7 +5429,11 @@ function busAssignTypeChanged(){
 
   busRenderTeams('arrive');   busRenderTeams('leave');
   busRenderBuses('arrive');   busRenderBuses('leave');
-  busRenderSummary('arrive'); busRenderSummary('leave');
+  // [v327] "전체배정현황보기" 모드일 때는 배정유형 콤보가 바뀌어도 배정현황 영역을 리셋하지 않고
+  // 유지한다(선탑자 지정 전체보기 패턴과 동일 원칙)
+  if(_busSummaryViewMode !== 'all'){
+    busRenderSummary('arrive'); busRenderSummary('leave');
+  }
   updateBusUnassignedBadge();
   busLeaderResetPrompt();
   busUpdateCapSummary(); // [v323] 배정유형 전환 시 "버스 설정" 요약도 새 배정유형 기준(미조회 상태)으로 갱신
@@ -7962,13 +7975,17 @@ function busRenderSummary(type){
   var unassigned=filteredTeams.filter(function(t){ return busTeamAssigned(t.id, type)===0; });
   var partial=filteredTeams.filter(function(t){ return buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===t.id; }); }).length>=2; });
   var active=buses.filter(function(b){ return b.slots.length>0; });
+  // [v327] "분산 배정"은 운행 버스가 2대 이상일 때만 의미가 있으므로, 1대 이하면 통계 타일 자체를 숨긴다.
+  var showSplitStat = active.length>=2;
   var stats=[
     {label:'전체 팀',   value:filteredTeams.length, unit:'팀', color:'var(--navy)', bg:'var(--sky)', bd:'var(--border2)'},
     {label:'전체 인원', value:total,                unit:'명', color:'#2d8a5a', bg:'#edf7f2', bd:'#b8dfc8'},
     {label:'운행 버스', value:active.length,        unit:'대', color:'#c89b30', bg:'#fdf6e3', bd:'#f0dea0'},
     {label:'미배정 팀', value:unassigned.length,    unit:'팀', color:unassigned.length>0?'#d94040':'#2d8a5a', bg:unassigned.length>0?'#fff0f0':'#edf7f2', bd:unassigned.length>0?'#f5c0c0':'#b8dfc8'},
-    {label:'분산 배정', value:partial.length,       unit:'팀', color:partial.length>0?'#c89b30':'#2d8a5a', bg:partial.length>0?'#fdf6e3':'#edf7f2', bd:partial.length>0?'#f0dea0':'#b8dfc8'},
   ];
+  if(showSplitStat){
+    stats.push({label:'분산 배정', value:partial.length, unit:'팀', color:partial.length>0?'#c89b30':'#2d8a5a', bg:partial.length>0?'#fdf6e3':'#edf7f2', bd:partial.length>0?'#f0dea0':'#b8dfc8'});
+  }
   var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px;">';
   stats.forEach(function(s){
     html+='<div style="background:'+s.bg+';border:1px solid '+s.bd+';border-radius:10px;padding:14px 16px;box-shadow:var(--shadow);">'+
@@ -8050,8 +8067,165 @@ function busRenderSummary(type){
   el.innerHTML=html;
 }
 
+// [v327] "전체배정현황보기" — 상단 배정유형 선택과 무관하게 전체 배정유형을 조합해 조회.
+// busArriveTeams/busArriveBuses 등 전역 상태는 건드리지 않고(다른 탭·자동배정 등에 영향 없도록)
+// 별도 캐시(_busSummaryAllCache)에만 보관한다. "선탑자 지정"의 전체보기(_busLeaderViewMode)와 동일 패턴.
+var _busSummaryViewMode = 'single'; // 'single' | 'all'
+var _busSummaryAllCache = {arrive:{buses:[],teams:[]}, leave:{buses:[],teams:[]}};
+
+function busSummaryShowAll(){
+  if(!USE_SHEET()){ showToast('⚠️ Google Sheets URL이 설정되지 않았습니다.','error'); return; }
+  _busSummaryViewMode = 'all';
+  var btnAll=$id('btn-bus-summary-showall'), btnSingle=$id('btn-bus-summary-showsingle');
+  if(btnAll) btnAll.style.display='none';
+  if(btnSingle) btnSingle.style.display='';
+
+  showLoading(true);
+  var sheetNames = ['버스배정_참석요약','버스배정_귀가요약','버스배정_기초정보','버스배정_운전자정보'];
+  var results={}, done=0;
+  sheetNames.forEach(function(sn){
+    apiCall({action:'getAll', sheetName:sn}).then(function(res){
+      results[sn] = (res&&res.success) ? (res.data||res.rows||[]) : [];
+    }).catch(function(){ results[sn]=[]; }).finally(function(){
+      done++;
+      if(done<sheetNames.length) return;
+      showLoading(false);
+      // 배정유형은 무시하고 년도·수양회종류·행사명만으로 필터링
+      var bf = _busGetFilter();
+      function filterRows(rows){
+        return (rows||[]).filter(function(r){
+          if(bf.year   && String(r['년도']||'').trim()!==bf.year)     return false;
+          if(bf.season && String(r['수양회종류']||'').trim()!==bf.season) return false;
+          if(bf.event  && String(r['행사명']||'').trim()!==bf.event)  return false;
+          return true;
+        });
+      }
+      var arrSum = filterRows(results['버스배정_참석요약']);
+      var lvSum  = filterRows(results['버스배정_귀가요약']);
+      var lmArr = _busBuildDriverInfoMap(results['버스배정_기초정보'], results['버스배정_운전자정보'], bf, '참석');
+      var lmLv  = _busBuildDriverInfoMap(results['버스배정_기초정보'], results['버스배정_운전자정보'], bf, '귀가');
+      var arrived = _busRowsToBuses(arrSum, lmArr, {prefixWithAssignType:true});
+      var leaved  = _busRowsToBuses(lvSum,  lmLv,  {prefixWithAssignType:true});
+      _busSummaryAllCache.arrive = arrived;
+      _busSummaryAllCache.leave  = leaved;
+      // [v327-fix] busRosterOpenForBus()/buildBusRoster()가 busArriveTeams/busArriveBuses(전역 상태)를
+      // 기준으로 탑승자 명단을 만들기 때문에, "탑승자내역" 버튼이 동작하려면 전체보기 데이터를
+      // 전역 상태에도 반영해야 한다(버스 배정 현황 화면의 busviewReload()와 동일 패턴).
+      // "배정유형별로 보기"로 되돌아갈 때 busTab('summary')를 재호출해 단일 배정유형 데이터로 복원한다.
+      busArriveTeams = arrived.teams; busArriveBuses = arrived.buses;
+      busLeaveTeams  = leaved.teams;  busLeaveBuses  = leaved.buses;
+      busSummaryRenderAllForType(busSummarySub || 'arrive');
+      showToast('✅ 전체 배정유형 조회 완료','success');
+    });
+  });
+}
+
+// [v327] 배정유형별 보기로 복귀 — busTab('summary')를 재호출해 현재 선택된 단일 배정유형 기준으로
+// 요약 시트를 다시 조회하고 전역 상태(busArriveTeams 등)를 복원한다(전체보기가 덮어썼던 것을 되돌림).
+function busSummaryShowSingle(){
+  _busSummaryViewMode = 'single';
+  var btnAll=$id('btn-bus-summary-showall'), btnSingle=$id('btn-bus-summary-showsingle');
+  if(btnAll) btnAll.style.display='';
+  if(btnSingle) btnSingle.style.display='none';
+  busTab('summary');
+}
+
+// [v327] 전체보기 모드 렌더링 — busRenderSummary()와 동일한 통계/카드 마크업을, 전역 상태 대신
+// _busSummaryAllCache의 조합 데이터로 그린다. 버스 카드 제목엔 이미 배정유형/배차명이 접두어로
+// 포함돼 있으므로(_busRowsToBuses prefixMode) 별도 표기 없이도 구분된다.
+function busSummaryRenderAllForType(type){
+  var elId = type==='leave' ? 'bus-summary-leave-content' : 'bus-summary-content';
+  var el = $id(elId); if(!el) return;
+  // [v327-fix] busSummaryShowAll()이 전역 상태(busArriveBuses 등)에도 반영해두므로 그대로 사용한다
+  // (아래 "탑승자내역" 버튼이 busRosterOpenForBus()를 통해 전역 상태를 조회하기 때문)
+  var buses = type==='leave' ? busLeaveBuses : busArriveBuses;
+  var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
+  var cap = busGetCap();
+  if(!buses.length){
+    el.innerHTML='<div class="empty-state" style="padding:40px;"><div class="icon">📋</div><p>전체 배정유형 기준으로 배정된 데이터가 없습니다.</p></div>';
+    return;
+  }
+  var filteredTeams = teams.filter(function(t){ return t.name.indexOf('시각선교부')<0 && t.name.indexOf('0 0')<0; });
+  var total = filteredTeams.reduce(function(s,t){ return s+t.count; },0);
+  var active = buses.filter(function(b){ return b.slots.length>0; });
+  // [v327] "분산 배정"은 해당 배정유형의 배정버스대수가 2대 이상일 때만 표시 — 팀이 이제
+  // 배정유형+이름으로 구분되므로(핵심 수정), 이 필터는 이미 배정유형별로 정확히 계산된다.
+  var partial = filteredTeams.filter(function(t){ return buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===t.id; }); }).length>=2; });
+  var showSplitStat = active.length>=2;
+  var stats=[
+    {label:'전체 팀',   value:filteredTeams.length, unit:'팀', color:'var(--navy)', bg:'var(--sky)', bd:'var(--border2)'},
+    {label:'전체 인원', value:total,                unit:'명', color:'#2d8a5a', bg:'#edf7f2', bd:'#b8dfc8'},
+    {label:'운행 버스', value:active.length,        unit:'대', color:'#c89b30', bg:'#fdf6e3', bd:'#f0dea0'},
+  ];
+  if(showSplitStat){
+    stats.push({label:'분산 배정', value:partial.length, unit:'팀', color:partial.length>0?'#c89b30':'#2d8a5a', bg:partial.length>0?'#fdf6e3':'#edf7f2', bd:partial.length>0?'#f0dea0':'#b8dfc8'});
+  }
+  var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px;">';
+  stats.forEach(function(s){
+    html+='<div style="background:'+s.bg+';border:1px solid '+s.bd+';border-radius:10px;padding:14px 16px;box-shadow:var(--shadow);">'+
+      '<div style="font-size:.73rem;color:var(--muted);margin-bottom:5px;font-weight:600;">'+s.label+'</div>'+
+      '<div style="font-size:1.6rem;font-weight:900;color:'+s.color+';line-height:1;">'+s.value+'<span style="font-size:.82rem;margin-left:2px;">'+s.unit+'</span></div>'+
+      '</div>';
+  });
+  html+='</div><div style="display:flex;flex-direction:column;gap:10px;">';
+  buses.forEach(function(bus){
+    var load = bus.slots.reduce(function(s,sl){ return s+sl.count; },0);
+    var over = load>cap;
+    var leaderName='';
+    if(bus.leaderId){
+      var lp=retreat.find(function(r){ return r.receiptId===bus.leaderId; });
+      if(lp) leaderName=lp.name;
+    }
+    html+='<div style="background:#fff;border:1px solid '+(over?'#f5c0c0':'var(--border2)')+';border-radius:12px;padding:16px 20px;box-shadow:var(--shadow);">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
+      '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">'+
+      '<div style="width:3px;height:15px;background:var(--navy);border-radius:2px;"></div>'+
+      '<span style="font-weight:700;font-size:.92rem;color:var(--navy);">'+esc(bus.name)+'</span>'+
+      '<span style="font-size:.77rem;color:var(--muted);">'+bus.slots.length+'팀</span>'+
+      '<span style="font-size:.76rem;color:var(--text2);">출발시간: <strong style="color:var(--text);">'+esc(bus.departTime||'-')+'</strong></span>'+
+      '<span style="font-size:.76rem;color:var(--text2);">운전자: <strong style="color:var(--text);">'+esc(bus.driverName||'-')+'</strong></span>'+
+      '<span style="font-size:.76rem;color:var(--text2);">선탑자: <strong style="color:var(--text);">'+esc(leaderName||'미지정')+'</strong></span>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'+
+      '<button onclick="busRosterOpenForBus(\''+bus.id+'\',\''+type+'\')" style="background:var(--sky);border:1px solid var(--border2);color:var(--navy);border-radius:20px;padding:3px 12px;font-size:.78rem;font-weight:700;cursor:pointer;">👥 탑승자내역</button>'+
+      '<span style="background:'+(over?'#fff0f0':'#edf7f2')+';color:'+(over?'#d94040':'#2d8a5a')+';border:1px solid '+(over?'#f5c0c0':'#b8dfc8')+';border-radius:20px;padding:3px 13px;font-weight:700;font-size:.83rem;">'+load+' / '+cap+'명</span>'+
+      '</div>'+
+      '</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+    if(!bus.slots.length){
+      html+='<span style="color:var(--muted);font-size:.8rem;">배정된 팀 없음</span>';
+    } else {
+      bus.slots.forEach(function(slot){
+        var team=teams.find(function(t){ return t.id===slot.teamId; }); if(!team) return;
+        var isSplit=showSplitStat && buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }).length>=2;
+        html+='<div style="background:'+(isSplit?'#fdf6e3':'#f7f8fc')+';border:1px solid '+(isSplit?'#f0dea0':'var(--border2)')+';border-radius:7px;padding:4px 11px;display:flex;align-items:center;gap:5px;">'+
+          '<div style="width:7px;height:7px;border-radius:50%;background:'+(isSplit?'#c89b30':team.color)+';flex-shrink:0;"></div>'+
+          '<span style="font-size:.82rem;font-weight:600;color:var(--text);">'+esc(team.name)+'</span>'+
+          '<span style="font-size:.75rem;color:'+(isSplit?'#c89b30':team.color)+';font-weight:700;">'+slot.count+'명</span>'+
+          (isSplit?'<span style="font-size:.65rem;color:#c89b30;">✂️</span>':'')+
+          '</div>';
+      });
+    }
+    html+='</div></div>';
+  });
+  if(showSplitStat && partial.length>0){
+    html+='<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#c89b30;margin-bottom:8px;font-size:.88rem;">✂️ 분산 배정 팀 ('+partial.length+')</div><div style="display:flex;flex-direction:column;gap:6px;">';
+    partial.forEach(function(team){
+      var sb=buses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); });
+      html+='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">'+
+        '<span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span>'+
+        sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+
+        '</div>';
+    });
+    html+='</div></div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+
 // ── 버스 뷰 모드 상태 ────────────────────────────────
 var bvwMode = 'summary';
+
 // 버스배정 현황 페이지용 시트 데이터 캐시
 var _bvwSheetStats = {
   arrive: { teams:0, total:0, buses:0, unassign:0, fromSheet:false },
@@ -8925,6 +9099,8 @@ function busRenderView(){
 // ── 배정 현황 렌더 ────────────────────────────────────
 function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses, visibleTeamIds, sheetUnassignTeams){
   if(!listEl) return;
+  // [v327] "분산 배정"은 운행 버스가 2대 이상일 때만 의미가 있으므로, 1대 이하면 태그/리스트를 숨긴다.
+  var showSplitStat = (active && active.length>=2);
   // bvwType 기반 현재 버스/팀 데이터
   var curBuses = bvwType==='leave' ? busLeaveBuses : busArriveBuses;
   var curTeams = bvwType==='leave' ? busLeaveTeams  : busArriveTeams;
@@ -8975,7 +9151,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
         slots.map(function(slot){
           var team=curTeams.find(function(t){ return t.id===slot.teamId; }); if(!team) return '';
           var isMine = visibleTeamIds && visibleTeamIds.indexOf(slot.teamId)>=0;
-          var isSplit=curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }).length>=2;
+          var isSplit=showSplitStat && curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }).length>=2;
           var slotBg    = isMine ? '#edf7f2' : isSplit ? '#fdf6e3' : '#f7f8fc';
           var slotBd    = isMine ? '#2d8a5a' : isSplit ? '#f0dea0' : 'var(--border2)';
           var slotColor = isMine ? '#2d8a5a' : isSplit ? '#c89b30' : team.color;
@@ -8993,7 +9169,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
   // ── 미배정팀 박스: 관리자+시트 데이터 우선, 아니면 로컬 기준 ──
   var renderUnassign = sheetUnassignTeams || unassign;
   if(renderUnassign.length>0) html+='<div style="background:#fff0f0;border:1px solid #f5c0c0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#d94040;margin-bottom:8px;font-size:.88rem;">⚠️ 미배정 팀 ('+renderUnassign.length+')</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'+renderUnassign.map(function(t){ return '<div style="background:#fff;border:1px solid #f5c0c0;border-radius:7px;padding:4px 12px;font-size:.82rem;color:#d94040;font-weight:600;">'+esc(t.name)+' ('+t.count+'명)</div>'; }).join('')+'</div></div>';
-  if(partial.length>0) html+='<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#c89b30;margin-bottom:8px;font-size:.88rem;">✂️ 분산 배정 팀 ('+partial.length+')</div><div style="display:flex;flex-direction:column;gap:6px;">'+partial.map(function(team){ var sb=curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }); return '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;"><span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span><span style="font-size:.78rem;color:var(--muted);">총 '+busTeamSlotTotal(team,sb)+'명 →</span>'+sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+'</div>'; }).join('')+'</div></div>';
+  if(showSplitStat && partial.length>0) html+='<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:12px;padding:14px 18px;"><div style="font-weight:700;color:#c89b30;margin-bottom:8px;font-size:.88rem;">✂️ 분산 배정 팀 ('+partial.length+')</div><div style="display:flex;flex-direction:column;gap:6px;">'+partial.map(function(team){ var sb=curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }); return '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;"><span style="font-weight:700;font-size:.85rem;color:'+team.color+';">'+esc(team.name)+'</span><span style="font-size:.78rem;color:var(--muted);">총 '+busTeamSlotTotal(team,sb)+'명 →</span>'+sb.map(function(b){ var sl=b.slots.find(function(s){ return s.teamId===team.id; }); return '<span style="background:#fff;border:1px solid #f0dea0;color:#c89b30;border-radius:6px;padding:2px 9px;font-size:.78rem;font-weight:600;">'+esc(b.name)+' '+sl.count+'명</span>'; }).join('')+'</div>'; }).join('')+'</div></div>';
   listEl.innerHTML=html;
 }
 
@@ -9474,7 +9650,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v326_driverjoin_baename_fix';
+var CACHE_VERSION = 'v328_summary_showall_roster_btn_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -16053,7 +16229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'bpOpenDetail','bpOpenInlineEdit','bpSaveInlineEdit','bpDeleteRow','bpCancelEdit','bpSaveEdit',
     'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport','bpBulkUploadOpen','bpBulkUploadHandleFile','bpBulkUploadParseCSV','bpBulkUploadProcess','bpStageAssignType',
     'bpEditDate','bpStageDate','bpCancelDateEdit',
-    'busTeamsSubTab','busAssignSubTab','busSummarySubTab',
+    'busTeamsSubTab','busAssignSubTab','busSummarySubTab','busSummaryShowAll','busSummaryShowSingle',
     'busLeaderSubTab','busLeaderRender','busLeaderRenderAll','busLeaderSave','busLeaderSaveAll','busLeaderSaveDispatch','busLeaderParishChange','busLeaderResetPrompt','busAssignTypeChanged',
     'vwReset','vwResetConfirm','vwFilter','vwOnSearch','vwOnArrDateChange',
     'vwSortBy','vwExportCSV','vwRenderTable','vwChangePS',
@@ -16122,7 +16298,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
     bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport, bpBulkUploadOpen:bpBulkUploadOpen, bpBulkUploadHandleFile:bpBulkUploadHandleFile, bpBulkUploadParseCSV:bpBulkUploadParseCSV, bpBulkUploadProcess:bpBulkUploadProcess, bpStageAssignType:bpStageAssignType,
     bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit,
-    busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab,
+    busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab, busSummaryShowAll:busSummaryShowAll, busSummaryShowSingle:busSummaryShowSingle,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderRenderAll:busLeaderRenderAll, busLeaderSave:busLeaderSave, busLeaderSaveAll:busLeaderSaveAll, busLeaderSaveDispatch:busLeaderSaveDispatch, busLeaderParishChange:busLeaderParishChange, busLeaderResetPrompt:busLeaderResetPrompt, busAssignTypeChanged:busAssignTypeChanged,
     vwReset:vwReset, vwResetConfirm:vwResetConfirm, vwFilter:vwFilter,
     vwOnSearch:vwOnSearch, vwOnArrDateChange:vwOnArrDateChange,
