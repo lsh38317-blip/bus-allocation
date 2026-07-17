@@ -697,7 +697,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <button class="nav-item" id="nav-roomview" onclick="switchPanel('roomview')"><span class="icon">🛏</span> 숙소 배정 현황</button>
         <button class="nav-item" id="nav-bus-view" onclick="switchPanel('busview')"><span class="icon">📋</span> 버스 배정 현황</button>
         <button class="nav-item" id="nav-enroll"     onclick="switchPanel('enroll')"    style="display:none"><span class="icon">📝</span> 버스신청</button>
-        <button class="nav-item"        id="nav-search"   onclick="switchPanel('search')">  <span class="icon">🔍</span> 배정인원현황</button>
+        <!-- [v342] 배정인원현황 메뉴 삭제 — 버스신청 화면 내 서브탭으로 통합 (switchPanel('search')는 서브탭에서 호출) -->
         <button class="nav-item" id="nav-mypage"   onclick="switchPanel('mypage')"   style="display:none"><span class="icon">🔑</span> 내 계정</button>
         <div class="nav-section" id="admin-section" style="display:none">관리자</div>
         <button class="nav-item" id="nav-goal"     onclick="switchPanel('goal')"     style="display:none"><span class="icon">🎯</span> 교회 목표 관리</button>
@@ -1576,10 +1576,16 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         </div>
 
         <!-- 접수인원등록 (관리자+구역장) -->
+        <!-- [v342] 버스신청/배정인원현황 서브탭 바 — enroll·search 패널 진입 시에만 노출 -->
+        <div id="enroll-subtabs" style="display:none;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <button id="enroll-subtab-enroll" class="btn btn-navy btn-sm"    onclick="switchPanel('enroll')">📝 개별신청</button>
+          <button id="enroll-subtab-search" class="btn btn-primary btn-sm" onclick="switchPanel('search')">🔍 일괄신청 및 현황</button>
+        </div>
+
         <div class="panel" id="panel-enroll">
           <div class="card">
-            <div class="card-header">
-              <div class="card-title">📝 버스신청</div>
+            <div class="card-header" style="justify-content:flex-end;">
+              <!-- [v343] 상단 title "버스신청" 고정으로 카드헤더 내 중복 텍스트/아이콘 삭제 -->
               <div style="display:flex;gap:8px;">
                 <button class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;white-space:nowrap;" onclick="enrollHistoryOpen()">📋 수양회접수내역</button>
               </div>
@@ -1783,7 +1789,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div class="card-header">
               <div class="card-title">검색 조건</div>
               <div style="display:flex;gap:6px;">
-                <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;" onclick="switchPanel('enroll')" title="배정인원등록 페이지로 이동">📝 등록</button>
+                <!-- [v342] "📝 등록" 버튼 삭제 — 상단 서브탭(버스신청)으로 대체 -->
                 <button class="btn btn-primary btn-sm" onclick="clearSearch()">↺ 초기화</button>
                 <button class="btn btn-sm" id="btn-reload-sheet"
                   onclick="reloadFromSheet()"
@@ -1850,7 +1856,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div class="toolbar">
               <div class="toolbar-info">검색결과: <strong id="result-count">0</strong>명</div>
               <div style="display:flex;align-items:center;gap:8px;">
-                <span id="data-source-badge" style="font-size:.72rem;padding:2px 9px;border-radius:20px;font-weight:600;"></span>
+                <!-- [v344] 구글 시트·N명 뱃지 삭제 -->
+                <input type="file" id="sp-bulk-upload-input" accept=".csv" style="display:none;" onchange="spBulkUploadHandleFile(this)">
+                <button class="btn btn-sm" style="background:#f4f4f4;border:1px solid #cfcfcf;color:#444;font-weight:700;" onclick="bpDownloadTemplate()" title="일괄업로드용 CSV 양식을 다운로드합니다">📄 양식 다운로드</button>
+                <button class="btn btn-sm" style="background:#e8f0fe;border:1px solid #90b4f0;color:#1a4d8f;font-weight:700;" onclick="spBulkUploadOpen()" title="버스 탑승자 명단(CSV)을 업로드해 참석/귀가 교통수단·배정유형을 일괄 반영">📥 일괄업로드</button>
+                <button class="btn btn-sm" id="sp-btn-bulk" style="background:#fff3e0;border:1px solid #f0c080;color:#8a5a00;font-weight:700;" onclick="spBulkToggleTransport()">🔁 일괄변경</button>
                 <div id="btn-export-wrap">
                   <button class="btn btn-green btn-sm" onclick="exportSearchExcel()">⬇️ CSV 다운로드</button>
                 </div>
@@ -1860,15 +1870,23 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <table style="width:100%;">
                 <thead>
                   <tr>
+                    <th><input type="checkbox" onchange="spToggleAll(this)" title="현재 페이지 전체 선택"></th>
                     <th>#</th>
                     <th style="display:none;">접수ID</th>
-                    <th onclick="sortByColumn('name',event.shiftKey)" style="cursor:pointer;user-select:none;">성명 <span id="sort-icon-name" style="font-size:.7rem;"></span></th>
-                    <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
-                    <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
-                    <th>참석버스배정</th>
-                    <th>귀가버스배정</th>
                     <th onclick="sortByColumn('event',event.shiftKey)" style="cursor:pointer;user-select:none;">회차 <span id="sort-icon-event" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('name',event.shiftKey)" style="cursor:pointer;user-select:none;">성명 <span id="sort-icon-name" style="font-size:.7rem;"></span></th>
+                    <th>성별</th>
+                    <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
+                    <th>참석일자</th>
+                    <th>참석교통수단</th>
+                    <th>참석배정유형</th>
+                    <th>참석버스배정</th>
+                    <th>귀가일자</th>
+                    <th>귀가교통수단</th>
+                    <th>귀가배정유형</th>
+                    <th>귀가버스배정</th>
                     <th>관리</th>
                   </tr>
                 </thead>
@@ -9833,7 +9851,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v341_bp_template_dl_dup_skip';
+var CACHE_VERSION = 'v344_search_bulk_edit_engine';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -10592,7 +10610,22 @@ function switchPanel(name, skipRender) {
   document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
   var panel=$id('panel-'+name); if(panel) panel.classList.add('active');
   var nav=$id('nav-'+name);     if(nav)   nav.classList.add('active');
-  var tt=$id('topbar-title'); if(tt) tt.textContent=PANEL_TITLES[name]||'';
+  // [v342] 배정인원현황(search)은 버스신청 메뉴의 서브탭이므로, nav-search가 없어도 사이드바는 nav-enroll을 하이라이트
+  if(name==='search'){ var navE=$id('nav-enroll'); if(navE) navE.classList.add('active'); }
+  // [v342] 버스신청/배정인원현황 서브탭 바 표시 및 활성 탭 스타일 처리
+  var subtabBar=$id('enroll-subtabs');
+  if(subtabBar){
+    if(name==='enroll'||name==='search'){
+      subtabBar.style.display='flex';
+      var stApply=$id('enroll-subtab-enroll'), stStatus=$id('enroll-subtab-search');
+      if(stApply)  stApply.className  = (name==='enroll') ? 'btn btn-navy btn-sm' : 'btn btn-primary btn-sm';
+      if(stStatus) stStatus.className = (name==='search') ? 'btn btn-navy btn-sm' : 'btn btn-primary btn-sm';
+    } else {
+      subtabBar.style.display='none';
+    }
+  }
+  // [v343] 배정인원현황(search)은 버스신청 화면의 서브탭이므로 상단 title은 "버스신청"으로 고정
+  var tt=$id('topbar-title'); if(tt) tt.textContent = PANEL_TITLES[(name==='search')?'enroll':name] || '';
   var ts=$id('topbar-sub');   if(ts) ts.textContent=PANEL_SUBS[name]||'';
   if(!skipRender){
     if(name==='accounts'){
@@ -11663,55 +11696,70 @@ function renderTable() {
   var pages=Math.ceil(filtered.length/SEARCH_PAGE_SIZE)||1;
   if(currentPage>pages) currentPage=pages;
   var slice=filtered.slice((currentPage-1)*SEARCH_PAGE_SIZE,currentPage*SEARCH_PAGE_SIZE);
-  var isAdmin   = currentUser&&currentUser.role==='admin';
-  var isDistrict= currentUser&&currentUser.role==='district';
   if(!filtered.length){ body.innerHTML=''; if(empty) empty.style.display=''; renderPagination(0); return; }
   if(empty) empty.style.display='none';
+  var _spArriveTeams = bpComputeAssignedTeams('arrive');
+  var _spLeaveTeams  = bpComputeAssignedTeams('leave');
   body.innerHTML=slice.map(function(r,i){
-    // 수정 가능 여부
-    var canInlineEdit = isAdmin ||
-      (isDistrict && currentUser.parish===r.parish && currentUser.district===r.district);
+    var idStr = String(r.id);
+    var canEdit = spCanEdit(r);
     var actionBtns =
-      '<button class="btn btn-primary btn-sm" onclick="openDetail(&quot;'+esc(String(r.id))+'&quot;)">상세</button>';
-    if(false && canInlineEdit){  // [hidden] 요청에 따라 그리드 인라인수정 버튼 비활성화(복원 시 false만 제거)
-      var editLabel = isAdmin ? '✏️ 수정' : '✏️ 수정';
-      var editStyle = isAdmin
-        ? 'background:#e8eef8;border:1px solid #c0cfe8;color:var(--navy);'
-        : 'background:#eaf7ee;border:1px solid #b8dfc8;color:#1a6b45;';
-      actionBtns += ' <button class="btn btn-sm" style="'+editStyle+'" '+
-        'onclick="openInlineEdit(&quot;'+esc(String(r.id))+'&quot;)">✏️ 수정</button>';
-    }
-    if(isAdmin){
-      actionBtns += ' <button class="btn btn-danger btn-sm" style="display:none;" onclick="deleteRow(&quot;'+esc(String(r.id))+'&quot;)">삭제</button>';  // [hidden] 요청에 따라 비활성화(복원 시 style 제거)
-    }
-    // 버스배정: 요건 조건식
-    // IF 교통수단=버스 AND 접수ID=탑승자.접수ID → 탑승자.배정호차
-    // ELIF 교통수단≠버스 → '-'
-    // ELSE → '미배정'
-    // _rosterFullArr/Lv: 필터 없는 전체 인덱스 (자료검색 전용, 버스배정 콤보 필터 오염 없음)
+      '<button class="btn btn-primary btn-sm" onclick="openDetail(&quot;'+esc(idStr)+'&quot;)">상세</button>';
     var rid = r.receiptId||'';
-    var arriveBusAssign = r.arriveTransport==='버스'
-      ? (rid && _rosterFullArr[rid] ? _rosterFullArr[rid] : '미배정')
-      : '-';
-    var leaveBusAssign  = r.leaveTransport==='버스'
-      ? (rid && _rosterFullLv[rid]  ? _rosterFullLv[rid]  : '미배정')
-      : '-';
-    var arriveBusStyle = arriveBusAssign==='미배정'
-      ? 'color:#d94040;font-size:.78rem;font-weight:600;'
-      : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
-    var leaveBusStyle  = leaveBusAssign==='미배정'
-      ? 'color:#d94040;font-size:.78rem;font-weight:600;'
-      : 'color:#1a6b45;font-size:.78rem;font-weight:700;';
-    return '<tr id="tr-'+esc(String(r.id))+'">'+
+    var arriveInfo = bpBusAssignInfo(r,'arrive', _spArriveTeams);
+    var leaveInfo  = bpBusAssignInfo(r,'leave', _spLeaveTeams);
+    var arriveBusStyle = arriveInfo.anomaly ? 'color:#d94040;font-size:.78rem;font-weight:600;'
+      : (arriveInfo.status==='unassigned' ? 'color:var(--muted);font-size:.78rem;font-weight:400;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;');
+    var leaveBusStyle  = leaveInfo.anomaly ? 'color:#d94040;font-size:.78rem;font-weight:600;'
+      : (leaveInfo.status==='unassigned' ? 'color:var(--muted);font-size:.78rem;font-weight:400;' : 'color:#1a6b45;font-size:.78rem;font-weight:700;');
+    var arriveDisp = spStagedArrive.hasOwnProperty(idStr) ? spStagedArrive[idStr] : (r.arriveTransport||'-');
+    var leaveDisp  = spStagedLeave.hasOwnProperty(idStr)  ? spStagedLeave[idStr]  : (r.leaveTransport||'-');
+    var arrivePending = spStagedArrive.hasOwnProperty(idStr);
+    var leavePending  = spStagedLeave.hasOwnProperty(idStr);
+    var arriveAssignDisp = spStagedArriveAssign.hasOwnProperty(idStr) ? spStagedArriveAssign[idStr] : (r.arriveAssignType||'');
+    var leaveAssignDisp  = spStagedLeaveAssign.hasOwnProperty(idStr)  ? spStagedLeaveAssign[idStr]  : (r.leaveAssignType||'');
+    var arriveAssignDisabled = !canEdit || (arriveDisp||'').trim() !== '버스';
+    var leaveAssignDisabled  = !canEdit || (leaveDisp||'').trim()  !== '버스';
+    var arriveDateRaw = spStagedArriveDate.hasOwnProperty(idStr) ? spStagedArriveDate[idStr] : (r.arriveDate||'');
+    var leaveDateRaw  = spStagedLeaveDate.hasOwnProperty(idStr)  ? spStagedLeaveDate[idStr]  : (r.leaveDate||'');
+    var arriveDateDisp = fmtDate(arriveDateRaw) || '-';
+    var leaveDateDisp  = fmtDate(leaveDateRaw)  || '-';
+    var arriveDatePending = spStagedArriveDate.hasOwnProperty(idStr);
+    var leaveDatePending  = spStagedLeaveDate.hasOwnProperty(idStr);
+    var isChecked = spSelectedIds.has(idStr);
+    // [v344] 구역장/교구장은 본인 소속 범위 밖 행은 편집 불가 — 클릭 불가한 정적 표시로 대체
+    var arriveDateCell = canEdit
+      ? '<span class="sp-date-badge" id="sp-arrive-date-badge-'+esc(idStr)+'" style="'+bpDateBadgeStyle(arriveDatePending)+'" onclick="spEditDate(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;)" title="클릭하면 날짜를 변경 예약할 수 있습니다">'+esc(arriveDateDisp)+'</span>'
+      : '<span style="font-size:.79rem;">'+esc(arriveDateDisp)+'</span>';
+    var leaveDateCell = canEdit
+      ? '<span class="sp-date-badge" id="sp-leave-date-badge-'+esc(idStr)+'" style="'+bpDateBadgeStyle(leaveDatePending)+'" onclick="spEditDate(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;)" title="클릭하면 날짜를 변경 예약할 수 있습니다">'+esc(leaveDateDisp)+'</span>'
+      : '<span style="font-size:.79rem;">'+esc(leaveDateDisp)+'</span>';
+    var arriveTransCell = canEdit
+      ? '<span class="sp-trans-badge" id="sp-arrive-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(arriveDisp,arrivePending)+'" onclick="spToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(arriveDisp)+'</span>'
+      : '<span style="'+bpTransBadgeStyle(arriveDisp,false).replace('cursor:pointer;','cursor:default;')+'">'+esc(arriveDisp)+'</span>';
+    var leaveTransCell = canEdit
+      ? '<span class="sp-trans-badge" id="sp-leave-badge-'+esc(idStr)+'" style="'+bpTransBadgeStyle(leaveDisp,leavePending)+'" onclick="spToggleTransport(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;)" title="클릭하면 버스↔자동차로 전환 예약됩니다">'+esc(leaveDisp)+'</span>'
+      : '<span style="'+bpTransBadgeStyle(leaveDisp,false).replace('cursor:pointer;','cursor:default;')+'">'+esc(leaveDisp)+'</span>';
+    var arriveAssignCell = '<select id="sp-arrive-assign-'+esc(idStr)+'" '+(arriveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(arriveAssignDisabled?'opacity:.5;':'')+'" onchange="spStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+_bpAssignOptionsHtml(arriveAssignDisp,'arrive')+'</select>';
+    var leaveAssignCell  = '<select id="sp-leave-assign-'+esc(idStr)+'" '+(leaveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(leaveAssignDisabled?'opacity:.5;':'')+'" onchange="spStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+_bpAssignOptionsHtml(leaveAssignDisp,'leave')+'</select>';
+    return '<tr id="sptr-'+esc(idStr)+'">'+
+      '<td>'+(canEdit?('<input type="checkbox" class="sp-chk-row" data-id="'+esc(idStr)+'" '+(isChecked?'checked':'')+' onchange="spToggleCheck(&quot;'+esc(idStr)+'&quot;,this.checked)">'):'')+'</td>'+
       '<td style="color:var(--text-dim);font-size:.74rem">'+((currentPage-1)*SEARCH_PAGE_SIZE+i+1)+'</td>'+
       '<td style="display:none;">'+esc(rid||'—')+'</td>'+
-      '<td><strong>'+maskName(r.name)+'</strong></td>'+
-      '<td>'+esc(r.district||'-')+'</td>'+
-      '<td>'+esc(r.group||'-')+'</td>'+
-      '<td style="'+arriveBusStyle+'">'+esc(arriveBusAssign)+'</td>'+
-      '<td style="'+leaveBusStyle+'">'+esc(leaveBusAssign)+'</td>'+
       '<td style="font-size:.79rem">'+esc(r.event||'-')+'</td>'+
+      '<td>'+esc(r.district||'-')+'</td>'+
+      '<td><strong>'+maskName(r.name)+'</strong></td>'+
+      '<td>'+esc(_enrollGenderLabel(r.gender))+'</td>'+
+      '<td>'+esc(r.group||'-')+'</td>'+
       '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
+      '<td id="sp-arrive-date-cell-'+esc(idStr)+'">'+arriveDateCell+'</td>'+
+      '<td>'+arriveTransCell+'</td>'+
+      '<td>'+arriveAssignCell+'</td>'+
+      '<td style="'+arriveBusStyle+'">'+esc(arriveInfo.value)+'</td>'+
+      '<td id="sp-leave-date-cell-'+esc(idStr)+'">'+leaveDateCell+'</td>'+
+      '<td>'+leaveTransCell+'</td>'+
+      '<td>'+leaveAssignCell+'</td>'+
+      '<td style="'+leaveBusStyle+'">'+esc(leaveInfo.value)+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
   }).join('');
@@ -11722,6 +11770,355 @@ function _salvLabel(v){
   if(v==='Y') return '예';
   if(v==='N') return '아니요';
   return '모름';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// [v344] 배정인원현황(일괄신청 및 현황) 편집 엔진 — 버스배정기초정보(bp)와 동일한
+// 스테이징(임시예약)→"일괄변경" 확정저장 방식을 사용하되, 관리자 외 구역장/교구장은
+// 본인 소속 범위 밖 데이터는 편집할 수 없도록 스코프 가드를 추가한다.
+// 저장(apiCall)·CSV 파서·배정유형 옵션 등은 bp* 공용 함수를 그대로 재사용하고,
+// 화면(DOM id)·스테이징 상태만 sp* 네임스페이스로 완전히 독립시켜 두 화면이 서로
+// 간섭하지 않도록 한다(같은 id가 두 패널에 동시에 존재하면 안 되므로).
+// ══════════════════════════════════════════════════════════════════
+var spStagedArrive = {};
+var spStagedLeave  = {};
+var spStagedArriveAssign = {};
+var spStagedLeaveAssign  = {};
+var spStagedArriveDate = {};
+var spStagedLeaveDate  = {};
+var spSelectedIds = new Set();
+
+// 편집 권한 스코프: 관리자=전체, 구역장=본인 구역만, 교구장=본인 교구 내 전체 구역만
+function spCanEdit(r){
+  if(!currentUser) return false;
+  var role = currentUser.role;
+  if(role==='admin') return true;
+  if(role==='district') return currentUser.parish===r.parish && currentUser.district===r.district;
+  if(role==='parish') return currentUser.parish===r.parish;
+  return false;
+}
+
+function spToggleCheck(id, checked){
+  var idStr=String(id);
+  if(checked){
+    spSelectedIds.add(idStr);
+  } else {
+    spSelectedIds.delete(idStr);
+    delete spStagedArrive[idStr]; delete spStagedLeave[idStr];
+    delete spStagedArriveAssign[idStr]; delete spStagedLeaveAssign[idStr];
+    delete spStagedArriveDate[idStr]; delete spStagedLeaveDate[idStr];
+    spRefreshRowBadges(idStr);
+  }
+  spUpdateBulkBtnLabel();
+}
+function spToggleAll(cb){
+  var rows = document.querySelectorAll('#table-body .sp-chk-row');
+  rows.forEach(function(el){
+    el.checked = cb.checked;
+    var idStr = el.getAttribute('data-id');
+    if(cb.checked){
+      spSelectedIds.add(idStr);
+    } else {
+      spSelectedIds.delete(idStr);
+      delete spStagedArrive[idStr]; delete spStagedLeave[idStr];
+      delete spStagedArriveAssign[idStr]; delete spStagedLeaveAssign[idStr];
+      delete spStagedArriveDate[idStr]; delete spStagedLeaveDate[idStr];
+      spRefreshRowBadges(idStr);
+    }
+  });
+  spUpdateBulkBtnLabel();
+}
+function spRefreshRowBadges(id){
+  var r = retreat.find(function(x){ return String(x.id)===String(id); }); if(!r) return;
+  var idStr = String(id);
+  var arriveBadge = $id('sp-arrive-badge-'+idStr);
+  if(arriveBadge){ arriveBadge.textContent = r.arriveTransport||'-'; arriveBadge.setAttribute('style', bpTransBadgeStyle(r.arriveTransport, false)); }
+  var leaveBadge = $id('sp-leave-badge-'+idStr);
+  if(leaveBadge){ leaveBadge.textContent = r.leaveTransport||'-'; leaveBadge.setAttribute('style', bpTransBadgeStyle(r.leaveTransport, false)); }
+  var arriveAssignSel = $id('sp-arrive-assign-'+idStr);
+  if(arriveAssignSel){
+    arriveAssignSel.value = r.arriveAssignType||'';
+    var isBusA = (r.arriveTransport||'').trim()==='버스';
+    arriveAssignSel.disabled = !isBusA; arriveAssignSel.style.opacity = isBusA?'':'.5';
+  }
+  var leaveAssignSel = $id('sp-leave-assign-'+idStr);
+  if(leaveAssignSel){
+    leaveAssignSel.value = r.leaveAssignType||'';
+    var isBusL = (r.leaveTransport||'').trim()==='버스';
+    leaveAssignSel.disabled = !isBusL; leaveAssignSel.style.opacity = isBusL?'':'.5';
+  }
+  spRedrawDateBadge(idStr, 'arrive');
+  spRedrawDateBadge(idStr, 'leave');
+}
+function spUpdateBulkBtnLabel(){
+  var btn=$id('sp-btn-bulk'); if(!btn) return;
+  var ids = {};
+  Object.keys(spStagedArrive).forEach(function(k){ ids[k]=true; });
+  Object.keys(spStagedLeave).forEach(function(k){ ids[k]=true; });
+  Object.keys(spStagedArriveAssign).forEach(function(k){ ids[k]=true; });
+  Object.keys(spStagedLeaveAssign).forEach(function(k){ ids[k]=true; });
+  Object.keys(spStagedArriveDate).forEach(function(k){ ids[k]=true; });
+  Object.keys(spStagedLeaveDate).forEach(function(k){ ids[k]=true; });
+  var n = Object.keys(ids).length;
+  btn.textContent = n ? ('🔁 일괄변경 ('+n+')') : '🔁 일괄변경';
+}
+function spToggleTransport(id, kind){
+  var idStr = String(id);
+  var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
+  if(!spCanEdit(r)){ showToast('본인 소속 범위 밖 데이터는 수정할 수 없습니다.','error'); return; }
+  var staged = kind==='arrive' ? spStagedArrive : spStagedLeave;
+  var cur = staged.hasOwnProperty(idStr) ? staged[idStr] : ((kind==='arrive'?r.arriveTransport:r.leaveTransport)||'');
+  var next = (cur.trim()==='버스') ? '자가용' : '버스';
+  staged[idStr] = next;
+  spSelectedIds.add(idStr);
+  var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+  var badge = $id((kind==='arrive'?'sp-arrive-badge-':'sp-leave-badge-')+idStr);
+  if(badge){ badge.textContent = next; badge.setAttribute('style', bpTransBadgeStyle(next, true)); }
+  var assignSel = $id((kind==='arrive'?'sp-arrive-assign-':'sp-leave-assign-')+idStr);
+  if(assignSel){ var isBus = next==='버스'; assignSel.disabled = !isBus; assignSel.style.opacity = isBus?'':'.5'; }
+  spUpdateBulkBtnLabel();
+}
+function spStageAssignType(id, kind, value){
+  var idStr = String(id);
+  var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
+  if(!spCanEdit(r)){ showToast('본인 소속 범위 밖 데이터는 수정할 수 없습니다.','error'); return; }
+  var staged = kind==='arrive' ? spStagedArriveAssign : spStagedLeaveAssign;
+  staged[idStr] = value;
+  spSelectedIds.add(idStr);
+  var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+  spUpdateBulkBtnLabel();
+}
+function spEditDate(id, kind){
+  var idStr = String(id);
+  var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
+  if(!spCanEdit(r)){ showToast('본인 소속 범위 밖 데이터는 수정할 수 없습니다.','error'); return; }
+  var cell = $id((kind==='arrive'?'sp-arrive-date-cell-':'sp-leave-date-cell-')+idStr);
+  if(!cell) return;
+  var staged = kind==='arrive' ? spStagedArriveDate : spStagedLeaveDate;
+  var curValRaw = staged.hasOwnProperty(idStr) ? staged[idStr] : ((kind==='arrive'?r.arriveDate:r.leaveDate)||'');
+  var curVal = fmtDate(curValRaw); if(curVal==='-') curVal='';
+  var inputId = (kind==='arrive'?'sp-arrive-date-input-':'sp-leave-date-input-')+idStr;
+  cell.innerHTML = '<input type="date" id="'+esc(inputId)+'" value="'+esc(curVal)+'" style="font-size:.79rem;padding:2px 4px;border:1.5px solid #8a5a00;border-radius:6px;" onchange="spStageDate(&quot;'+esc(idStr)+'&quot;,&quot;'+kind+'&quot;,this.value)" onblur="spCancelDateEdit(&quot;'+esc(idStr)+'&quot;,&quot;'+kind+'&quot;)">';
+  var inputEl = $id(inputId);
+  if(inputEl){ inputEl.focus(); if(inputEl.showPicker){ try{ inputEl.showPicker(); }catch(e){} } }
+}
+function spStageDate(id, kind, value){
+  var idStr = String(id);
+  if(!value){ spCancelDateEdit(idStr, kind); return; }
+  var staged = kind==='arrive' ? spStagedArriveDate : spStagedLeaveDate;
+  staged[idStr] = value;
+  spSelectedIds.add(idStr);
+  var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+  spRedrawDateBadge(idStr, kind);
+  if(kind==='arrive'){
+    var nextLeave = _enrollAddDays(value, 3);
+    if(nextLeave){ spStagedLeaveDate[idStr] = nextLeave; spRedrawDateBadge(idStr, 'leave'); }
+  }
+  spUpdateBulkBtnLabel();
+}
+function spCancelDateEdit(id, kind){ spRedrawDateBadge(String(id), kind); }
+function spRedrawDateBadge(idStr, kind){
+  var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
+  var staged = kind==='arrive' ? spStagedArriveDate : spStagedLeaveDate;
+  var pending = staged.hasOwnProperty(idStr);
+  var val = pending ? staged[idStr] : ((kind==='arrive'?r.arriveDate:r.leaveDate)||'');
+  var disp = fmtDate(val) || '-';
+  var cell = $id((kind==='arrive'?'sp-arrive-date-cell-':'sp-leave-date-cell-')+idStr);
+  if(!cell) return;
+  var badgeId = (kind==='arrive'?'sp-arrive-date-badge-':'sp-leave-date-badge-')+idStr;
+  cell.innerHTML = '<span class="sp-date-badge" id="'+esc(badgeId)+'" style="'+bpDateBadgeStyle(pending)+'" onclick="spEditDate(&quot;'+esc(idStr)+'&quot;,&quot;'+kind+'&quot;)" title="클릭하면 날짜를 변경 예약할 수 있습니다">'+esc(disp)+'</span>';
+}
+
+// [v344] 양식 다운로드는 bpDownloadTemplate()을 그대로 재사용(버튼 onclick에서 직접 호출)
+function spBulkUploadOpen(){
+  var inp = $id('sp-bulk-upload-input');
+  if(inp) inp.click();
+}
+function spBulkUploadHandleFile(input){
+  var file = input.files[0]; if(!file){ return; }
+  var ext = file.name.split('.').pop().toLowerCase();
+  if(ext==='xlsx' || ext==='xls'){
+    showToast('⚠️ 엑셀 파일은 CSV로 변환 후 업로드해주세요. (엑셀 → 다른 이름으로 저장 → CSV)','error');
+    input.value=''; return;
+  }
+  if(ext==='numbers'){
+    showToast('⚠️ .numbers 파일은 Numbers 앱에서 파일 → 내보내기 → CSV 후 업로드해주세요.','error');
+    input.value=''; return;
+  }
+  var readAs = function(enc){ return new Promise(function(res,rej){
+    var r = new FileReader();
+    r.onload = function(e){ res(e.target.result); };
+    r.onerror = function(){ rej(new Error('파일을 읽을 수 없습니다')); };
+    r.readAsText(file, enc);
+  }); };
+  readAs('UTF-8').then(function(text){
+    var cleaned = text.replace(/^\uFEFF/,'');
+    var bad = (cleaned.match(/\ufffd/g)||[]).length;
+    if(bad>5) return readAs('EUC-KR').then(function(t){ return t.replace(/^\uFEFF/,''); });
+    return cleaned;
+  }).then(function(text){
+    spBulkUploadProcess(text);
+  }).catch(function(){
+    showToast('⚠️ 파일을 읽을 수 없습니다.','error');
+  });
+  input.value = '';
+}
+// [v344] CSV 파싱은 bpBulkUploadParseCSV() 재사용. 매칭 후 "본인 소속 범위 밖" 행은
+// 관리자가 아니면 자동 제외(스코프 가드)하고, 제외 건수를 별도로 안내한다.
+function spBulkUploadProcess(text){
+  var parsed = bpBulkUploadParseCSV(text);
+  if(parsed.error){ showToast('⚠️ '+parsed.error, 'error'); return; }
+  if(!parsed.matched.length && !parsed.notFound.length && !parsed.ambiguous.length){
+    showToast('⚠️ 인식된 데이터가 없습니다.', 'error'); return;
+  }
+  var outOfScope = [];
+  var inScope = parsed.matched.filter(function(item){
+    if(spCanEdit(item.r)) return true;
+    outOfScope.push((item.r.district||'')+' '+(item.r.name||''));
+    return false;
+  });
+
+  var toStage = [], dupSkipped = [];
+  inScope.forEach(function(item){
+    var curArriveOk = !item.arriveType || ((item.r.arriveTransport||'')==='버스' && (item.r.arriveAssignType||'')===item.arriveType);
+    var curLeaveOk  = !item.leaveType  || ((item.r.leaveTransport||'') ==='버스' && (item.r.leaveAssignType||'') ===item.leaveType);
+    var needsArrive = item.arriveType && !curArriveOk;
+    var needsLeave  = item.leaveType  && !curLeaveOk;
+    if(needsArrive || needsLeave){
+      toStage.push({ r:item.r, arriveType: needsArrive?item.arriveType:'', leaveType: needsLeave?item.leaveType:'' });
+    } else {
+      dupSkipped.push((item.r.district||'')+' '+(item.r.name||''));
+    }
+  });
+
+  var summary = '매칭 '+parsed.matched.length+'건';
+  if(outOfScope.length) summary += ' (그중 본인 소속 범위 밖 '+outOfScope.length+'건 제외)';
+  if(dupSkipped.length) summary += ' · 변경사항 없음 '+dupSkipped.length+'건 제외';
+  summary += ' → 실제 반영 대상 '+toStage.length+'건';
+  if(parsed.notFound.length)   summary += ' · 명단없음 '+parsed.notFound.length+'건';
+  if(parsed.ambiguous.length)  summary += ' · 동명이인 '+parsed.ambiguous.length+'건';
+  var skipNote = (parsed.notFound.length||parsed.ambiguous.length||outOfScope.length)
+    ? '\n(명단없음/동명이인/범위밖 건은 건너뜁니다)' : '';
+  if(!confirm(summary+'\n\n'+toStage.length+'건을 "일괄변경" 대상으로 예약할까요?\n(실제 저장은 이후 "🔁 일괄변경" 버튼을 눌러야 반영됩니다)'+skipNote)) return;
+  if(!toStage.length){
+    _spBulkUploadShowSkipped(parsed, dupSkipped, outOfScope);
+    return;
+  }
+
+  showLoading(true);
+  apiCall({action:'getAll', sheetName:'버스배정_기초정보'}).then(function(res){
+    var baseRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+    var sYear   = ($id('s-year')||{value:''}).value.trim();
+    var sSeason = ($id('s-retreat-type')||{value:''}).value.trim();
+    var sEvent  = ($id('s-event')||{value:''}).value.trim();
+    var dateMap = {};
+    baseRows.forEach(function(r){
+      if(sYear   && String(r['년도'])!==String(sYear))   return;
+      if(sSeason && r['수양회종류']!==sSeason) return;
+      if(sEvent  && r['행사명']!==sEvent)     return;
+      var key = (r['배정유형']||'')+'|'+(r['운행방향']||'');
+      if(r['출발일자']) dateMap[key] = r['출발일자'];
+    });
+
+    var arriveCount=0, leaveCount=0, dateCount=0;
+    toStage.forEach(function(item){
+      var idStr = String(item.r.id);
+      if(item.arriveType){
+        spStagedArrive[idStr] = '버스';
+        spStagedArriveAssign[idStr] = item.arriveType;
+        var aDate = dateMap[item.arriveType+'|참석'];
+        if(aDate){ spStagedArriveDate[idStr] = aDate; dateCount++; }
+        spSelectedIds.add(idStr);
+        arriveCount++;
+      }
+      if(item.leaveType){
+        spStagedLeave[idStr] = '버스';
+        spStagedLeaveAssign[idStr] = item.leaveType;
+        var lDate = dateMap[item.leaveType+'|귀가'];
+        if(lDate){ spStagedLeaveDate[idStr] = lDate; dateCount++; }
+        spSelectedIds.add(idStr);
+        leaveCount++;
+      }
+    });
+
+    renderTable();
+    spUpdateBulkBtnLabel();
+    var doneMsg = '✅ 일괄업로드로 '+toStage.length+'건을 예약했습니다 (참석 '+arriveCount+'건 / 귀가 '+leaveCount+'건 / 일자자동설정 '+dateCount+'건)'
+      +' — "🔁 일괄변경" 버튼을 눌러야 실제 저장됩니다.';
+    showToast(doneMsg, 'success', true);
+    _spBulkUploadShowSkipped(parsed, dupSkipped, outOfScope);
+  }).catch(function(e){
+    showToast('⚠️ 버스배정기초정보 조회 실패: '+(e&&e.message||e), 'error');
+  }).finally(function(){ showLoading(false); });
+}
+function _spBulkUploadShowSkipped(parsed, dupSkipped, outOfScope){
+  var lines = [];
+  if(parsed.notFound.length)   lines.push('▶ 참석인원현황에서 찾을 수 없음 ('+parsed.notFound.length+'건)\n'+parsed.notFound.join(', '));
+  if(parsed.ambiguous.length)  lines.push('▶ 동명이인 등으로 특정 불가 ('+parsed.ambiguous.length+'건)\n'+parsed.ambiguous.join(', '));
+  if(outOfScope && outOfScope.length) lines.push('▶ 본인 소속 범위 밖이라 제외됨 ('+outOfScope.length+'건)\n'+outOfScope.join(', '));
+  if(dupSkipped && dupSkipped.length) lines.push('▶ 이미 동일하게 설정돼 있어 건너뜀 ('+dupSkipped.length+'건)\n'+dupSkipped.join(', '));
+  if(lines.length) alert('⚠️ 아래 항목은 건너뛰었습니다. 수동으로 확인해주세요.\n\n'+lines.join('\n\n'));
+}
+// [v344] "일괄변경" 확정저장 — bpApplyRowChanges()(저장 API 공용 함수) 재사용, 접수ID 기준
+// 순차 처리(사람당 1회 저장, 동시 다발 API 호출 금지 원칙 준수). 저장 직전 스코프를 재검증해
+// 혹시라도 스테이징된 범위밖 데이터가 있으면 저장하지 않고 건너뛴다(방어적 이중 체크).
+function spBulkToggleTransport(){
+  var idSet = {};
+  Object.keys(spStagedArriveDate).forEach(function(k){ idSet[k]=true; });
+  Object.keys(spStagedLeaveDate).forEach(function(k){ idSet[k]=true; });
+  Object.keys(spStagedArrive).forEach(function(k){ idSet[k]=true; });
+  Object.keys(spStagedLeave).forEach(function(k){ idSet[k]=true; });
+  Object.keys(spStagedArriveAssign).forEach(function(k){ idSet[k]=true; });
+  Object.keys(spStagedLeaveAssign).forEach(function(k){ idSet[k]=true; });
+  var idList = Object.keys(idSet);
+  if(!idList.length){ alert('변경 예약(배지/콤보/날짜 클릭)된 항목이 없습니다.'); return; }
+
+  var arriveDateN=Object.keys(spStagedArriveDate).length, leaveDateN=Object.keys(spStagedLeaveDate).length;
+  var arriveN=Object.keys(spStagedArrive).length, leaveN=Object.keys(spStagedLeave).length;
+  var arriveAssignN=Object.keys(spStagedArriveAssign).length, leaveAssignN=Object.keys(spStagedLeaveAssign).length;
+  if(!confirm('참석일자 '+arriveDateN+'건 / 귀가일자 '+leaveDateN+'건 / 참석교통 '+arriveN+'건 / 귀가교통 '+leaveN+'건 / 참석배정유형 '+arriveAssignN+'건 / 귀가배정유형 '+leaveAssignN+'건의 변경사항을 저장하시겠습니까? (총 '+idList.length+'명)')) return;
+
+  showLoading(true);
+  var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, failCount=0, blockedCount=0;
+  var chain = idList.reduce(function(p, idStr){
+    return p.then(function(){
+      var r = retreat.find(function(x){ return String(x.id)===idStr; });
+      if(!r) return;
+      if(!spCanEdit(r)){ blockedCount++; return; }
+      var changes = {};
+      if(spStagedArriveDate.hasOwnProperty(idStr))   changes.arriveDate = spStagedArriveDate[idStr];
+      if(spStagedLeaveDate.hasOwnProperty(idStr))    changes.leaveDate = spStagedLeaveDate[idStr];
+      if(spStagedArrive.hasOwnProperty(idStr))       changes.arriveTransport = spStagedArrive[idStr];
+      if(spStagedLeave.hasOwnProperty(idStr))        changes.leaveTransport = spStagedLeave[idStr];
+      if(spStagedArriveAssign.hasOwnProperty(idStr)) changes.arriveAssign = spStagedArriveAssign[idStr];
+      if(spStagedLeaveAssign.hasOwnProperty(idStr))  changes.leaveAssign = spStagedLeaveAssign[idStr];
+      return bpApplyRowChanges(r, changes)
+        .then(function(res){
+          if(!res || !res.changed) return;
+          var f = res.fields;
+          if(f.arriveDate) arriveDateCount++;
+          if(f.leaveDate) leaveDateCount++;
+          if(f.arriveTransport) arriveCount++;
+          if(f.leaveTransport) leaveCount++;
+          if(f.arriveAssign) arriveAssignCount++;
+          if(f.leaveAssign) leaveAssignCount++;
+        })
+        .catch(function(e){ failCount++; console.warn('[일괄변경 실패]', r.name, e&&e.message||e); });
+    });
+  }, Promise.resolve());
+
+  return chain.then(function(){
+    save(); updateStats(); updateBusUnassignedBadge();
+    spStagedArrive = {}; spStagedLeave = {}; spStagedArriveAssign = {}; spStagedLeaveAssign = {};
+    spStagedArriveDate = {}; spStagedLeaveDate = {};
+    spSelectedIds.clear();
+    doSearch();
+    var msg = '✅ 일괄변경 완료 (참석일자 '+arriveDateCount+'건 / 귀가일자 '+leaveDateCount+'건 / 참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건)'
+      +(blockedCount?(' · 범위밖 제외 '+blockedCount+'건'):'')+(failCount?(' · 실패 '+failCount+'건'):'');
+    showToast(msg, failCount ? 'error' : 'success');
+  }).finally(function(){
+    showLoading(false);
+  });
 }
 
 // ── 구역장 인라인 수정 (테이블 행 → 수정 폼 교체) ─────
@@ -16452,7 +16849,11 @@ document.addEventListener('DOMContentLoaded', function() {
     'bpDoSearch','bpClearSearch','bpSearchParishChange','bpReloadFromSheet','bpGoPage',
     'bpOpenDetail','bpOpenInlineEdit','bpSaveInlineEdit','bpDeleteRow','bpCancelEdit','bpSaveEdit',
     'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport','bpBulkUploadOpen','bpBulkUploadHandleFile','bpBulkUploadParseCSV','bpBulkUploadProcess','bpStageAssignType',
-    'bpEditDate','bpStageDate','bpCancelDateEdit',
+    'bpEditDate','bpStageDate','bpCancelDateEdit','bpDownloadTemplate',
+    // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진 — onclick/onchange에서 직접 호출되는 함수만 등록
+    'spToggleTransport','spToggleCheck','spToggleAll','spStageAssignType',
+    'spEditDate','spStageDate','spCancelDateEdit',
+    'spBulkUploadOpen','spBulkUploadHandleFile','spBulkToggleTransport',
     'busTeamsSubTab','busAssignSubTab','busSummarySubTab','busSummaryShowAll','busSummaryShowSingle',
     'busLeaderSubTab','busLeaderRender','busLeaderRenderAll','busLeaderSave','busLeaderSaveAll','busLeaderSaveDispatch','busLeaderParishChange','busLeaderResetPrompt','busAssignTypeChanged',
     'vwReset','vwResetConfirm','vwFilter','vwOnSearch','vwOnArrDateChange',
@@ -16521,7 +16922,11 @@ document.addEventListener('DOMContentLoaded', function() {
     bpDoSearch:bpDoSearch, bpClearSearch:bpClearSearch, bpSearchParishChange:bpSearchParishChange, bpReloadFromSheet:bpReloadFromSheet, bpGoPage:bpGoPage,
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
     bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport, bpBulkUploadOpen:bpBulkUploadOpen, bpBulkUploadHandleFile:bpBulkUploadHandleFile, bpBulkUploadParseCSV:bpBulkUploadParseCSV, bpBulkUploadProcess:bpBulkUploadProcess, bpStageAssignType:bpStageAssignType,
-    bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit,
+    bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit, bpDownloadTemplate:bpDownloadTemplate,
+    // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진
+    spToggleTransport:spToggleTransport, spToggleCheck:spToggleCheck, spToggleAll:spToggleAll, spStageAssignType:spStageAssignType,
+    spEditDate:spEditDate, spStageDate:spStageDate, spCancelDateEdit:spCancelDateEdit,
+    spBulkUploadOpen:spBulkUploadOpen, spBulkUploadHandleFile:spBulkUploadHandleFile, spBulkToggleTransport:spBulkToggleTransport,
     busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab, busSummaryShowAll:busSummaryShowAll, busSummaryShowSingle:busSummaryShowSingle,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderRenderAll:busLeaderRenderAll, busLeaderSave:busLeaderSave, busLeaderSaveAll:busLeaderSaveAll, busLeaderSaveDispatch:busLeaderSaveDispatch, busLeaderParishChange:busLeaderParishChange, busLeaderResetPrompt:busLeaderResetPrompt, busAssignTypeChanged:busAssignTypeChanged,
     vwReset:vwReset, vwResetConfirm:vwResetConfirm, vwFilter:vwFilter,
