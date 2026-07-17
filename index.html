@@ -706,6 +706,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <button class="nav-item" id="nav-bus"      onclick="switchPanel('bus')"      style="display:none"><span class="icon">🚌</span> 버스 배정</button>
         <button class="nav-item" id="nav-room"     onclick="switchPanel('room')"     style="display:none"><span class="icon">🏠</span> 숙소 배정</button>
         <button class="nav-item" id="nav-accounts" onclick="switchPanel('accounts')" style="display:none"><span class="icon">👥</span> 계정 관리</button>
+        <button class="nav-item" id="nav-codes"    onclick="switchPanel('codes')"    style="display:none"><span class="icon">🗂</span> 코드관리</button>
         <button class="nav-item"        id="nav-register" onclick="switchPanel('register')" style="display:none"><span class="icon">✏️</span> 자료 등록</button>
       </nav>
       <div class="sidebar-footer">
@@ -1876,9 +1877,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th onclick="sortByColumn('event',event.shiftKey)" style="cursor:pointer;user-select:none;">회차 <span id="sort-icon-event" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('district',event.shiftKey)" style="cursor:pointer;user-select:none;">구역 <span id="sort-icon-district" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('name',event.shiftKey)" style="cursor:pointer;user-select:none;">성명 <span id="sort-icon-name" style="font-size:.7rem;"></span></th>
-                    <th>성별</th>
-                    <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
-                    <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
+                    <th style="display:none;">성별</th>
+                    <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;display:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
+                    <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;display:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
                     <th>참석일자</th>
                     <th>참석교통수단</th>
                     <th>참석배정유형</th>
@@ -2328,6 +2329,48 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </table>
               <div id="acc-empty" class="empty-state" style="display:none;padding:28px;">
                 <div class="icon">👤</div><p>등록된 계정이 없습니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CODE MANAGEMENT -->
+        <div class="panel" id="panel-codes">
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;">
+            <button class="btn btn-sm" style="background:#eef2f7;color:var(--navy);border:1px solid var(--border2);" onclick="codeLoadAll()">🔄 새로고침</button>
+            <button class="btn btn-navy btn-sm" onclick="codeSaveUseYn()" id="code-btn-save">☁️ 구글시트 저장</button>
+          </div>
+          <div style="display:grid;grid-template-columns:30% 70%;gap:14px;align-items:start;">
+            <!-- ① 대분류 영역 -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🗂 대분류</div>
+                <button class="btn btn-primary btn-sm" onclick="codeAddMajor()">＋ 대분류 추가</button>
+              </div>
+              <div id="code-major-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+              <div id="code-major-empty" class="empty-state" style="display:none;padding:20px;">
+                <div class="icon">🗂</div><p>등록된 대분류가 없습니다.</p>
+              </div>
+              <div style="margin-top:12px;">
+                <button class="btn btn-danger btn-sm" style="width:100%;" onclick="codeDeleteMajor()" id="code-btn-del-major" disabled>🗑 선택 대분류 삭제</button>
+              </div>
+            </div>
+            <!-- ② 중분류 영역 -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title" id="code-minor-title">중분류를 보려면 좌측에서 대분류를 선택하세요</div>
+                <button class="btn btn-primary btn-sm" onclick="codeAddMinor()" id="code-btn-add-minor" disabled>＋ 중분류 추가</button>
+              </div>
+              <div class="table-wrap">
+                <table style="width:100%;">
+                  <thead>
+                    <tr><th>#</th><th>코드명</th><th>사용여부</th><th>정렬</th><th>관리</th></tr>
+                  </thead>
+                  <tbody id="code-minor-body"></tbody>
+                </table>
+                <div id="code-minor-empty" class="empty-state" style="display:none;padding:28px;">
+                  <div class="icon">📭</div><p>대분류를 선택해 주세요.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -9851,7 +9894,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v348_sp_bulk_upload_dedup_delete';
+var CACHE_VERSION = 'v351_bp_detail_assigntype';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -10482,7 +10525,7 @@ function closeSidebar(){
 }
 
 // ── 초기화 ──
-var PANEL_TITLES={home:'수양회집계현황',goalstatus:'수양회목표달성현황',register:'자료 등록',enroll:'버스신청',search:'배정인원현황',busview:'버스 배정 현황',bus:'버스 배정',busbase:'버스배정 기초정보',excel:'참석인원관리',goal:'교회 목표 관리',accounts:'계정 관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
+var PANEL_TITLES={home:'수양회집계현황',goalstatus:'수양회목표달성현황',register:'자료 등록',enroll:'버스신청',search:'배정인원현황',busview:'버스 배정 현황',bus:'버스 배정',busbase:'버스배정 기초정보',excel:'참석인원관리',goal:'교회 목표 관리',accounts:'계정 관리',codes:'코드관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
 var PANEL_SUBS={
   home:'수양회 참석자 현황을 확인합니다.',
   goalstatus:'구역별 목표 대비 접수·성도·전도 달성 현황을 확인합니다.',
@@ -10494,6 +10537,7 @@ var PANEL_SUBS={
   excel:'수양회 접수 파일을 업로드해 확인하고 저장합니다.',
   goal:'전체 목표 및 구역별 목표(CSV)를 등록하고 관리합니다.',
   accounts:'관리자·구역장·교구장 계정을 등록하고 관리합니다.',
+  codes:'사이트 전역에서 사용하는 공통코드(대분류/중분류)를 등록·관리합니다.',
   room:'구역별 숙소 배정을 관리합니다.',
   mypage:'내 계정 정보 조회 및 비밀번호 변경.',
   roomview:'건물별 숙소 배정 현황을 확인합니다.',
@@ -10519,7 +10563,7 @@ function initApp() {
   $id('sb-role').textContent=roleLabel;
   // 메뉴 노출 — role별 제어
   // 관리자 전용 메뉴 (자료 등록 제외 — 향후 재활성화 예정)
-  ['nav-bus','nav-excel','nav-accounts','nav-room','nav-goal','nav-busbase','admin-section'].forEach(function(id){
+  ['nav-bus','nav-excel','nav-accounts','nav-room','nav-goal','nav-busbase','nav-codes','admin-section'].forEach(function(id){
     var el=$id(id); if(el) el.style.display=isAdmin?'':'none';
   });
   // 자료 등록: 항상 숨김
@@ -10591,11 +10635,11 @@ function switchPanel(name, skipRender) {
 
   // ── 접근 제어 ──────────────────────────────────────
   // 관리자 전용 패널
-  if(['register','excel','accounts','bus','room','goal','busbase','busview'].indexOf(name)>=0 && !isAdmin){
+  if(['register','excel','accounts','bus','room','goal','busbase','busview','codes'].indexOf(name)>=0 && !isAdmin){
     showToast('접근 권한이 없습니다.','error'); return;
   }
   // 교구장: 자료검색·홈·roomview·목표달성현황만 허용
-  if(isParish && ['register','excel','accounts','bus','room','goal','busbase','busview'].indexOf(name)>=0){
+  if(isParish && ['register','excel','accounts','bus','room','goal','busbase','busview','codes'].indexOf(name)>=0){
     showToast('교구장은 조회 권한만 있습니다.','error'); return;
   }
   // 접수인원등록: 관리자 + 구역장 + 교구장 허용
@@ -10630,6 +10674,9 @@ function switchPanel(name, skipRender) {
   if(!skipRender){
     if(name==='accounts'){
       if(USE_SHEET()){ loadAccountsFromSheet(); }  // 계정목록 재조회 (완료 시 내부에서 renderAccounts() 자동 호출)
+    }
+    if(name==='codes'){
+      codeLoadAll();
     }
     if(name==='excel'){
       vwLoadLastProcTime();
@@ -11749,9 +11796,9 @@ function renderTable() {
       '<td style="font-size:.79rem">'+esc(r.event||'-')+'</td>'+
       '<td>'+esc(r.district||'-')+'</td>'+
       '<td><strong>'+maskName(r.name)+'</strong></td>'+
-      '<td>'+esc(_enrollGenderLabel(r.gender))+'</td>'+
-      '<td>'+esc(r.group||'-')+'</td>'+
-      '<td>'+esc(_salvLabel(r.salvCode))+'</td>'+
+      '<td style="display:none;">'+esc(_enrollGenderLabel(r.gender))+'</td>'+
+      '<td style="display:none;">'+esc(r.group||'-')+'</td>'+
+      '<td style="display:none;">'+esc(_salvLabel(r.salvCode))+'</td>'+
       '<td id="sp-arrive-date-cell-'+esc(idStr)+'">'+arriveDateCell+'</td>'+
       '<td>'+arriveTransCell+'</td>'+
       '<td>'+arriveAssignCell+'</td>'+
@@ -13959,6 +14006,7 @@ function bpOpenDetail(id){
     ['회별', r.group||'-'],
     ['참석 일자', fmtDate(r.arriveDate)||'-'],
     ['참석 교통수단', r.arriveTransport||'-'],
+    ['참석배정유형', r.arriveAssignType||'-'],
     ['참석 버스배정', (function(){
       var rid=r.receiptId||'';
       if(r.arriveTransport!=='버스') return '-';
@@ -13966,6 +14014,7 @@ function bpOpenDetail(id){
     })()],
     ['귀가 일자', fmtDate(r.leaveDate)||'-'],
     ['귀가 교통수단', r.leaveTransport||'-'],
+    ['귀가배정유형', r.leaveAssignType||'-'],
     ['귀가 버스배정', (function(){
       var rid=r.receiptId||'';
       if(r.leaveTransport!=='버스') return '-';
@@ -17041,6 +17090,261 @@ function rvRosterRender(rows){
   tbody.innerHTML=html;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// [v349] 코드관리 — 대분류(CODE_MAJOR)/중분류(CODE_MINOR) 관리 화면
+// GAS 신규 액션 없이 기존 getAll/add/update/delete만 재사용한다(등록ID 패턴과 동일하게
+// ID는 프론트에서 생성). CODE_MAJOR/CODE_MINOR 시트는 최초 저장 시 GAS의
+// getOrCreateSheet()가 자동 생성한다.
+// ══════════════════════════════════════════════════════════════════
+var codeMajorList = [];   // [{대분류ID, 대분류명, 정렬순서, 등록일시, 등록자}]
+var codeMinorList = [];   // [{중분류ID, 대분류ID, 중분류명, 사용여부, 정렬순서, 등록일시, 등록자}]
+var codeSelectedMajorId = '';
+var codeStagedUseYn = {}; // {중분류ID: 'Y'|'N'} — 저장 전 임시 변경분
+
+function codeLoadAll(){
+  if(!USE_SHEET()){
+    showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error');
+    codeRenderMajorList(); codeRenderMinorList();
+    return;
+  }
+  showLoading(true);
+  Promise.resolve()
+    .then(function(){ return apiCall({action:'getAll', sheetName:'CODE_MAJOR'}); })
+    .then(function(res){
+      codeMajorList = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      codeMajorList.sort(function(a,b){ return (Number(a['정렬순서'])||9999)-(Number(b['정렬순서'])||9999); });
+      return apiCall({action:'getAll', sheetName:'CODE_MINOR'});
+    })
+    .then(function(res){
+      codeMinorList = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      codeStagedUseYn = {};
+      if(!codeSelectedMajorId && codeMajorList.length) codeSelectedMajorId = codeMajorList[0]['대분류ID'];
+      codeRenderMajorList();
+      codeRenderMinorList();
+    })
+    .catch(function(e){ showToast('⚠️ 코드 조회 실패: '+(e&&e.message||e), 'error'); })
+    .finally(function(){ showLoading(false); });
+}
+function _codeNextMajorId(){
+  var maxN = 0;
+  codeMajorList.forEach(function(m){
+    var n = parseInt(String(m['대분류ID']||'').replace(/^M/,''), 10);
+    if(!isNaN(n) && n>maxN) maxN=n;
+  });
+  return 'M' + String(maxN+1).padStart(3,'0');
+}
+function _codeNextMinorId(){
+  var maxN = 0;
+  codeMinorList.forEach(function(m){
+    var n = parseInt(String(m['중분류ID']||'').replace(/^S/,''), 10);
+    if(!isNaN(n) && n>maxN) maxN=n;
+  });
+  return 'S' + String(maxN+1).padStart(4,'0');
+}
+function codeRenderMajorList(){
+  var box = $id('code-major-list'); var empty = $id('code-major-empty'); if(!box) return;
+  if(!codeMajorList.length){ box.innerHTML=''; if(empty) empty.style.display=''; $id('code-btn-del-major').disabled=true; return; }
+  if(empty) empty.style.display='none';
+  box.innerHTML = codeMajorList.map(function(m){
+    var sel = String(m['대분류ID'])===String(codeSelectedMajorId);
+    return '<div onclick="codeSelectMajor(&quot;'+esc(String(m['대분류ID']))+'&quot;)" style="cursor:pointer;padding:9px 12px;border-radius:8px;font-size:.85rem;font-weight:'+(sel?'700':'500')+';'
+      +(sel?'background:var(--navy);color:#fff;':'background:#f4f6fa;color:var(--text2);')+'display:flex;justify-content:space-between;align-items:center;">'
+      +'<span>▸ '+esc(m['대분류명']||'')+'</span>'+(sel?'<span style="font-size:.72rem;">선택됨</span>':'')+'</div>';
+  }).join('');
+  $id('code-btn-del-major').disabled = !codeSelectedMajorId;
+}
+function codeSelectMajor(id){
+  codeSelectedMajorId = id;
+  codeStagedUseYn = {};
+  codeRenderMajorList();
+  codeRenderMinorList();
+}
+function codeAddMajor(){
+  var name = prompt('추가할 대분류명을 입력하세요. (예: 수양회종류)');
+  if(name===null) return;
+  name = name.trim();
+  if(!name){ showToast('명칭을 입력해 주세요.','error'); return; }
+  if(name.length>30){ showToast('대분류명은 최대 30자입니다.','error'); return; }
+  if(codeMajorList.some(function(m){ return (m['대분류명']||'').trim()===name; })){
+    showToast('이미 등록된 명칭입니다.','error'); return;
+  }
+  var newId = _codeNextMajorId();
+  var nextOrder = codeMajorList.length ? Math.max.apply(null, codeMajorList.map(function(m){ return Number(m['정렬순서'])||0; }))+1 : 1;
+  var data = {
+    '대분류ID': newId, '대분류명': name, '정렬순서': nextOrder,
+    '등록일시': _procTimeToStr ? _procTimeToStr(new Date()) : new Date().toISOString(),
+    '등록자': (currentUser&&currentUser.id)||''
+  };
+  if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
+  showLoading(true);
+  apiCall(Object.assign({action:'add', sheetName:'CODE_MAJOR'}, data))
+    .then(function(res){
+      if(!(res&&res.success)){ showToast('⚠️ 저장 실패: '+(res&&(res.error||res.message)||'알 수 없는 오류'),'error'); return; }
+      codeMajorList.push(data);
+      codeSelectedMajorId = newId;
+      codeRenderMajorList(); codeRenderMinorList();
+      showToast('✅ 대분류가 추가되었습니다.','success');
+    })
+    .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){ showLoading(false); });
+}
+function codeDeleteMajor(){
+  if(!codeSelectedMajorId) return;
+  var childCount = codeMinorList.filter(function(m){ return String(m['대분류ID'])===String(codeSelectedMajorId); }).length;
+  if(childCount>0){
+    alert('하위 중분류가 있어 삭제할 수 없습니다. 먼저 하위 항목을 모두 삭제해 주세요.');
+    return;
+  }
+  var major = codeMajorList.find(function(m){ return String(m['대분류ID'])===String(codeSelectedMajorId); });
+  if(!confirm('"'+(major&&major['대분류명']||'')+'" 대분류를 삭제하시겠습니까?')) return;
+  if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
+  showLoading(true);
+  apiCall({action:'delete', sheetName:'CODE_MAJOR', id:codeSelectedMajorId})
+    .then(function(res){
+      if(!(res&&res.success)){ showToast('⚠️ 삭제 실패: '+(res&&(res.error||res.message)||'알 수 없는 오류'),'error'); return; }
+      codeMajorList = codeMajorList.filter(function(m){ return String(m['대분류ID'])!==String(codeSelectedMajorId); });
+      codeSelectedMajorId = codeMajorList.length ? codeMajorList[0]['대분류ID'] : '';
+      codeRenderMajorList(); codeRenderMinorList();
+      showToast('✅ 대분류가 삭제되었습니다.','success');
+    })
+    .catch(function(e){ showToast('⚠️ 삭제 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){ showLoading(false); });
+}
+function codeRenderMinorList(){
+  var title = $id('code-minor-title');
+  var addBtn = $id('code-btn-add-minor');
+  var body = $id('code-minor-body');
+  var empty = $id('code-minor-empty');
+  if(!body) return;
+  if(!codeSelectedMajorId){
+    if(title) title.textContent = '중분류를 보려면 좌측에서 대분류를 선택하세요';
+    if(addBtn) addBtn.disabled = true;
+    body.innerHTML=''; if(empty){ empty.style.display=''; empty.querySelector('p').textContent='대분류를 선택해 주세요.'; }
+    codeUpdateSaveBtnLabel();
+    return;
+  }
+  var major = codeMajorList.find(function(m){ return String(m['대분류ID'])===String(codeSelectedMajorId); });
+  if(title) title.textContent = '선택된 대분류: ' + (major&&major['대분류명']||'');
+  if(addBtn) addBtn.disabled = false;
+  var minors = codeMinorList.filter(function(m){ return String(m['대분류ID'])===String(codeSelectedMajorId); })
+    .sort(function(a,b){ return (Number(a['정렬순서'])||9999)-(Number(b['정렬순서'])||9999); });
+  if(!minors.length){
+    body.innerHTML=''; if(empty){ empty.style.display=''; empty.querySelector('p').textContent='등록된 중분류가 없습니다.'; }
+    codeUpdateSaveBtnLabel();
+    return;
+  }
+  if(empty) empty.style.display='none';
+  body.innerHTML = minors.map(function(m,i){
+    var id = String(m['중분류ID']);
+    var useYn = codeStagedUseYn.hasOwnProperty(id) ? codeStagedUseYn[id] : (m['사용여부']||'Y');
+    var pending = codeStagedUseYn.hasOwnProperty(id);
+    var on = useYn==='Y';
+    return '<tr>'+
+      '<td style="color:var(--muted);font-size:.72rem;">'+(i+1)+'</td>'+
+      '<td>'+esc(m['중분류명']||'')+'</td>'+
+      '<td><span onclick="codeToggleUseYn(&quot;'+esc(id)+'&quot;)" style="cursor:pointer;display:inline-block;padding:2px 10px;border-radius:12px;font-size:.78rem;font-weight:700;user-select:none;'
+        +(on?'background:#eaf7ee;color:#1a6b45;border:1.5px solid #1a6b45;':'background:#f4f4f4;color:#888;border:1.5px solid #ccc;')
+        +(pending?'border-style:dashed;':'border-style:solid;')+'">'+(on?'●ON':'○OFF')+'</span></td>'+
+      '<td style="font-size:.78rem;color:var(--muted);">'+esc(String(m['정렬순서']||''))+'</td>'+
+      '<td><button class="btn btn-danger btn-sm" onclick="codeDeleteMinor(&quot;'+esc(id)+'&quot;)">🗑</button></td>'+
+    '</tr>';
+  }).join('');
+  codeUpdateSaveBtnLabel();
+}
+function codeUpdateSaveBtnLabel(){
+  var btn = $id('code-btn-save'); if(!btn) return;
+  var n = Object.keys(codeStagedUseYn).length;
+  btn.textContent = n ? ('☁️ 구글시트 저장 ('+n+')') : '☁️ 구글시트 저장';
+}
+function codeToggleUseYn(minorId){
+  var m = codeMinorList.find(function(x){ return String(x['중분류ID'])===minorId; }); if(!m) return;
+  var cur = codeStagedUseYn.hasOwnProperty(minorId) ? codeStagedUseYn[minorId] : (m['사용여부']||'Y');
+  codeStagedUseYn[minorId] = cur==='Y' ? 'N' : 'Y';
+  codeRenderMinorList();
+}
+function codeAddMinor(){
+  if(!codeSelectedMajorId){ showToast('먼저 대분류를 선택해 주세요.','error'); return; }
+  var name = prompt('추가할 중분류명을 입력하세요. (예: 춘계)');
+  if(name===null) return;
+  name = name.trim();
+  if(!name){ showToast('명칭을 입력해 주세요.','error'); return; }
+  if(name.length>30){ showToast('중분류명은 최대 30자입니다.','error'); return; }
+  var siblings = codeMinorList.filter(function(m){ return String(m['대분류ID'])===String(codeSelectedMajorId); });
+  if(siblings.some(function(m){ return (m['중분류명']||'').trim()===name; })){
+    showToast('이미 등록된 명칭입니다.','error'); return;
+  }
+  var newId = _codeNextMinorId();
+  var nextOrder = siblings.length ? Math.max.apply(null, siblings.map(function(m){ return Number(m['정렬순서'])||0; }))+1 : 1;
+  var data = {
+    '중분류ID': newId, '대분류ID': codeSelectedMajorId, '중분류명': name,
+    '사용여부': 'Y', '정렬순서': nextOrder,
+    '등록일시': _procTimeToStr ? _procTimeToStr(new Date()) : new Date().toISOString(),
+    '등록자': (currentUser&&currentUser.id)||''
+  };
+  if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
+  showLoading(true);
+  apiCall(Object.assign({action:'add', sheetName:'CODE_MINOR'}, data))
+    .then(function(res){
+      if(!(res&&res.success)){ showToast('⚠️ 저장 실패: '+(res&&(res.error||res.message)||'알 수 없는 오류'),'error'); return; }
+      codeMinorList.push(data);
+      codeRenderMinorList();
+      showToast('✅ 중분류가 추가되었습니다.','success');
+    })
+    .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){ showLoading(false); });
+}
+function codeDeleteMinor(minorId){
+  var m = codeMinorList.find(function(x){ return String(x['중분류ID'])===minorId; }); if(!m) return;
+  // [v349] 참조중 여부 체크 — 현재는 코드값을 실제로 참조하는 화면이 없어 항상 미참조로 판정됨
+  // (향후 기존 드롭다운을 코드관리로 이관할 때 retreat 등 실데이터 대상 검사 로직을 채워야 함)
+  var inUse = false;
+  if(inUse){
+    alert('사용 중인 코드입니다. 완전 삭제 대신 사용여부를 OFF로 변경해 주세요.');
+    return;
+  }
+  if(!confirm('"'+(m['중분류명']||'')+'" 중분류를 삭제하시겠습니까?')) return;
+  if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
+  showLoading(true);
+  apiCall({action:'delete', sheetName:'CODE_MINOR', id:minorId})
+    .then(function(res){
+      if(!(res&&res.success)){ showToast('⚠️ 삭제 실패: '+(res&&(res.error||res.message)||'알 수 없는 오류'),'error'); return; }
+      codeMinorList = codeMinorList.filter(function(x){ return String(x['중분류ID'])!==minorId; });
+      delete codeStagedUseYn[minorId];
+      codeRenderMinorList();
+      showToast('✅ 중분류가 삭제되었습니다.','success');
+    })
+    .catch(function(e){ showToast('⚠️ 삭제 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){ showLoading(false); });
+}
+// [v349] 사용여부 변경 확정저장 — 스테이징된 항목을 접수ID 없이 중분류ID 기준으로 순차 update
+function codeSaveUseYn(){
+  var ids = Object.keys(codeStagedUseYn);
+  if(!ids.length){ alert('변경(사용여부 토글) 예약된 항목이 없습니다.'); return; }
+  if(!confirm('사용여부 변경 '+ids.length+'건을 저장하시겠습니까?')) return;
+  if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
+  showLoading(true);
+  var okCount=0, failCount=0;
+  var chain = ids.reduce(function(p, id){
+    return p.then(function(){
+      var newYn = codeStagedUseYn[id];
+      return apiCall({action:'update', sheetName:'CODE_MINOR', '중분류ID':id, '사용여부':newYn})
+        .then(function(res){
+          if(res&&res.success){
+            var m = codeMinorList.find(function(x){ return String(x['중분류ID'])===id; });
+            if(m) m['사용여부'] = newYn;
+            okCount++;
+          } else { failCount++; }
+        })
+        .catch(function(){ failCount++; });
+    });
+  }, Promise.resolve());
+  chain.then(function(){
+    codeStagedUseYn = {};
+    codeRenderMinorList();
+    showToast('✅ 사용여부 저장 완료 ('+okCount+'건)'+(failCount?(' · 실패 '+failCount+'건'):''), failCount?'error':'success');
+  }).finally(function(){ showLoading(false); });
+}
+
 
 document.addEventListener('DOMContentLoaded', function() {
   var _expose = [
@@ -17079,6 +17383,8 @@ document.addEventListener('DOMContentLoaded', function() {
     'bpOpenDetail','bpOpenInlineEdit','bpSaveInlineEdit','bpDeleteRow','bpCancelEdit','bpSaveEdit',
     'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport','bpBulkUploadOpen','bpBulkUploadHandleFile','bpBulkUploadParseCSV','bpBulkUploadProcess','bpStageAssignType',
     'bpEditDate','bpStageDate','bpCancelDateEdit','bpDownloadTemplate','bpStageBus','_bpileToggleBusFields',
+    // [v349] 코드관리
+    'codeLoadAll','codeSelectMajor','codeAddMajor','codeDeleteMajor','codeAddMinor','codeToggleUseYn','codeDeleteMinor','codeSaveUseYn',
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진 — onclick/onchange에서 직접 호출되는 함수만 등록
     'spToggleTransport','spToggleCheck','spToggleAll','spStageAssignType',
     'spEditDate','spStageDate','spCancelDateEdit',
@@ -17152,6 +17458,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
     bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport, bpBulkUploadOpen:bpBulkUploadOpen, bpBulkUploadHandleFile:bpBulkUploadHandleFile, bpBulkUploadParseCSV:bpBulkUploadParseCSV, bpBulkUploadProcess:bpBulkUploadProcess, bpStageAssignType:bpStageAssignType,
     bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit, bpDownloadTemplate:bpDownloadTemplate, bpStageBus:bpStageBus, _bpileToggleBusFields:_bpileToggleBusFields,
+    codeLoadAll:codeLoadAll, codeSelectMajor:codeSelectMajor, codeAddMajor:codeAddMajor, codeDeleteMajor:codeDeleteMajor, codeAddMinor:codeAddMinor, codeToggleUseYn:codeToggleUseYn, codeDeleteMinor:codeDeleteMinor, codeSaveUseYn:codeSaveUseYn,
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진
     spToggleTransport:spToggleTransport, spToggleCheck:spToggleCheck, spToggleAll:spToggleAll, spStageAssignType:spStageAssignType,
     spEditDate:spEditDate, spStageDate:spStageDate, spCancelDateEdit:spCancelDateEdit,
