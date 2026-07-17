@@ -4827,7 +4827,9 @@ function _busBuildDriverInfoMap(baseRows, driverRows, bf, direction){
           alightLoc:  String(d['하차위치']||'').trim(),
           driverName: String(d['이름']||'').trim(),
           baeName:    String(d['배차명']||'').trim(), // [v326]
-          departTime: departTime
+          vehicle:    String(d['차량번호']||'').trim(), // [v357] 배차표 신규 양식(기사/차량번호 줄)용
+          departTime: departTime,
+          departDate: String(baseRow['출발일자']||'').trim() // [v357] 배차표 신규 양식(정보줄 날짜)용
         };
       });
   });
@@ -5866,6 +5868,7 @@ function busLeaderSave(){
   var slots = [];       // {busName, leaderId}
   var notFound = [];    // 참석인원현황에서 못 찾은 항목(이름 자체가 없음)
   var noRecord = [];    // [v356] 이름은 있으나 현재 년도/수양회종류/회차(+버스이용자)로 접수내역이 없는 항목
+  var typeMismatch = [];// [v359] 접수내역은 있으나 본인의 참석/귀가배정유형이 현재 저장 대상 배정유형과 다른 항목
   var ambiguous = [];   // 동명이인 등으로 특정 불가
   var incomplete = [];  // 일부만 입력된 항목
   for(var i=1;i<=n;i++){
@@ -5889,12 +5892,19 @@ function busLeaderSave(){
       continue;
     }
     if(scopedMatches.length>1){ ambiguous.push(busName+'('+name+')'); continue; }
+    // [v359] 접수내역까지 확인된 사람의 "본인 참석/귀가배정유형"이 현재 저장하려는 배정유형과 같은지 확인
+    var personAssignType = (direction==='귀가' ? (scopedMatches[0].leaveAssignType||'') : (scopedMatches[0].arriveAssignType||'')).trim();
+    if(personAssignType !== assignType){
+      typeMismatch.push('지정된 선탑자의 배정유형이 지정하려는 배정유형과 동일하지 않습니다. 선탑자 버스신청정보를 확인해주세요. ('+busName+' '+name+'님: '+(personAssignType||'미지정')+' ≠ '+assignType+')');
+      continue;
+    }
     slots.push({busName:busName, leaderId: scopedMatches[0].receiptId||''});
   }
-  if(incomplete.length) showToast('⚠️ 교구/구역/이름을 모두 입력해주세요: '+incomplete.join(', '),'error');
-  if(notFound.length)   showToast('⚠️ 참석인원현황에서 찾을 수 없음: '+notFound.join(', '),'error');
-  if(noRecord.length)   alert(noRecord.join('\n'));
-  if(ambiguous.length)  showToast('⚠️ 동명이인 등으로 특정할 수 없음: '+ambiguous.join(', '),'error');
+  if(incomplete.length)   showToast('⚠️ 교구/구역/이름을 모두 입력해주세요: '+incomplete.join(', '),'error');
+  if(notFound.length)     showToast('⚠️ 참석인원현황에서 찾을 수 없음: '+notFound.join(', '),'error');
+  if(noRecord.length)     alert(noRecord.join('\n'));
+  if(typeMismatch.length) alert(typeMismatch.join('\n'));
+  if(ambiguous.length)    showToast('⚠️ 동명이인 등으로 특정할 수 없음: '+ambiguous.join(', '),'error');
   if(!slots.length){ return; }
 
   // [v41] 선탑자ID는 버스배정_운전자정보(등록ID+배차)에 저장 — 요약시트는 더 이상 사용하지 않음
@@ -5968,7 +5978,7 @@ function busLeaderSaveAll(){
   var transportKey = direction==='귀가' ? 'leaveTransport' : 'arriveTransport';
   // [v323] 배차명 컬럼 추가 — 헤더 불일치로 시트 컬럼이 유실되지 않도록 맞춤
   var drvHdr = ['NO','등록ID','배차','배차명','이름','연락처','차량번호','승차위치','하차위치','선탑자ID'];
-  var notFound = [], noRecord = [], ambiguous = [], incomplete = [];
+  var notFound = [], noRecord = [], typeMismatch = [], ambiguous = [], incomplete = [];
   // 그룹별 slots: [{assignType, regId, slots:[{busName, leaderId}]}]
   var groupSlots = _busLeaderAllGroups.map(function(g, gi){
     var slots = [];
@@ -5994,6 +6004,12 @@ function busLeaderSaveAll(){
         continue;
       }
       if(scopedMatches.length>1){ ambiguous.push(tag+'('+name+')'); continue; }
+      // [v359] 접수내역까지 확인된 사람의 "본인 참석/귀가배정유형"이 이 그룹의 배정유형(g.assignType)과 같은지 확인
+      var personAssignType = (direction==='귀가' ? (scopedMatches[0].leaveAssignType||'') : (scopedMatches[0].arriveAssignType||'')).trim();
+      if(personAssignType !== g.assignType){
+        typeMismatch.push('지정된 선탑자의 배정유형이 지정하려는 배정유형과 동일하지 않습니다. 선탑자 버스신청정보를 확인해주세요. ('+tag+' '+name+'님: '+(personAssignType||'미지정')+' ≠ '+g.assignType+')');
+        continue;
+      }
       slots.push({busName:busName, leaderId: scopedMatches[0].receiptId||''});
     }
     return {assignType:g.assignType, regId:g.regId, slots:slots};
@@ -6005,6 +6021,10 @@ function busLeaderSaveAll(){
   if(noRecord.length){
     var uniqNoRecord = noRecord.filter(function(m,i){ return noRecord.indexOf(m)===i; });
     alert(uniqNoRecord.join('\n'));
+  }
+  if(typeMismatch.length){
+    var uniqTypeMismatch = typeMismatch.filter(function(m,i){ return typeMismatch.indexOf(m)===i; });
+    alert(uniqTypeMismatch.join('\n'));
   }
   if(ambiguous.length)  showToast('⚠️ 동명이인 등으로 특정할 수 없음: '+ambiguous.join(', '),'error');
   if(!groupSlots.length){ return; }
@@ -9421,28 +9441,78 @@ function _bvwSortKey(name){
   var m = String(name||'').match(/(\d+)/);
   return m ? parseInt(m[1],10) : 999999;
 }
-// 요약 시트 원본 행 → { 버스명: {boardLoc, alightLoc, leaderId, driverName, departTime, cap} } 맵
-// [v313] 상차·하차위치는 요약시트에서 완전히 제거되어 driverMap(_busBuildDriverInfoMap 결과,
-// 배정유형|버스명 키)으로만 조인해서 채움 — 운전자이름·출발시간도 함께 포함
+// [v358] 신규: 버스배정_기초정보 + 버스배정_운전자정보만으로 배정유형별 전체 버스(1호~배정대수) 메타 구성.
+// 요약시트(버스배정_참석/귀가요약)는 배정유형 컬럼이 비어있거나 신뢰할 수 없는 경우가 있어(예: 배정유형이
+// 공백인 상태로 저장된 과거 데이터) 조인 키가 충돌해 엉뚱한 배정유형의 기사/차량번호가 섞여 나오는
+// 문제가 있었다. 등록ID는 기초정보↔운전자정보 사이의 원래 신뢰 가능한 조인 키이므로 이것만 사용한다.
+// 부가 효과: 승객이 0명이라도 기초정보에 등록된 버스는 항상 카드가 생성된다(요약시트 미저장 시 누락되던 문제도 해결).
+function _bvwBuildBusMetaMapFromBase(baseRows, driverRows, bf, direction){
+  var map = {};
+  (baseRows||[]).filter(function(r){
+    return String(r['년도'])===String(bf.year) && r['수양회종류']===bf.season && r['행사명']===bf.event
+      && r['운행방향']===direction;
+  }).forEach(function(baseRow){
+    var regId = baseRow['등록ID']||'';
+    var atype = String(baseRow['배정유형']||'').trim();
+    var count = parseInt(baseRow['배정대수'],10) || 0;
+    var cap   = parseInt(baseRow['버스정원'],10) || busGetCap();
+    var departDate = String(baseRow['출발일자']||'').trim();
+    var departTime = String(baseRow['출발시간']||'').trim();
+    for(var i=1; i<=count; i++){
+      var busLabel = i+'호';
+      var busName  = '버스 '+busLabel;
+      var d = (driverRows||[]).find(function(r){
+        return String(r['등록ID']||'')===String(regId) && bbNormalizeBaeLabel(r['배차'])===busLabel;
+      }) || {};
+      map[atype+'|'+busName] = {
+        atype:      atype,
+        busName:    busName,
+        boardLoc:   String(d['승차위치']||'').trim(),
+        alightLoc:  String(d['하차위치']||'').trim(),
+        leaderId:   String(d['선탑자ID']||'').trim(),
+        driverName: String(d['이름']||'').trim(),
+        baeName:    String(d['배차명']||'').trim(),
+        vehicle:    String(d['차량번호']||'').trim(),
+        departTime: departTime,
+        departDate: departDate,
+        cap:        cap
+      };
+    }
+  });
+  return map;
+}
+// 요약 시트 원본 행 → { 배정유형|버스명: {boardLoc, alightLoc, leaderId, driverName, baeName, vehicle,
+// departTime, departDate, cap} } 맵. [v357] 배정유형이 다른 동일 번호 버스(예: 선발대 버스1호 vs
+// 본대 버스1호)가 서로 덮어쓰던 기존 버그를 "배정유형|버스명" 복합키로 수정.
+// [v358] 배차표 다운로드(bvwExportBusSchedule)에서는 더 이상 이 함수를 사용하지 않음 —
+// _bvwBuildBusMetaMapFromBase()로 대체(요약시트의 배정유형 신뢰성 문제 회피). 다른 화면에서
+// 참조할 가능성을 고려해 함수 자체는 유지.
 function _bvwBuildBusMetaMap(summaryRows, driverMap){
   var map = {};
   (summaryRows||[]).forEach(function(r){
     var name = String(r['버스명']||'').trim();
     if(!name) return;
     var atype = String(r['배정유형']||'').trim();
-    var d = (driverMap && driverMap[atype+'|'+name]) || {};
-    map[name] = {
+    var key = atype+'|'+name;
+    var d = (driverMap && driverMap[key]) || {};
+    map[key] = {
+      atype:      atype,
+      busName:    name,
       boardLoc:   d.boardLoc||'',
       alightLoc:  d.alightLoc||'',
       leaderId:   d.leaderId||'',
       driverName: d.driverName||'',
+      baeName:    d.baeName||'',
+      vehicle:    d.vehicle||'',
       departTime: d.departTime||'',
+      departDate: d.departDate||'',
       cap:        parseInt(r['정원'],10) || busGetCap()
     };
   });
   return map;
 }
-// 탑승자 시트 원본 행들 → { 버스명: [ {접수ID,교구,구역,이름,회별,일자}, ... ] } (placeholder/빈 행 제외)
+// 탑승자 시트 원본 행들 → { 배정유형|버스명: [ {접수ID,교구,구역,이름,회별,일자}, ... ] } (placeholder/빈 행 제외)
+// [v357] 그룹 키를 "배정유형|버스명" 복합키로 변경(위 메타맵과 동일 원칙)
 function _bvwGroupRoster(rosterRows){
   // 접수ID 기준으로 참석인원명단(retreat)에서 이름을 다시 조회 — 탑승자_참석/귀가 시트에
   // 예전 버스배정 처리 때 저장된 마스킹 이름(예: 홍*동)이 남아있어도 항상 최신 풀네임으로 표시
@@ -9454,12 +9524,14 @@ function _bvwGroupRoster(rosterRows){
   var map = {};
   (rosterRows||[]).forEach(function(r){
     var bus = String(r['버스명']||'').trim();
+    var atype = String(r['배정유형']||'').trim();
     var sheetName = String(r['이름']||'').trim();
     if(!bus || !sheetName || sheetName==='(명단 미연동)') return;
     var receiptId = String(r['접수ID']||'').trim();
     var fullName = (receiptId && nameByReceiptId[receiptId]) ? nameByReceiptId[receiptId] : sheetName;
-    if(!map[bus]) map[bus]=[];
-    map[bus].push({
+    var key = atype+'|'+bus;
+    if(!map[key]) map[key]=[];
+    map[key].push({
       receiptId: receiptId,
       parish:    String(r['교구']||'').trim(),
       district:  String(r['구역']||'').trim(),
@@ -9471,20 +9543,48 @@ function _bvwGroupRoster(rosterRows){
   });
   return map;
 }
-// 호차 1개 → CSV용 행배열 (No/교구/구역/이름/성별/비고, 정원까지 빈 줄 패딩, 선탑자 표시)
-// 배정인원 상세 페이지(교구/구역 분리 표시)와 동일한 컬럼 구성
-function _bvwBuildSheetRows(busName, meta, passengers, titleText){
-  meta = meta || {boardLoc:'',alightLoc:'',leaderId:'',driverName:'',departTime:'',cap:busGetCap()};
+// [v357] 24시간제("13:00") → "PM 1시" / "00:00" → "AM 12시" / "12:00" → "PM 12시"
+function _bvwFormatAmPm(timeStr){
+  var m = String(timeStr||'').match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return '';
+  var h = parseInt(m[1],10);
+  var ampm = h<12 ? 'AM' : 'PM';
+  var h12 = h%12; if(h12===0) h12=12;
+  return ampm+' '+h12+'시';
+}
+// [v357] "2026-07-23" → "목" (요일)
+function _bvwWeekdayKR(dateStr){
+  var m = String(dateStr||'').match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return '';
+  var d = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+  if(isNaN(d.getTime())) return '';
+  return ['일','월','화','수','목','금','토'][d.getDay()];
+}
+// [v357] "2026-07-23" → "7/23"
+function _bvwFormatMD(dateStr){
+  var m = String(dateStr||'').match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return dateStr||'';
+  return parseInt(m[2],10)+'/'+parseInt(m[3],10);
+}
+// [v357] 호차 카드 1개 → CSV용 행배열. 카카오톡 공유 배차표 양식 기준:
+//   1행: "{전체호차번호}호차 ({배차명})"
+//   2행: "{M}/{D}({요일}), {AM/PM} {H}시 {배차명}"
+//   3행: "기사: {운전자명} | 차량번호: {차량번호}"
+//   4행(헤더): No / 구역 / 이름 — 3컬럼만(교구·성별·비고 제거)
+//   본문: 구역은 값이 있을 때만 표시(없으면 공란), 선탑자는 이름 뒤에 "(선탑자)" 직접 표기
+//   하단: "탑승인원 {N}"
+function _bvwBuildSheetRows(globalNo, meta, passengers){
+  meta = meta || {cap:busGetCap()};
   var cap = meta.cap || busGetCap();
+  var label = meta.baeName || meta.atype || ''; // [Q1] 배차명 우선, 없으면 배정유형으로 폴백
   var rows = [];
-  rows.push([titleText+' — '+_bvwBusLabel(busName)]);
-  var infoDate = (passengers[0] && passengers[0].date) || '';
-  var infoParts = [];
-  if(infoDate) infoParts.push(infoDate+(meta.departTime?' '+meta.departTime:'')+' 출발');
-  if(meta.boardLoc || meta.alightLoc) infoParts.push('상차 '+(meta.boardLoc||'-')+' → 하차 '+(meta.alightLoc||'-'));
-  if(meta.driverName) infoParts.push('운전자 '+meta.driverName);
-  rows.push([infoParts.join(' · ')]);
-  rows.push(['No','교구','구역','이름','성별','비고']);
+  rows.push([globalNo+'호차'+(label?' ('+label+')':'')]);
+  var infoLine = meta.departDate
+    ? (_bvwFormatMD(meta.departDate)+'('+_bvwWeekdayKR(meta.departDate)+'), '+_bvwFormatAmPm(meta.departTime)+(label?' '+label:''))
+    : '';
+  rows.push([infoLine]);
+  rows.push(['기사: '+(meta.driverName||'-')+' | 차량번호: '+(meta.vehicle||'-')]);
+  rows.push(['No','구역','이름']);
   // 선탑자를 맨 위로 정렬 (leaderId 미지정 시 원래 순서 유지, stable sort로 나머지 순서 보존)
   var sortedPax = passengers.slice();
   if(meta.leaderId){
@@ -9498,11 +9598,13 @@ function _bvwBuildSheetRows(busName, meta, passengers, titleText){
     var p = sortedPax[i];
     if(p){
       var isLeader = p.receiptId && p.receiptId===meta.leaderId;
-      rows.push([i+1, p.parish||'', p.district||(p.group||''), p.name, p.gender||'', isLeader?'선탑자':'']);
+      var districtDisp = p.district ? p.district.replace(/구역$/,'') : ''; // [Q2] 구역 있으면 구역, 없으면 공란
+      rows.push([i+1, districtDisp, p.name+(isLeader?' (선탑자)':'')]);
     } else {
-      rows.push([i+1, '', '', '', '', '']);
+      rows.push([i+1, '', '']);
     }
   }
+  rows.push(['탑승인원', '', sortedPax.length]);
   rows.push([]); // 호차 간 구분용 빈 줄
   return rows;
 }
@@ -9512,23 +9614,23 @@ function _bvwPadRow(row, width){
   while(r.length < width) r.push('');
   return r;
 }
-// 호차 카드 여러 개를 N대씩 한 줄(행)로 묶어서 CSV 행 배열 생성 — 다 차면 다음 줄로 내려감
-// 예: 1~5호차가 1번째 줄, 6~10호차가 2번째 줄, 11~15호차가 3번째 줄 ... (가로로 1,2,3,4,5 순서)
-function _bvwBuildSplitRows(busNames, metaMap, groupMap, titleText){
-  var CARD_W = 6;          // No/교구/구역/이름/성별/비고
+// [v357] 호차 카드 여러 개를 N대씩 한 줄(행)로 묶어서 CSV 행 배열 생성 — 다 차면 다음 줄로 내려감.
+// busKeys는 이미 출발일자+출발시간 기준 오름차순 정렬된 "배정유형|버스명" 복합키 목록(전체 배정유형 통합
+// 일련번호 부여 대상) — 카카오톡 배차표 양식과 동일하게 배정유형 구분 없이 1호차~N호차로 이어붙인다.
+function _bvwBuildSplitRows(busKeys, metaMap, groupMap){
+  var CARD_W = 3;          // No/구역/이름
   var BUSES_PER_ROW = 5;   // 한 줄에 배치할 호차 수
 
-  // 호차별 카드(행배열) 생성 + 6열로 패딩
-  var cardOf = function(bn){
-    return _bvwBuildSheetRows(bn, metaMap[bn], groupMap[bn]||[], titleText)
+  var cardOf = function(key, idx){
+    return _bvwBuildSheetRows(idx+1, metaMap[key], groupMap[key]||[])
       .map(function(row){ return _bvwPadRow(row, CARD_W); });
   };
-  var allCards = busNames.map(cardOf);
+  var allCards = busKeys.map(cardOf);
 
   // 모든 카드 길이(행 수)를 가장 긴 카드 기준으로 통일 — 호차마다 정원(cap)이 달라도 줄이 안 어긋나게
   var maxLen = 0;
   allCards.forEach(function(c){ if(c.length>maxLen) maxLen=c.length; });
-  var blankRowW = function(){ return ['','','','','','']; };
+  var blankRowW = function(){ return ['','','']; };
   allCards = allCards.map(function(c){
     var r = c.slice();
     while(r.length < maxLen) r.push(blankRowW());
@@ -9555,12 +9657,12 @@ function bvwExportBusSchedule(typeOverride){
   // 타입 인자가 있으면 그 값(예: 관리자 배정현황 탭의 busSummarySub) 사용, 없으면 기존처럼 busview 탭(bvwType) 기준
   var useType = typeOverride || bvwType;
   var isLeave = (useType==='leave');
-  var summarySheet = isLeave ? '버스배정_귀가요약' : '버스배정_참석요약';
   var rosterSheet  = isLeave ? '탑승자_귀가'       : '탑승자_참석';
   var typeLabel    = isLeave ? '귀가' : '참석';
 
-  // [v41] 선탑자ID 조인을 위해 기초정보·운전자정보도 함께 조회
-  var sheetsToFetch = [summarySheet, rosterSheet, '버스배정_기초정보', '버스배정_운전자정보'];
+  // [v358] 요약시트(버스배정_참석/귀가요약) 조회 제거 — 버스 목록·기사·차량번호·정원은
+  // 이제 버스배정_기초정보 + 버스배정_운전자정보(등록ID 조인)만으로 직접 구성한다.
+  var sheetsToFetch = [rosterSheet, '버스배정_기초정보', '버스배정_운전자정보'];
   Promise.all(sheetsToFetch.map(function(sn){
     return apiCall({action:'getAll', sheetName:sn})
       .then(function(res){ return (res && res.success) ? (res.data||res.rows||[]) : []; })
@@ -9579,14 +9681,23 @@ function bvwExportBusSchedule(typeOverride){
         return true;
       });
     }
-    var summary = _exportFilter(results[0]);
-    var roster  = _exportFilter(results[1]);
-    var leaderMap = _busBuildDriverInfoMap(results[2], results[3], _expBf, typeLabel);
-    var meta = _bvwBuildBusMetaMap(summary, leaderMap);
+    var roster     = _exportFilter(results[0]);
+    var baseRows   = results[1]; // [v358] _bvwBuildBusMetaMapFromBase가 자체적으로 년도/종류/행사명/방향 필터링
+    var driverRows = results[2];
+    var meta = _bvwBuildBusMetaMapFromBase(baseRows, driverRows, _expBf, typeLabel);
     var groups = _bvwGroupRoster(roster);
-    var busNames = Object.keys(meta).sort(function(a,b){ return _bvwSortKey(a)-_bvwSortKey(b); });
+    // [v357] 배정유형 구분 없이 출발일자+출발시간 오름차순으로 전체 호차 통합 정렬 →
+    // 카카오톡 배차표 양식처럼 1호차~N호차 일련번호를 배정유형과 무관하게 이어붙인다.
+    // (출발일자·시간이 같으면 버스명의 숫자 순서로 안정적으로 정렬)
+    var busKeys = Object.keys(meta).sort(function(a,b){
+      var ma = meta[a], mb = meta[b];
+      var da = (ma.departDate||'')+' '+(ma.departTime||'');
+      var db = (mb.departDate||'')+' '+(mb.departTime||'');
+      if(da!==db) return da<db ? -1 : 1;
+      return _bvwSortKey(ma.busName)-_bvwSortKey(mb.busName);
+    });
 
-    if(!busNames.length){
+    if(!busKeys.length){
       showToast(typeLabel+' 버스 배정 결과가 없습니다. 먼저 배정을 완료해 주세요.','error');
       showLoading(false);
       return;
@@ -9596,13 +9707,16 @@ function bvwExportBusSchedule(typeOverride){
     var pad=function(n){ return ('0'+n).slice(-2); };
     var updatedStr = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
 
-    var allRows = [['서울강서교회 수양회 '+typeLabel+'버스 배차표 (업데이트 '+updatedStr+')'], []];
-    allRows = allRows.concat(_bvwBuildSplitRows(busNames, meta, groups, '서울강서교회 수양회 '+typeLabel+'버스 배차'));
+    // [v357] "{행사명}{수양회종류} {하행/상행}버스 배차" — 하행=참석, 상행=귀가 (Q3 반영)
+    var directionLabel = isLeave ? '상행' : '하행';
+    var titleLine = (_expBf.event||'')+(_expBf.season||'')+' '+directionLabel+'버스 배차 (업데이트 '+updatedStr+')';
+    var allRows = [[titleLine], []];
+    allRows = allRows.concat(_bvwBuildSplitRows(busKeys, meta, groups));
 
-    var rowsOfBuses = Math.ceil(busNames.length/5);
-    var splitMsg = busNames.length>5 ? ' · 5대씩 '+rowsOfBuses+'줄 배치' : '';
+    var rowsOfBuses = Math.ceil(busKeys.length/5);
+    var splitMsg = busKeys.length>5 ? ' · 5대씩 '+rowsOfBuses+'줄 배치' : '';
     _downloadCSV(allRows, '버스배차표_'+typeLabel+'_'+today()+'.csv');
-    showToast('✅ '+typeLabel+' 배차표 다운로드 완료! ('+busNames.length+'호차'+splitMsg+')','success');
+    showToast('✅ '+typeLabel+' 배차표 다운로드 완료! ('+busKeys.length+'호차'+splitMsg+')','success');
   }).catch(function(e){
     showToast('배차표 생성 오류: '+(e&&e.message||e),'error');
   }).finally(function(){
@@ -10557,7 +10671,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v356_leader_save_event_scope_check';
+var CACHE_VERSION = 'v359_leader_save_assigntype_check';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
