@@ -5895,7 +5895,7 @@ function busLeaderSave(){
     // [v359] 접수내역까지 확인된 사람의 "본인 참석/귀가배정유형"이 현재 저장하려는 배정유형과 같은지 확인
     var personAssignType = (direction==='귀가' ? (scopedMatches[0].leaveAssignType||'') : (scopedMatches[0].arriveAssignType||'')).trim();
     if(personAssignType !== assignType){
-      typeMismatch.push('지정된 선탑자의 배정유형이 지정하려는 배정유형과 동일하지 않습니다. 선탑자 버스신청정보를 확인해주세요. ('+busName+' '+name+'님: '+(personAssignType||'미지정')+' ≠ '+assignType+')');
+      typeMismatch.push(name+'님의 배정유형이 지정하려는 배정유형과 동일하지 않습니다. 선탑자 버스신청정보를 확인해주세요. ('+busName+' — 본인: '+(personAssignType||'미지정')+' ≠ 지정대상: '+assignType+')');
       continue;
     }
     slots.push({busName:busName, leaderId: scopedMatches[0].receiptId||''});
@@ -6007,7 +6007,7 @@ function busLeaderSaveAll(){
       // [v359] 접수내역까지 확인된 사람의 "본인 참석/귀가배정유형"이 이 그룹의 배정유형(g.assignType)과 같은지 확인
       var personAssignType = (direction==='귀가' ? (scopedMatches[0].leaveAssignType||'') : (scopedMatches[0].arriveAssignType||'')).trim();
       if(personAssignType !== g.assignType){
-        typeMismatch.push('지정된 선탑자의 배정유형이 지정하려는 배정유형과 동일하지 않습니다. 선탑자 버스신청정보를 확인해주세요. ('+tag+' '+name+'님: '+(personAssignType||'미지정')+' ≠ '+g.assignType+')');
+        typeMismatch.push(name+'님의 배정유형이 지정하려는 배정유형과 동일하지 않습니다. 선탑자 버스신청정보를 확인해주세요. ('+tag+' — 본인: '+(personAssignType||'미지정')+' ≠ 지정대상: '+g.assignType+')');
         continue;
       }
       slots.push({busName:busName, leaderId: scopedMatches[0].receiptId||''});
@@ -9686,11 +9686,18 @@ function bvwExportBusSchedule(typeOverride){
     var driverRows = results[2];
     var meta = _bvwBuildBusMetaMapFromBase(baseRows, driverRows, _expBf, typeLabel);
     var groups = _bvwGroupRoster(roster);
-    // [v357] 배정유형 구분 없이 출발일자+출발시간 오름차순으로 전체 호차 통합 정렬 →
-    // 카카오톡 배차표 양식처럼 1호차~N호차 일련번호를 배정유형과 무관하게 이어붙인다.
-    // (출발일자·시간이 같으면 버스명의 숫자 순서로 안정적으로 정렬)
+    // [v360] 배정유형 고정 순서(선발대 → 본대(봉사) → 본대 → 중고등부 → 직장조)로 1차 정렬 →
+    // 동일 배정유형 내에서는 출발일자+출발시간 오름차순 → 버스명 숫자 순으로 2차 정렬.
+    // 목록에 없는 배정유형(신규/기타)은 맨 뒤로 밀려 날짜순으로 배치된다.
+    var ASSIGN_TYPE_ORDER = ['선발대','본대(봉사)','본대','중고등부','직장조'];
+    function _bvwAssignTypeRank(atype){
+      var idx = ASSIGN_TYPE_ORDER.indexOf(atype);
+      return idx===-1 ? ASSIGN_TYPE_ORDER.length : idx;
+    }
     var busKeys = Object.keys(meta).sort(function(a,b){
       var ma = meta[a], mb = meta[b];
+      var ra = _bvwAssignTypeRank(ma.atype), rb = _bvwAssignTypeRank(mb.atype);
+      if(ra!==rb) return ra-rb;
       var da = (ma.departDate||'')+' '+(ma.departTime||'');
       var db = (mb.departDate||'')+' '+(mb.departTime||'');
       if(da!==db) return da<db ? -1 : 1;
@@ -10671,7 +10678,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v359_leader_save_assigntype_check';
+var CACHE_VERSION = 'v360_export_order_leadername_msg';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
