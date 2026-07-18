@@ -1333,6 +1333,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <button class="btn btn-sm" onclick="busSaveTeamsToSheet()" style="background:#1a6b45;color:#fff;border:none;font-weight:600;">
                     ☁️ 내역저장
                   </button>
+                  <div style="width:1px;height:20px;background:var(--border2);"></div>
+                  <!-- [v389] 선탑자 지정 탭에서 이동 — id/동작(busResetConfirm/busResetByAssignTypeConfirm,
+                       참석/귀가 모드별 텍스트 자동전환은 busTeamsSubTab()이 그대로 처리) 그대로 유지 -->
+                  <button id="bus-teams-reset-btn" onclick="busResetConfirm()" style="background:transparent;border:1px solid #d94040;color:#d94040;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 참석배정 전체 초기화</button>
+                  <button id="bus-teams-reset-bytype-btn" onclick="busResetByAssignTypeConfirm()" style="background:transparent;border:1px solid #d97a1f;color:#d97a1f;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 배정유형별 초기화</button>
                 </div>
               </div>
               <!-- [v364] 배정버스1대 일괄 내역조회 결과 미리보기 — 배정유형별 구분선 + 배정내역 테이블 -->
@@ -1497,10 +1502,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <button class="btn btn-navy btn-sm" onclick="busLeaderRender()" style="font-weight:700;">
                   🚌 배정유형별 대수 불러오기
                 </button>
-                <!-- [v289] 구역관리 페이지에서 이동됨 — id/동작(busResetConfirm, 참석/귀가 모드별 텍스트 자동전환) 그대로 유지 -->
-                <button id="bus-teams-reset-btn" onclick="busResetConfirm()" style="background:transparent;border:1px solid #d94040;color:#d94040;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 참석배정 전체 초기화</button>
-                <!-- [v321] 배정유형별 초기화 — 현재 선택된 배정유형만 초기화(다른 배정유형 보존) -->
-                <button id="bus-teams-reset-bytype-btn" onclick="busResetByAssignTypeConfirm()" style="background:transparent;border:1px solid #d97a1f;color:#d97a1f;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 배정유형별 초기화</button>
               </div>
             </div>
             <div id="bus-leader-list">
@@ -11185,7 +11186,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v388_bb_detail_modal_leader';
+var CACHE_VERSION = 'v389_leader_tab_hide_reset_move';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -11860,8 +11861,8 @@ function initApp() {
   // 자료 등록: 항상 숨김
   var navReg=$id('nav-register'); if(navReg) navReg.style.display='none';
   var ew=$id('btn-export-wrap'); if(ew) ew.style.display=isAdmin?'':'none';
-  // 선탑자 지정 탭 버튼: 관리자만 표시
-  var leaderTab=$id('bus-tab-leader'); if(leaderTab) leaderTab.style.display=isAdmin?'':'none';
+  // [v389] 선탑자 지정 탭 버튼: 관리자 여부와 무관하게 항상 숨김(초기화 버튼은 버스신청자불러오기 탭으로 이동)
+  var leaderTab=$id('bus-tab-leader'); if(leaderTab) leaderTab.style.display='none';
   // 수양회목표달성현황의 관리자 안내링크: 관리자만 표시
   var gsLink=$id('gs-admin-link'); if(gsLink) gsLink.style.display=isAdmin?'':'none';
   // 자료검색 / 숙소현황 / 목표달성현황: 모든 권한 표시
