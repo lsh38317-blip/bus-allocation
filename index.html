@@ -8521,20 +8521,14 @@ function _busTeamTabReset(type){
       if(err) errSheets.push(s.sheetName);
       done++;
       if(done < sheets.length) return;
-      // ── 4. 선탑자ID 초기화 (해당 운행방향의 모든 배정유형 대상) ──
-      // 운전자 이름/연락처/차량번호/승하차위치는 "버스운행설정" 등록 소관이므로 보존
-      _busFindBaseRegIds(bf, direction, null, function(regIds){
-        _busClearLeaderIds(regIds, function(clearedCount){
-          // ── 5. 완료 처리 ──
-          showLoading(false);
-          if(errSheets.length){
-            showToast('⚠️ 일부 시트 초기화 실패: '+errSheets.join(', '),'error');
-          } else {
-            showToast('✅ '+label+' 전체 초기화 완료 — 팀내역·요약·탑승자 3개 시트'
-              +(clearedCount?' + 선탑자 '+clearedCount+'건':'')+' 삭제 ('+bf.year+' '+bf.season+' '+bf.event+')','success');
-          }
-        });
-      });
+      // [v381] 선탑자ID 초기화 단계 제거 — 다른 화면(선탑자 지정)에서 별도로 처리하므로
+      // 여기서 중복으로 처리할 필요가 없다는 판단에 따라 제거.
+      showLoading(false);
+      if(errSheets.length){
+        showToast('⚠️ 일부 시트 초기화 실패: '+errSheets.join(', '),'error');
+      } else {
+        showToast('✅ '+label+' 전체 초기화 완료 — 팀내역·요약·탑승자 3개 시트 삭제 ('+bf.year+' '+bf.season+' '+bf.event+')','success');
+      }
     });
   });
 }
@@ -8588,18 +8582,14 @@ function _busTeamTabResetByAssignType(type){
       if(err) errSheets.push(s.sheetName);
       done++;
       if(done < sheets.length) return;
-      // ── 선탑자ID 초기화 (현재 배정유형만 대상) ──
-      _busFindBaseRegIds(bf, direction, bf.assignType, function(regIds){
-        _busClearLeaderIds(regIds, function(clearedCount){
-          showLoading(false);
-          if(errSheets.length){
-            showToast('⚠️ 일부 시트 초기화 실패: '+errSheets.join(', '),'error');
-          } else {
-            showToast('✅ '+label+' 초기화 완료 — 팀내역·요약·탑승자 3개 시트'
-              +(clearedCount?' + 선탑자 '+clearedCount+'건':'')+' 삭제(다른 배정유형은 보존, '+bf.year+' '+bf.season+' '+bf.event+')','success');
-          }
-        });
-      });
+      // [v381] 선탑자ID 초기화 단계 제거 — 다른 화면(선탑자 지정)에서 별도로 처리하므로
+      // 여기서 중복으로 처리할 필요가 없다는 판단에 따라 제거.
+      showLoading(false);
+      if(errSheets.length){
+        showToast('⚠️ 일부 시트 초기화 실패: '+errSheets.join(', '),'error');
+      } else {
+        showToast('✅ '+label+' 초기화 완료 — 팀내역·요약·탑승자 3개 시트 삭제(다른 배정유형은 보존, '+bf.year+' '+bf.season+' '+bf.event+')','success');
+      }
     }, true);
   });
 }
@@ -11144,7 +11134,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v380_menu_rename_teamstab';
+var CACHE_VERSION = 'v382_room_sort_rename';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -18272,6 +18262,27 @@ function roomRenderView(){
 
 // ── 숙소 배정 현황: 구역 클릭 시 배정인원 명단 드로어 ──
 var _rvRosterRows = [];  // 현재 드로어에 표시 중인 행 캐시
+// [v382] "숙소" 컬럼(구 "배정호") 헤더 클릭 정렬 상태 — 팝업을 새로 열 때마다 오름차순으로 초기화된다.
+var _rvRoomSortDir = 'asc';
+function _rvSortRoomsAsc(arr){
+  return arr.slice().sort(function(a,b){ return (a.room||'').localeCompare(b.room||'','ko'); });
+}
+// [v382] "숙소" 헤더 클릭 시 오름차순/내림차순 토글 정렬 (검색 필터가 적용돼 있으면 그 결과 기준으로 정렬)
+function rvSortByRoom(){
+  _rvRoomSortDir = (_rvRoomSortDir==='asc') ? 'desc' : 'asc';
+  var inp=$id('rvdr-search');
+  var q = inp ? inp.value : '';
+  var base = q ? _rvRosterRows.filter(function(r){
+    var lq=q.toLowerCase();
+    return (r.name||'').toLowerCase().indexOf(lq)>=0 || (r.parish||'').indexOf(q)>=0 || (r.district||'').indexOf(q)>=0;
+  }) : _rvRosterRows;
+  var sorted = base.slice().sort(function(a,b){
+    var c = (a.room||'').localeCompare(b.room||'','ko');
+    return _rvRoomSortDir==='asc' ? c : -c;
+  });
+  rvRosterRender(sorted);
+  var th=$id('rvdr-room-th'); if(th) th.textContent = '숙소 '+(_rvRoomSortDir==='asc' ? '▲' : '▼');
+}
 
 function rvOpenRoster(key){
   // key = "건물명|교구명|구역명"
@@ -18282,17 +18293,16 @@ function rvOpenRoster(key){
   var members = roomData.filter(function(d){
     return d.building===bldg && (d.parish||'(교구 미지정)')===parish && (d.district||'(구역 미지정)')===dist;
   });
-  // 정렬: 호실 > 이름
-  members.sort(function(a,b){
-    var ra=a.room||'', rb=b.room||'';
-    return ra.localeCompare(rb,'ko') || (a.name||'').localeCompare(b.name||'','ko');
-  });
+  // [v382] 팝업을 새로 열 때마다 정렬 상태를 "숙소 오름차순"으로 초기화
+  _rvRoomSortDir = 'asc';
+  members = _rvSortRoomsAsc(members);
   _rvRosterRows = members;
 
   var t=$id('rvdr-title'); if(t) t.textContent=esc(bldg)+' · '+esc(parish)+' · '+esc(dist);
   var s=$id('rvdr-sub');   if(s) s.textContent='숙소 배정 인원 (숙소배정내역 시트)';
 
   var inp=$id('rvdr-search'); if(inp) inp.value='';
+  var th0=$id('rvdr-room-th'); if(th0) th0.textContent='숙소 ▲';
   rvRosterRender(members);
 
   var ov=$id('rvdr-overlay'); if(ov) ov.classList.add('show');
@@ -18312,19 +18322,16 @@ function rvOpenBuildingRoster(bldg){
     ? _rvBaseDataCache.slice()
     : _rvBaseDataCache.filter(function(d){ return (d.building||'(미지정)')===bldg; });
 
-  members.sort(function(a,b){
-    var pa=a.parish||'(교구 미지정)', pb=b.parish||'(교구 미지정)';
-    if(pa!==pb) return pa.localeCompare(pb,'ko'); // 교구 오름차순
-    var da=a.district||'(구역 미지정)', db=b.district||'(구역 미지정)';
-    if(da!==db) return da.localeCompare(db,'ko'); // 구역 오름차순
-    return (a.name||'').localeCompare(b.name||'','ko');
-  });
+  // [v382] 팝업을 새로 열 때마다 정렬 상태를 "숙소 오름차순"으로 초기화
+  _rvRoomSortDir = 'asc';
+  members = _rvSortRoomsAsc(members);
   _rvRosterRows = members;
 
   var t=$id('rvdr-title'); if(t) t.textContent = (bldg==='__ALL__') ? '전체 인원' : esc(bldg)+' 전체 인원';
-  var s=$id('rvdr-sub');   if(s) s.textContent = '숙소 배정 인원 (숙소배정내역 시트) · 교구/구역 오름차순';
+  var s=$id('rvdr-sub');   if(s) s.textContent = '숙소 배정 인원 (숙소배정내역 시트) · 숙소 오름차순';
 
   var inp=$id('rvdr-search'); if(inp) inp.value='';
+  var th0=$id('rvdr-room-th'); if(th0) th0.textContent='숙소 ▲';
   rvRosterRender(members);
 
   var ov=$id('rvdr-overlay'); if(ov) ov.classList.add('show');
@@ -18681,7 +18688,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'roomInputReset','roomSheetResetConfirm','roomResetAll','roomSaveToSheet','roomExportCSV','roomRestore','_getRoomFilter',
     'roomAddBuilding','roomAddGroup','roomAutoAssign','roomRenderBuildings','roomRenderView',
     'roomviewSearch',
-    'rvOpenRoster','rvOpenBuildingRoster','rvRosterRender','rvRosterFilter','rvRosterClose',
+    'rvOpenRoster','rvOpenBuildingRoster','rvRosterRender','rvRosterFilter','rvRosterClose','rvSortByRoom',
     'roomRosterOpen','roomRosterClose','roomRosterFilter',
     'busRosterOpen','busRosterOpenForBus','busRosterClose','busRosterFilter',
     '_bvwCalcSheetStats','_bvwFetchSheetStats','_bvwRenderStatsOnly',
@@ -18762,7 +18769,7 @@ document.addEventListener('DOMContentLoaded', function() {
     roomAddBuilding:roomAddBuilding, roomAddGroup:roomAddGroup,
     roomAutoAssign:roomAutoAssign, roomRenderBuildings:roomRenderBuildings, roomRenderView:roomRenderView,
     roomviewSearch:roomviewSearch,
-    rvOpenRoster:rvOpenRoster, rvOpenBuildingRoster:rvOpenBuildingRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose,
+    rvOpenRoster:rvOpenRoster, rvOpenBuildingRoster:rvOpenBuildingRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose, rvSortByRoom:rvSortByRoom,
     roomRosterOpen:roomRosterOpen, roomRosterClose:roomRosterClose, roomRosterFilter:roomRosterFilter,
     busRosterOpen:busRosterOpen, busRosterOpenForBus:busRosterOpenForBus, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
     _bvwCalcSheetStats:_bvwCalcSheetStats, _bvwFetchSheetStats:_bvwFetchSheetStats, _bvwRenderStatsOnly:_bvwRenderStatsOnly,
@@ -20098,7 +20105,7 @@ window.enrollEventOptionsRefresh  = enrollEventOptionsRefresh;
           <th>교구</th>
           <th>구역</th>
           <th>이름</th>
-          <th>배정호</th>
+          <th id="rvdr-room-th" onclick="rvSortByRoom()" style="cursor:pointer;user-select:none;" title="클릭하여 오름차순/내림차순 정렬">숙소 ▲</th>
         </tr>
       </thead>
       <tbody id="rvdr-tbody"></tbody>
