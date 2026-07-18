@@ -1388,6 +1388,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <!-- 버스기초정보 불러오기 / 배정버스1대 일괄배정 / 자동배정 / 버스배정 초기화 (정원요약과 같은 줄, 우측 정렬) -->
                 <div style="display:flex;gap:6px;margin-left:auto;">
                   <button class="btn btn-sm" id="bus-load-registered-count-btn" onclick="busLoadRegisteredCount()" style="background:transparent;border:1px solid var(--navy);color:var(--navy);font-weight:600;" title="버스배정기초정보에 등록된 배정대수·버스정원을 조회해 그대로 반영">📋 버스기초정보 불러오기</button>
+                  <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;" title="체크 시 최소 필요 버스대수 계산에 시각선교부 인원을 본대 인원에 합산합니다(기본값 미포함)">
+                    <input type="checkbox" id="bus-jh-include-main-toggle" onchange="busUpdateCapSummary(); busCheckBusCountWarning();"> 시각선교부 본대 포함여부
+                  </label>
                   <button class="btn btn-sm" id="bus-bulk1-btn" onclick="busAssignBus1Bulk()" style="background:transparent;border:1px solid #2d8a5a;color:#2d8a5a;font-weight:600;" title="현재 탭(참석/귀가)의 배정대수=1인 배정유형을 모두 한 번에 일괄 배정합니다">🚍 배정버스 1대 일괄배정</button>
                   <button class="btn btn-navy btn-sm" onclick="busAutoAssign()">⚡ 자동 배정</button>
                   <button class="btn btn-sm" onclick="busTabResetConfirm()" style="background:transparent;border:1px solid #c89b30;color:#c89b30;font-weight:600;" title="현재 탭 버스배정 초기화 (배정상태 미배정·요약/탑승자 삭제)">🔄 버스배정 초기화</button>
@@ -5322,7 +5325,7 @@ function busJHMergeToggle(){
     if(res) showToast(value?'✅ 본대 시각선교부 배정으로 설정되었습니다.':'본대 시각선교부 배정이 해제되었습니다.','success');
   }).catch(function(e){ showToast('⚠️ 저장 오류: '+(e&&e.message||e),'error'); chk.checked=!value; });
 }
-// [v181] 버스대수 입력칸 blur 시 인라인 경고 — 팀 미등록/대수부족 2가지 상태 안내
+// [v181] 버스대수 입력칸 blur 시 인라인 경고 — 팀 미등록 상태만 안내(요청1: 대수부족 경고 문구 제거)
 function busCheckBusCountWarning(){
   var el=$id('bus-count-warning'); if(!el) return;
   var type = busAssignSub;
@@ -5333,17 +5336,9 @@ function busCheckBusCountWarning(){
     el.style.display = '';
     return;
   }
-  var required = requiredInfo.calculated;
-  var base = busGetCount();
-  if(base < required){
-    var basis = (requiredInfo.registeredCount > requiredInfo.headcountCalculated)
-      ? ' (버스배정기초정보 등록 '+requiredInfo.registeredCount+'대 기준)' : '';
-    el.textContent = '⚠️ 등록된 버스 대수('+base+'대)가 최소 필요 대수('+required+'대)보다 적습니다'+basis+'.';
-    el.style.color = '#d94040';
-    el.style.display = '';
-  } else {
-    el.style.display = 'none';
-  }
+  // [v361] "등록된 버스 대수가 최소 필요 대수보다 적습니다" 경고 문구는 더 이상 표시하지 않음
+  // (계산 자체는 busAutoAssign의 alert 차단 로직에서 그대로 사용되므로 기능은 유지됨)
+  el.style.display = 'none';
 }
 
 // ── 탭 전환 ─────────────────────────────────────────
@@ -6528,6 +6523,14 @@ function busCalcRequiredBuses(type){
   var normalTeams = teams.filter(function(t){ return t.name!=='중고등부'; });
   var normalTotal = normalTeams.reduce(function(s,t){ return s+t.count; },0);
   var jhTotal     = jhTeams.reduce(function(s,t){ return s+t.count; },0);
+  // [v361] "시각선교부 본대 포함여부" 체크박스(기본값 미포함) — 현재 배정유형이 '본대'이고 체크돼 있으면
+  // 시각선교부 인원수를 본대 필요인원에 합산해서 최소 필요 버스대수를 계산한다.
+  var jhIncludeChk = $id('bus-jh-include-main-toggle');
+  if(assignType==='본대' && jhIncludeChk && jhIncludeChk.checked){
+    var jhPeopleForMain = _busAggregateTeamsByAssignType(type, '시각선교부');
+    var jhForMainTotal = jhPeopleForMain.reduce(function(s,t){ return s+t.count; },0);
+    normalTotal += jhForMainTotal;
+  }
   // [v311] 일반팀 인원이 0명이면 0대 — jhNeeded는 이미 이렇게 처리하고 있었는데 normalNeeded만
   // 무조건 최소 1대로 강제하는 비대칭이 있어, 중고등부만 있는 경우 불필요하게 +1대씩 부풀려지던 문제 수정
   var normalNeeded = normalTeams.length>0 ? Math.max(1, Math.ceil(normalTotal/cap)) : 0;
@@ -7247,7 +7250,7 @@ function busAssignBus1Bulk(type){
     var candidateTargets = scoped.filter(function(r){ return (parseInt(r['배정대수'],10)||0)===1; });
     if(!candidateTargets.length){
       showLoading(false);
-      showToast('배정대수 1대로 등록된 배정유형이 없습니다.','error');
+      alert('배정버스 1대로 등록된 '+direction+' 배정유형이 없습니다. 버스기초정보를 확인해주세요');
       return;
     }
 
@@ -10678,7 +10681,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v360_export_order_leadername_msg';
+var CACHE_VERSION = 'v362_roomview_building_roster_modal';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -17622,6 +17625,8 @@ var _rvBldgColors = [
   {bg:'#f3eeff',        bd:'#c9b8f0',        c:'#4a20a0',     barBg:'#b09ae0'},
   {bg:'#e8f7fd',        bd:'#9fd4ed',        c:'#1060a0',     barBg:'#80c0e8'},
 ];
+// [v362] 상단 요약카드(전체인원/건물별) 클릭 시 팝업으로 열어줄 "현재 조회 범위(baseData)" 캐시
+var _rvBaseDataCache = [];
 
 function roomRenderView(){
   var elEmpty=$id('roomview-empty');
@@ -17707,18 +17712,19 @@ function roomRenderView(){
   buildings.sort(function(a,b){ return a.localeCompare(b,'ko'); });
 
   // ── 통계 카드 ──
+  _rvBaseDataCache = baseData; // [v362] 팝업 모달에서 재사용
   var statsEl=$id('roomview-stats');
   if(statsEl){
     var totalCnt=baseData.length;
-    // 카드1: 전체 인원
-    var sHtml='<div style="background:var(--sky);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);">'
+    // 카드1: 전체 인원 — [v362] 클릭 시 전체 인원 팝업 모달
+    var sHtml='<div onclick="rvOpenBuildingRoster(\'__ALL__\')" style="cursor:pointer;background:var(--sky);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);">'
       +'<div style="font-size:.72rem;color:var(--muted);margin-bottom:4px;font-weight:600;">전체 인원</div>'
       +'<div style="font-size:1.5rem;font-weight:900;color:var(--navy);line-height:1;">'+totalCnt+'<span style="font-size:.78rem;margin-left:2px;">명</span></div>'
       +'</div>';
-    // 카드N: 건물별 인원
+    // 카드N: 건물별 인원 — [v362] 클릭 시 해당 건물 전체 인원 팝업 모달
     buildings.forEach(function(bldg,i){
       var col=_rvBldgColors[i % _rvBldgColors.length];
-      sHtml+='<div style="background:'+col.bg+';border:1px solid '+col.bd+';border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);">'
+      sHtml+='<div onclick="rvOpenBuildingRoster(\''+esc(bldg).replace(/'/g,"\\'")+'\')" style="cursor:pointer;background:'+col.bg+';border:1px solid '+col.bd+';border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);">'
         +'<div style="font-size:.72rem;color:var(--muted);margin-bottom:4px;font-weight:600;">'+esc(bldg)+'</div>'
         +'<div style="font-size:1.5rem;font-weight:900;color:'+col.c+';line-height:1;">'+(bldgCountMap[bldg]||0)+'<span style="font-size:.78rem;margin-left:2px;">명</span></div>'
         +'</div>';
@@ -17833,6 +17839,33 @@ function rvOpenRoster(key){
 function rvRosterClose(){
   var ov=$id('rvdr-overlay'); if(ov) ov.classList.remove('show');
   var dr=$id('rvdr-drawer');  if(dr) dr.classList.remove('open');
+}
+
+// [v362] 상단 요약카드(전체인원 / 건물별 카드) 클릭 시 — 해당 범위 전체 인원 명단 팝업.
+// bldg==='__ALL__'이면 현재 조회 범위(baseData) 전체, 아니면 해당 건물 전체(교구/구역 무관).
+// 표시 순서: 교구 내림차순 → 같은 교구 내에서 구역 내림차순(요청 반영) → 이름 가나다순
+function rvOpenBuildingRoster(bldg){
+  var members = (bldg==='__ALL__')
+    ? _rvBaseDataCache.slice()
+    : _rvBaseDataCache.filter(function(d){ return (d.building||'(미지정)')===bldg; });
+
+  members.sort(function(a,b){
+    var pa=a.parish||'(교구 미지정)', pb=b.parish||'(교구 미지정)';
+    if(pa!==pb) return pb.localeCompare(pa,'ko'); // 교구 내림차순
+    var da=a.district||'(구역 미지정)', db=b.district||'(구역 미지정)';
+    if(da!==db) return db.localeCompare(da,'ko'); // 구역 내림차순
+    return (a.name||'').localeCompare(b.name||'','ko');
+  });
+  _rvRosterRows = members;
+
+  var t=$id('rvdr-title'); if(t) t.textContent = (bldg==='__ALL__') ? '전체 인원' : esc(bldg)+' 전체 인원';
+  var s=$id('rvdr-sub');   if(s) s.textContent = '숙소 배정 인원 (숙소배정내역 시트) · 교구/구역 내림차순';
+
+  var inp=$id('rvdr-search'); if(inp) inp.value='';
+  rvRosterRender(members);
+
+  var ov=$id('rvdr-overlay'); if(ov) ov.classList.add('show');
+  var dr=$id('rvdr-drawer');  if(dr) dr.classList.add('open');
 }
 
 function rvRosterFilter(q){
@@ -18184,7 +18217,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'roomInputReset','roomSheetResetConfirm','roomResetAll','roomSaveToSheet','roomExportCSV','roomRestore','_getRoomFilter',
     'roomAddBuilding','roomAddGroup','roomAutoAssign','roomRenderBuildings','roomRenderView',
     'roomviewSearch',
-    'rvOpenRoster','rvRosterRender','rvRosterFilter','rvRosterClose',
+    'rvOpenRoster','rvOpenBuildingRoster','rvRosterRender','rvRosterFilter','rvRosterClose',
     'roomRosterOpen','roomRosterClose','roomRosterFilter',
     'busRosterOpen','busRosterOpenForBus','busRosterClose','busRosterFilter',
     '_bvwCalcSheetStats','_bvwFetchSheetStats','_bvwRenderStatsOnly',
@@ -18264,7 +18297,7 @@ document.addEventListener('DOMContentLoaded', function() {
     roomAddBuilding:roomAddBuilding, roomAddGroup:roomAddGroup,
     roomAutoAssign:roomAutoAssign, roomRenderBuildings:roomRenderBuildings, roomRenderView:roomRenderView,
     roomviewSearch:roomviewSearch,
-    rvOpenRoster:rvOpenRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose,
+    rvOpenRoster:rvOpenRoster, rvOpenBuildingRoster:rvOpenBuildingRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose,
     roomRosterOpen:roomRosterOpen, roomRosterClose:roomRosterClose, roomRosterFilter:roomRosterFilter,
     busRosterOpen:busRosterOpen, busRosterOpenForBus:busRosterOpenForBus, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
     _bvwCalcSheetStats:_bvwCalcSheetStats, _bvwFetchSheetStats:_bvwFetchSheetStats, _bvwRenderStatsOnly:_bvwRenderStatsOnly,
