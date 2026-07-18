@@ -1296,7 +1296,15 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div class="card" style="margin-bottom:14px;">
               <div class="card-header">
                 <div class="card-title" id="bus-import-card-title">🔗 참석자 데이터 연동</div>
-                <div style="display:flex;gap:6px;align-items:center;">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                  <!-- [v364] 배정버스1대 일괄 내역조회/저장 — 배정대수=1이면서 아직 팀내역 미등록인 배정유형만 골라 일괄 처리 -->
+                  <button id="bus-bulk1-import-btn" class="btn btn-sm" onclick="busBulk1ImportOpen()" style="background:#eaf7f0;border:1px solid #2d8a5a;color:#1a6b45;font-weight:700;" title="배정대수=1로 등록됐지만 아직 팀내역이 없는 배정유형만 골라 참석/귀가인원명단에서 일괄 조회합니다">
+                    🚍🔗 배정버스1대 일괄 내역조회
+                  </button>
+                  <button id="bus-bulk1-save-btn" class="btn btn-sm" onclick="busBulk1SaveAll()" style="background:#1a6b45;color:#fff;border:none;font-weight:700;" title="일괄 내역조회로 가져온 모든 배정유형을 팀내역 시트에 한 번에 저장합니다">
+                    🚍☁️ 배정버스1대 일괄 내역저장
+                  </button>
+                  <div style="width:1px;height:20px;background:var(--border2);"></div>
                   <button class="btn btn-navy btn-sm" onclick="busImportFromRetreat()">
                     🔗 내역조회
                   </button>
@@ -1305,6 +1313,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   </button>
                 </div>
               </div>
+              <!-- [v364] 배정버스1대 일괄 내역조회 결과 미리보기 — 배정유형별 구분선 + 배정내역 테이블 -->
+              <div id="bus-bulk1-preview-area" style="display:none;margin-top:12px;"></div>
               <!-- 참석버스팀 탭 결과 영역 -->
               <div id="bus-import-arrive-area">
                 <div id="bus-import-arrive-result" style="display:none;">
@@ -4434,6 +4444,7 @@ var BUS_COLORS = [
   '#8a2d6b','#2d8a7a','#c18a4a','#6b8a2d','#8a4a7b'
 ];
 var busArriveTeams = [];   // 참석버스 팀
+var busBulk1Groups  = [];  // [v364] 배정버스1대 일괄 내역조회 결과: [{assignType, direction, entries:[{key,parish,district,count,isJH}], total}]
 var busArriveBuses = [];   // 참석버스 배정 결과
 var _busSuppressTabReload  = false;  // 자동배정 직후 busTab assign 시트 재조회 억제 플래그
 var _busRestoreSuppressed  = false;  // 자동배정 직후 _busRestoreFromSheet in-memory 덮어쓰기 억제 플래그
@@ -6276,6 +6287,250 @@ function _busRenderImportTable(tbodyId, rows, type){
       '</td>'+
     '</tr>';
   }).join('');
+}
+
+// ── [v364] 배정버스1대 일괄 내역조회/저장 ──────────────────────────────
+// 배정대수=1로 등록됐지만 아직 팀내역(버스배정_참석/귀가팀내역)이 없는 배정유형만 골라
+// 참석인원명단에서 일괄 집계 → 배정유형별 구분선 미리보기 → 일괄 저장까지 지원한다.
+// 처리 범위는 현재 선택된 팀관리 서브탭(busTeamsSub: 참석/귀가)만 대상으로 한다.
+
+// 버스배정_기초정보에서 현재 필터(년도·수양회종류·행사명)+운행방향(direction) 기준
+// 배정대수=1로 등록된 배정유형 목록을 반환. [busAssignBus1Bulk()의 candidateTargets 로직과 동일 원칙]
+function _busBulk1GetCandidateTypes(baseRows, direction, bf){
+  var scoped = baseRows.filter(function(r){
+    return String(r['년도'])===String(bf.year) && r['수양회종류']===bf.season && r['행사명']===bf.event
+      && r['운행방향']===direction;
+  });
+  return scoped.filter(function(r){ return (parseInt(r['배정대수'],10)||0)===1; })
+    .map(function(r){ return String(r['배정유형']||'').trim(); })
+    .filter(function(v,i,arr){ return v && arr.indexOf(v)===i; }); // 중복 제거
+}
+
+// 팀내역 시트(teamRows)에서 현재 필터(년도·수양회종류·행사명) 범위 내 이미 등록된 배정유형 집합 반환
+function _busBulk1GetRegisteredTypes(teamRows, bf){
+  var set = {};
+  teamRows.filter(function(r){
+    return String(r['년도'])===String(bf.year) && r['수양회종류']===bf.season && r['행사명']===bf.event;
+  }).forEach(function(r){ set[String(r['배정유형']||'').trim()] = true; });
+  return set;
+}
+
+// 참석인원명단(rows)에서 특정 배정유형(assignType) + 교통수단=버스 인원을 교구/구역별로 집계
+// (_busImportBuildUI()의 집계 로직을 특정 배정유형 1건 기준으로 분리한 버전)
+function _busBulk1AggregateForType(rows, type, assignType){
+  var isLeave = (type==='leave');
+  var transportKey = isLeave ? 'leaveTransport' : 'arriveTransport';
+  var busMap = {};
+  rows.filter(function(r){
+    if((r[transportKey]||'').trim()!=='버스') return false;
+    if(isBusExcluded(r)) return false;
+    if(isJuniorHighBus(r)) return assignType==='중고등부';
+    var val = isLeave ? r.leaveAssignType : r.arriveAssignType;
+    return (val||'').trim() === assignType;
+  }).forEach(function(r){
+    var key;
+    if(isJuniorHighBus(r)){
+      key = '중고등부';
+      if(!busMap[key]) busMap[key]={parish:'중고등부', district:'중고등부', count:0, isJH:true};
+    } else {
+      key = ((r.parish||'미분류')+' '+(r.district||'')).trim();
+      if(!busMap[key]) busMap[key]={parish:r.parish||'미분류', district:r.district||'', count:0};
+    }
+    busMap[key].count++;
+  });
+  var entries = Object.keys(busMap).map(function(k){ return Object.assign({key:k},busMap[k]); });
+  entries.sort(function(a,b){
+    if(a.isJH && !b.isJH) return 1;
+    if(!a.isJH && b.isJH) return -1;
+    if(a.parish!==b.parish) return (a.parish||'').localeCompare(b.parish||'','ko');
+    return (a.district||'').localeCompare(b.district||'','ko');
+  });
+  return entries;
+}
+
+function busBulk1ImportOpen(){
+  if(!USE_SHEET()){ showToast('Google Sheets 연동이 필요합니다.','error'); return; }
+  var type = busTeamsSub || 'arrive';
+  var isLeave = (type==='leave');
+  var direction = isLeave ? '귀가' : '참석';
+  var teamSheet = isLeave ? '버스배정_귀가팀내역' : '버스배정_참석팀내역';
+  var label = isLeave ? '귀가' : '참석';
+  var bf = _busGetFilter();
+
+  showLoading(true);
+  apiCall({action:'getAll', sheetName:'버스배정_기초정보'}).then(function(baseRes){
+    var baseRows = (baseRes&&baseRes.success) ? (baseRes.data||baseRes.rows||[]) : [];
+    var candidateTypes = _busBulk1GetCandidateTypes(baseRows, direction, bf);
+    if(!candidateTypes.length){
+      showLoading(false);
+      showToast('배정버스 1대로 등록된 '+direction+' 배정유형이 없습니다. 버스기초정보를 확인해주세요.','info');
+      return;
+    }
+    return apiCall({action:'getAll', sheetName:teamSheet}).then(function(teamRes){
+      var teamRows = (teamRes&&teamRes.success) ? (teamRes.data||teamRes.rows||[]) : [];
+      var registeredTypes = _busBulk1GetRegisteredTypes(teamRows, bf);
+      var targetTypes = candidateTypes.filter(function(at){ return !registeredTypes[at]; });
+      if(!targetTypes.length){
+        showLoading(false);
+        showToast('ℹ️ 배정대수 1대 중 미등록 '+direction+' 배정유형이 없습니다(이미 모두 내역 등록됨).','info');
+        return;
+      }
+      return apiCall({action:'getAll', sheetName:'참석인원명단'}).then(function(res){
+        if(!res||!res.success){
+          showLoading(false);
+          showToast('참석인원명단 조회 실패: '+(res&&res.message||'알 수 없는 오류'),'error');
+          return;
+        }
+        var rows = (res.data||res.rows||[]).map(sheetRowToObj);
+        try{ _ls.set('retreat_data', JSON.stringify(rows)); }catch(e){}
+        retreat = rows;
+
+        var groups = targetTypes.map(function(at){
+          var entries = _busBulk1AggregateForType(rows, type, at);
+          var total = entries.reduce(function(s,r){ return s+r.count; },0);
+          return {assignType:at, direction:direction, entries:entries, total:total};
+        }).filter(function(g){ return g.entries.length>0; });
+
+        showLoading(false);
+        if(!groups.length){
+          showToast('ℹ️ 미등록 배정유형('+targetTypes.join(', ')+')에 해당하는 '+label+' 교통수단=버스 인원이 없습니다.','info');
+          busBulk1Groups = [];
+          $id('bus-bulk1-preview-area').style.display='none';
+          return;
+        }
+        busBulk1Groups = groups;
+        _busBulk1RenderPreview(groups, type);
+        var totalPeople = groups.reduce(function(s,g){ return s+g.total; },0);
+        showToast('🚍🔗 미등록 '+groups.length+'개 배정유형('+totalPeople+'명) 일괄 조회 완료. 확인 후 "일괄 내역저장"을 눌러주세요.','success');
+      });
+    });
+  }).catch(function(e){
+    showLoading(false);
+    showToast('⚠️ 조회 오류: '+(e&&e.message||e),'error');
+  });
+}
+
+function _busBulk1RenderPreview(groups, type){
+  var area = $id('bus-bulk1-preview-area'); if(!area) return;
+  var accentColor = type==='arrive' ? 'var(--navy)' : '#2d8a5a';
+  var headerBg     = type==='arrive' ? 'var(--navy)' : '#2d8a5a';
+  var badgeBg      = type==='arrive' ? '#eef2fb' : '#edf7f2';
+  var html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'+
+    '<div style="width:3px;height:16px;background:#2d8a5a;border-radius:2px;"></div>'+
+    '<span style="font-weight:700;font-size:.88rem;color:#1a6b45;">🚍 배정버스 1대 일괄 내역 (미등록 '+groups.length+'건 · 총 '+
+      groups.reduce(function(s,g){ return s+g.total; },0)+'명)</span></div>';
+  groups.forEach(function(g){
+    html += '<div style="border-top:1px dashed var(--border2);margin:10px 0 6px;padding-top:8px;">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+        '<span style="background:'+headerBg+';color:#fff;border-radius:20px;padding:2px 12px;font-size:.8rem;font-weight:700;">'+esc(g.assignType)+'</span>'+
+        '<span style="font-size:.76rem;color:var(--muted);">'+g.entries.length+'팀 · '+g.total+'명</span>'+
+      '</div>'+
+      '<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border2);">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:.8rem;">'+
+          '<thead><tr style="background:'+headerBg+';">'+
+            '<th style="padding:6px 12px;color:#fff;font-weight:600;text-align:left;">교구</th>'+
+            '<th style="padding:6px 12px;color:#fff;font-weight:600;text-align:left;">구역 / 팀명</th>'+
+            '<th style="padding:6px 12px;color:#fff;font-weight:600;text-align:center;">인원수</th>'+
+            '<th style="padding:6px 12px;color:#fff;font-weight:600;text-align:center;">상태</th>'+
+          '</tr></thead><tbody>'+
+          g.entries.map(function(r,i){
+            var bg = i%2===0 ? '#fff' : '#f7f9fc';
+            var isJH = (r.isJH || r.key==='중고등부');
+            var parishCell = isJH
+              ? '<span style="background:linear-gradient(90deg,#7b5ea7,#5a3d8a);color:#fff;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700;">🎒 중고등부</span>'
+              : esc(r.parish);
+            var districtCell = isJH
+              ? '<span style="font-size:.82rem;color:#7b5ea7;font-weight:700;">중고등부</span>'
+              : esc(r.district||'-');
+            return '<tr style="border-bottom:1px solid var(--border2);background:'+(isJH?'#f7f3fc':bg)+';">'+
+              '<td style="padding:6px 12px;font-size:.82rem;color:var(--muted);">'+parishCell+'</td>'+
+              '<td style="padding:6px 12px;font-weight:600;">'+districtCell+'</td>'+
+              '<td style="padding:6px 12px;text-align:center;"><span style="background:'+badgeBg+';color:'+accentColor+';border-radius:20px;padding:2px 10px;font-size:.78rem;font-weight:700;">'+r.count+'명</span></td>'+
+              '<td style="padding:6px 12px;text-align:center;"><span style="font-size:.72rem;background:#fff4e0;color:#c89b30;border-radius:20px;padding:1px 9px;font-weight:700;">🆕 신규</span></td>'+
+            '</tr>';
+          }).join('')+
+        '</tbody></table>'+
+      '</div>'+
+    '</div>';
+  });
+  area.innerHTML = html;
+  area.style.display = '';
+}
+
+function busBulk1SaveAll(){
+  if(!USE_SHEET()){ showToast('구글 시트 연동 후 사용 가능합니다.','error'); return; }
+  if(!busBulk1Groups.length){
+    showToast('먼저 "배정버스1대 일괄 내역조회"를 실행해 주세요.','error');
+    return;
+  }
+  var type = busTeamsSub || 'arrive';
+  var isLeave = (type==='leave');
+  var teamSheet = isLeave ? '버스배정_귀가팀내역' : '버스배정_참석팀내역';
+  var label = isLeave ? '귀가버스' : '참석버스';
+  var teamHdr = ['NO','년도','수양회종류','행사명','배정유형','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+  var bf = _busGetFilter();
+
+  showLoading(true);
+  apiCall({action:'getAll', sheetName:teamSheet}).then(function(res){
+    var sheetRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+
+    // 기존 등록 키(배정유형+교구+구역/팀명) — 중복 skip
+    var existKeys = {};
+    sheetRows.forEach(function(r){
+      var sat = String(r['배정유형']||'').trim();
+      var sp = String(r['교구']||'').trim();
+      var sd = String(r['구역/팀명']||'').trim();
+      if(!sp && sd){ var _fp=_busParseParish(sd); sp=_fp.parish; sd=_fp.district; }
+      existKeys[sat+'|'+sp+'|'+sd] = true;
+    });
+
+    var nextNo = sheetRows.length + 1;
+    var newRows = [];
+    var perTypeCount = {};
+    busBulk1Groups.forEach(function(g){
+      g.entries.forEach(function(r){
+        var _pp = _busParseParish(r.key||'');
+        var parish = (r.parish||'').trim() || _pp.parish;
+        var distNm = parish ? _pp.district : (r.key||'').trim();
+        var k = g.assignType+'|'+parish+'|'+distNm;
+        if(!existKeys[k]){
+          newRows.push([nextNo++, bf.year, bf.season, bf.event, g.assignType, parish, distNm, r.count||0, '미배정', '', '', r.isJH?'중고등부':'']);
+          perTypeCount[g.assignType] = (perTypeCount[g.assignType]||0)+1;
+        }
+      });
+    });
+
+    if(!newRows.length){
+      showLoading(false);
+      showToast('ℹ️ 신규 팀 없음 — 이미 모두 등록되어 있습니다.','info');
+      return;
+    }
+
+    // [프로젝트 원칙] 시트 1개(teamSheet)에 대한 저장이므로 그룹이 여러 개여도 단일 append 호출로 처리(순차/병렬 이슈 없음)
+    fetch(API_URL,{method:'POST',headers:_gasHeaders({'Content-Type':'text/plain'}),
+      body:JSON.stringify({sheetName:teamSheet, mode:'append', headers:teamHdr, rows:newRows}),
+      redirect:'follow'})
+      .then(function(r){ return r.text(); })
+      .then(function(txt){
+        var summary = Object.keys(perTypeCount).map(function(k){ return k+'('+perTypeCount[k]+'팀)'; }).join(', ');
+        try{
+          var j=JSON.parse(txt);
+          if(j&&j.success===false){ showToast('⚠️ '+teamSheet+' 저장 실패: '+(j.error||''),'error'); return; }
+        }catch(e){}
+        showToast('✅ '+label+' 배정버스1대 일괄 내역저장 완료 — '+newRows.length+'팀 추가: '+summary,'success');
+        busBulk1Groups = [];
+        var area = $id('bus-bulk1-preview-area');
+        if(area){ area.style.display='none'; area.innerHTML=''; }
+        // 현재 배정유형 콤보 선택값이 저장된 배정유형 중 하나면 화면 갱신
+        var curAt = ($id('bus-sel-assigntype')||{value:''}).value.trim();
+        if(curAt && perTypeCount[curAt]) busImportFromRetreat();
+      })
+      .catch(function(){ showToast('⚠️ '+teamSheet+' 저장 오류','error'); })
+      .finally(function(){ showLoading(false); });
+  }).catch(function(e){
+    showLoading(false);
+    showToast('⚠️ 조회 오류: '+(e&&e.message||e),'error');
+  });
 }
 
 // 전체선택 토글
@@ -10696,7 +10951,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v363_jh_include_guard_ui';
+var CACHE_VERSION = 'v364_bulk1_history_import_save';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -18208,6 +18463,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'busAssignBus1Bulk','busJHMergeToggle',
     'busDeleteBus','busResetAll','busResetConfirm','busResetByAssignTypeConfirm','vwClearAllConfirm','_busTeamTabReset','_busTeamTabResetByAssignType','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busFindBaseRegIds','_busClearLeaderIds','_busRowMatchesAssignType','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew','_busCalcReassignGroups','calcBusUnassignedCounts',
     'busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh','busCheckBusCountWarning',
+    'busBulk1ImportOpen','busBulk1SaveAll',
     'busSaveToSheet','busExportCSV','busRestore',
     'bvwSetMode','bvwSetType','busviewReload','_busviewGetFilter','bvwExportBusSchedule','busSummaryExportCSV','_busBuildDriverInfoMap','_busBuildLeaderMap',
     'busSelectAll','busImportAddSelected',
@@ -18283,6 +18539,7 @@ document.addEventListener('DOMContentLoaded', function() {
     busResetAll:busResetAll, busResetConfirm:busResetConfirm, busResetByAssignTypeConfirm:busResetByAssignTypeConfirm, vwClearAllConfirm:vwClearAllConfirm, _busTeamTabReset:_busTeamTabReset, _busTeamTabResetByAssignType:_busTeamTabResetByAssignType, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear, _busFindBaseRegIds:_busFindBaseRegIds, _busClearLeaderIds:_busClearLeaderIds, _busRowMatchesAssignType:_busRowMatchesAssignType,
     busDrop:busDrop, busMoveSlot:busMoveSlot, busDragOverEnter:busDragOverEnter, busDragOverLeave:busDragOverLeave, busRenderView:busRenderView, busSetDrag:busSetDrag, busSetDragNew:busSetDragNew, _busCalcReassignGroups:_busCalcReassignGroups, calcBusUnassignedCounts:calcBusUnassignedCounts,
     busImportFromRetreat:busImportFromRetreat, busLoadTeamsFromSheet:busLoadTeamsFromSheet, _busLoadOneTeamSheet:_busLoadOneTeamSheet, busSaveTeamsToSheet:busSaveTeamsToSheet, _busUpdateTeamStatus:_busUpdateTeamStatus, _busUpdateTeamStatusAndRefresh:_busUpdateTeamStatusAndRefresh, busCheckBusCountWarning:busCheckBusCountWarning,
+    busBulk1ImportOpen:busBulk1ImportOpen, busBulk1SaveAll:busBulk1SaveAll,
     busSaveToSheet:busSaveToSheet, busExportCSV:busExportCSV,
     busRestore:busRestore,
     bvwSetMode:bvwSetMode, bvwSetType:bvwSetType, busviewReload:busviewReload, _busviewGetFilter:_busviewGetFilter, bvwExportBusSchedule:bvwExportBusSchedule, busSummaryExportCSV:busSummaryExportCSV, _busBuildDriverInfoMap:_busBuildDriverInfoMap, _busBuildLeaderMap:_busBuildLeaderMap,
