@@ -10951,7 +10951,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v364_bulk1_history_import_save';
+var CACHE_VERSION = 'v365_room_roster_sort_asc';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -18113,7 +18113,7 @@ function rvRosterClose(){
 
 // [v362] 상단 요약카드(전체인원 / 건물별 카드) 클릭 시 — 해당 범위 전체 인원 명단 팝업.
 // bldg==='__ALL__'이면 현재 조회 범위(baseData) 전체, 아니면 해당 건물 전체(교구/구역 무관).
-// 표시 순서: 교구 내림차순 → 같은 교구 내에서 구역 내림차순(요청 반영) → 이름 가나다순
+// 표시 순서: 교구 오름차순 → 같은 교구 내에서 구역 오름차순(요청 반영) → 이름 가나다순
 function rvOpenBuildingRoster(bldg){
   var members = (bldg==='__ALL__')
     ? _rvBaseDataCache.slice()
@@ -18121,15 +18121,15 @@ function rvOpenBuildingRoster(bldg){
 
   members.sort(function(a,b){
     var pa=a.parish||'(교구 미지정)', pb=b.parish||'(교구 미지정)';
-    if(pa!==pb) return pb.localeCompare(pa,'ko'); // 교구 내림차순
+    if(pa!==pb) return pa.localeCompare(pb,'ko'); // 교구 오름차순
     var da=a.district||'(구역 미지정)', db=b.district||'(구역 미지정)';
-    if(da!==db) return db.localeCompare(da,'ko'); // 구역 내림차순
+    if(da!==db) return da.localeCompare(db,'ko'); // 구역 오름차순
     return (a.name||'').localeCompare(b.name||'','ko');
   });
   _rvRosterRows = members;
 
   var t=$id('rvdr-title'); if(t) t.textContent = (bldg==='__ALL__') ? '전체 인원' : esc(bldg)+' 전체 인원';
-  var s=$id('rvdr-sub');   if(s) s.textContent = '숙소 배정 인원 (숙소배정내역 시트) · 교구/구역 내림차순';
+  var s=$id('rvdr-sub');   if(s) s.textContent = '숙소 배정 인원 (숙소배정내역 시트) · 교구/구역 오름차순';
 
   var inp=$id('rvdr-search'); if(inp) inp.value='';
   rvRosterRender(members);
