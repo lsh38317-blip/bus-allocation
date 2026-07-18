@@ -1388,10 +1388,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <!-- 버스기초정보 불러오기 / 배정버스1대 일괄배정 / 자동배정 / 버스배정 초기화 (정원요약과 같은 줄, 우측 정렬) -->
                 <div style="display:flex;gap:6px;margin-left:auto;">
                   <button class="btn btn-sm" id="bus-load-registered-count-btn" onclick="busLoadRegisteredCount()" style="background:transparent;border:1px solid var(--navy);color:var(--navy);font-weight:600;" title="버스배정기초정보에 등록된 배정대수·버스정원을 조회해 그대로 반영">📋 버스기초정보 불러오기</button>
-                  <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;" title="체크 시 최소 필요 버스대수 계산에 시각선교부 인원을 본대 인원에 합산합니다(기본값 미포함)">
+                  <button class="btn btn-sm" id="bus-bulk1-btn" onclick="busAssignBus1Bulk()" style="background:transparent;border:1px solid #2d8a5a;color:#2d8a5a;font-weight:600;" title="현재 탭(참석/귀가)의 배정대수=1인 배정유형을 모두 한 번에 일괄 배정합니다">🚍 배정버스 1대 일괄배정</button>
+                  <label style="display:flex;align-items:center;gap:5px;font-size:.78rem;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;font-weight:700;" title="체크 시 최소 필요 버스대수 계산에 시각선교부 인원을 본대 인원에 합산합니다(기본값 미포함)">
                     <input type="checkbox" id="bus-jh-include-main-toggle" onchange="busUpdateCapSummary(); busCheckBusCountWarning();"> 시각선교부 본대 포함여부
                   </label>
-                  <button class="btn btn-sm" id="bus-bulk1-btn" onclick="busAssignBus1Bulk()" style="background:transparent;border:1px solid #2d8a5a;color:#2d8a5a;font-weight:600;" title="현재 탭(참석/귀가)의 배정대수=1인 배정유형을 모두 한 번에 일괄 배정합니다">🚍 배정버스 1대 일괄배정</button>
                   <button class="btn btn-navy btn-sm" onclick="busAutoAssign()">⚡ 자동 배정</button>
                   <button class="btn btn-sm" onclick="busTabResetConfirm()" style="background:transparent;border:1px solid #c89b30;color:#c89b30;font-weight:600;" title="현재 탭 버스배정 초기화 (배정상태 미배정·요약/탑승자 삭제)">🔄 버스배정 초기화</button>
                 </div>
@@ -6661,6 +6661,14 @@ function busReuniteGuardianPairs(busArr, teamsInGroup, busType, cap){
 
 function busAutoAssign(type){
   type = type || busAssignSub;  // 인자 없으면 현재 탭 기준
+  // [v363] 시각선교부 본대 포함여부가 체크된 상태로 '본대'가 아닌 다른 배정유형을 자동배정하려 하면
+  // (시각선교부는 이미 본대에 포함되는 것으로 간주되는 상태이므로) 안내 후 중단한다.
+  var _v363AssignType = ($id('bus-sel-assigntype')||{value:''}).value.trim();
+  var _v363JHIncludeChk = $id('bus-jh-include-main-toggle');
+  if(_v363AssignType!=='본대' && _v363JHIncludeChk && _v363JHIncludeChk.checked){
+    alert('시각선교부는 본대에 포함됩니다. 체크를 해제해 주세요');
+    return;
+  }
   var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
   if(teams.length===0){ alert(type==='leave'?'귀가버스 팀을 먼저 등록하세요.':'참석버스 팀을 먼저 등록하세요.'); return; }
   // [v323] 버스배정기초정보 미등록 시 자동배정 차단 — 기본값으로 진행하지 않음
@@ -7238,6 +7246,13 @@ function busAssignBus1Bulk(type){
   type = type || busAssignSub || (busMainType==='leave'?'leave':'arrive');
   var direction = type==='leave' ? '귀가' : '참석';
   var teamSheet = type==='leave' ? '버스배정_귀가팀내역' : '버스배정_참석팀내역';
+  // [v363] 시각선교부 본대 포함여부가 체크돼 있으면(시각선교부는 이미 본대에 합류되는 것으로 간주)
+  // 1대 일괄배정 자체를 진행하지 않고 안내 후 중단한다.
+  var jhIncludeChk = $id('bus-jh-include-main-toggle');
+  if(jhIncludeChk && jhIncludeChk.checked){
+    alert('시각선교부는 본대에 포함됩니다. 체크를 해제해 주세요');
+    return;
+  }
   if(!USE_SHEET()){ showToast('Google Sheets 연동이 필요합니다.','error'); return; }
   showLoading(true);
   var bf = _busGetFilter();
@@ -10681,7 +10696,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v362_roomview_building_roster_modal';
+var CACHE_VERSION = 'v363_jh_include_guard_ui';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
