@@ -14442,16 +14442,49 @@ function saveEdit() {
 }
 
 // ── 삭제 ──
+// ══════════════════════════════════════════════════════════════════
+// [v398] 참석자 삭제 공용 유틸 — deleteRow(sp)/bpDeleteRow(bp) 양쪽에서 재사용
+// ══════════════════════════════════════════════════════════════════
+function _deleteConfirmMsg(r){
+  if(!r) return '정말 삭제하시겠습니까?\n\n되돌릴 수 없습니다.';
+  return '정말 삭제하시겠습니까?\n\n'+(r.parish||'-')+' '+(r.district||'-')+' '+maskName(r.name||'-')+'\n\n되돌릴 수 없습니다.';
+}
+// 삭제 대상자가 참석/귀가 버스에 배정돼 있으면 탑승자_참석/귀가 시트의 해당 행과
+// 버스배정_참석/귀가요약의 탑승인원 카운트를 함께 정리한다. 캐스케이드 실패는 무시하고
+// (콘솔 경고만 남기고) 본 삭제(참석인원명단)는 그대로 진행한다 — 앱의 기존 "경고만 표시,
+// 진행은 막지 않음" 원칙과 동일. 동시 다발 API 호출 금지 원칙에 따라 순차 처리한다.
+function _deleteBusRosterCascade(r){
+  if(!USE_SHEET() || !r || !r.receiptId) return Promise.resolve();
+  var rid = r.receiptId;
+  var teamKey = busGetTeamKey(r);
+  var chain = Promise.resolve();
+  if((r.arriveTransport||'').trim()==='버스'){
+    var curArrBus = _rosterFullArr[rid]||'';
+    chain = chain
+      .then(function(){ return apiCall({action:'delete', sheetName:'탑승자_참석', id:rid}).catch(function(e){ console.warn('[삭제 캐스케이드] 탑승자_참석 삭제 실패', e&&e.message||e); }); })
+      .then(function(){ return _updateBusSummarySheet('arrive', teamKey, curArrBus||'(미배정)', '(미배정)').catch(function(e){ console.warn('[삭제 캐스케이드] 참석요약 갱신 실패', e&&e.message||e); }); });
+  }
+  if((r.leaveTransport||'').trim()==='버스'){
+    var curLvBus = _rosterFullLv[rid]||'';
+    chain = chain
+      .then(function(){ return apiCall({action:'delete', sheetName:'탑승자_귀가', id:rid}).catch(function(e){ console.warn('[삭제 캐스케이드] 탑승자_귀가 삭제 실패', e&&e.message||e); }); })
+      .then(function(){ return _updateBusSummarySheet('leave', teamKey, curLvBus||'(미배정)', '(미배정)').catch(function(e){ console.warn('[삭제 캐스케이드] 귀가요약 갱신 실패', e&&e.message||e); }); });
+  }
+  return chain;
+}
 function deleteRow(id, fromModal) {
+  var target = retreat.find(function(x){ return String(x.id)===String(id); });
+  if(!confirm(_deleteConfirmMsg(target))) return;
   if(!USE_SHEET()){
     retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
     save(); if(fromModal) closeModal('detail-modal');
     doSearch(); updateStats(); showToast('삭제되었습니다.','info'); return;
   }
-  var target = retreat.find(function(x){ return String(x.id)===String(id); });
   var deleteKey = (target && target.receiptId) ? target.receiptId : String(id);
   showLoading(true);
-  apiCall({action:'delete',id:deleteKey})
+  _deleteBusRosterCascade(target).then(function(){
+    return apiCall({action:'delete',id:deleteKey});
+  })
     .then(function(res){
       if(res.success){
         retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
@@ -15645,15 +15678,18 @@ function bpSaveEdit(){
     .finally(function(){ showLoading(false); });
 }
 function bpDeleteRow(id, fromModal){
+  var target=retreat.find(function(x){ return String(x.id)===String(id); });
+  if(!confirm(_deleteConfirmMsg(target))) return;
   if(!USE_SHEET()){
     retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
     save(); if(fromModal) closeModal('bp-detail-modal');
     bpDoSearch(); updateStats(); showToast('삭제되었습니다.','info'); return;
   }
-  var target=retreat.find(function(x){ return String(x.id)===String(id); });
   var deleteKey=(target && target.receiptId) ? target.receiptId : String(id);
   showLoading(true);
-  apiCall({action:'delete',id:deleteKey})
+  _deleteBusRosterCascade(target).then(function(){
+    return apiCall({action:'delete',id:deleteKey});
+  })
     .then(function(res){
       if(res.success){
         retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
