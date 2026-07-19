@@ -14483,14 +14483,14 @@ function deleteRow(id, fromModal) {
   var deleteKey = (target && target.receiptId) ? target.receiptId : String(id);
   showLoading(true);
   _deleteBusRosterCascade(target).then(function(){
-    return apiCall({action:'delete',id:deleteKey});
+    return apiCall({action:'delete', sheetName:'참석인원명단', id:deleteKey});
   })
     .then(function(res){
       if(res.success){
         retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
         if(fromModal) closeModal('detail-modal');
         doSearch(); updateStats(); showToast('삭제되었습니다.','info');
-      } else { showToast('삭제 실패: '+res.message,'error'); }
+      } else { showToast('삭제 실패: '+(res.message||res.error||'알 수 없는 오류'),'error'); }
     })
     .catch(function(e){ showToast('서버 오류: '+e.message,'error'); })
     .finally(function(){ showLoading(false); });
@@ -15688,14 +15688,14 @@ function bpDeleteRow(id, fromModal){
   var deleteKey=(target && target.receiptId) ? target.receiptId : String(id);
   showLoading(true);
   _deleteBusRosterCascade(target).then(function(){
-    return apiCall({action:'delete',id:deleteKey});
+    return apiCall({action:'delete', sheetName:'참석인원명단', id:deleteKey});
   })
     .then(function(res){
       if(res.success){
         retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
         if(fromModal) closeModal('bp-detail-modal');
         bpDoSearch(); updateStats(); showToast('삭제되었습니다.','info');
-      } else { showToast('삭제 실패: '+res.message,'error'); }
+      } else { showToast('삭제 실패: '+(res.message||res.error||'알 수 없는 오류'),'error'); }
     })
     .catch(function(e){ showToast('서버 오류: '+e.message,'error'); })
     .finally(function(){ showLoading(false); });
