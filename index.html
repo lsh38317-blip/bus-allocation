@@ -1631,7 +1631,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <!-- [v342] 버스신청/배정인원현황 서브탭 바 — enroll·search 패널 진입 시에만 노출 -->
         <div id="enroll-subtabs" style="display:none;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
           <button id="enroll-subtab-enroll" class="btn btn-navy btn-sm"    onclick="switchPanel('enroll')">📝 개별신청</button>
-          <button id="enroll-subtab-search" class="btn btn-primary btn-sm" onclick="switchPanel('search')">🔍 일괄신청 및 현황</button>
+          <button id="enroll-subtab-search" class="btn btn-primary btn-sm" onclick="switchPanel('search')">🔍 일괄신청</button>
+          <button id="enroll-subtab-roster" class="btn btn-primary btn-sm" onclick="switchPanel('busroster')">🚌 탑승자 명단</button>
         </div>
 
         <div class="panel" id="panel-enroll">
@@ -1951,6 +1952,86 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div class="pagination" id="pagination"></div>
           </div>
         </div>
+
+        <!-- [v401] 버스신청 - 탑승자 명단 (버스 배정 현황과 동일한 조건행 + 간결 카드) -->
+        <div class="panel" id="panel-busroster">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;
+                      border-bottom:2px solid var(--border2);padding-bottom:8px;flex-wrap:wrap;">
+            <select id="sr-sel-year"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
+            </select>
+            <select id="sr-sel-season"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="춘계">춘계</option>
+              <option value="하계" selected>하계</option>
+              <option value="추계">추계</option>
+              <option value="동계">동계</option>
+            </select>
+            <select id="sr-sel-event"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="">전체</option>
+              <option value="1차" selected>1차</option>
+              <option value="2차">2차</option>
+              <option value="3차">3차</option>
+              <option value="4차">4차</option>
+              <option value="5차">5차</option>
+              <option value="6차">6차</option>
+              <option value="7차">7차</option>
+            </select>
+            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;flex-shrink:0;"></div>
+            <select id="sr-s-parish"
+              onchange="srParishChange()"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="">전체</option>
+            </select>
+            <select id="sr-s-district"
+              style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
+                     font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
+              <option value="">전체</option>
+            </select>
+            <div style="width:1px;height:24px;background:var(--border);margin:0 2px;flex-shrink:0;"></div>
+            <button id="sr-tab-arrive"
+              onclick="srSetType('arrive')"
+              style="padding:5px 18px;border:none;border-bottom:3px solid var(--navy);background:none;
+                     font-weight:700;font-size:.88rem;color:var(--navy);cursor:pointer;">
+              🚌 참석 배정
+            </button>
+            <button id="sr-tab-leave"
+              onclick="srSetType('leave')"
+              style="padding:5px 18px;border:none;border-bottom:3px solid transparent;background:none;
+                     font-weight:600;font-size:.88rem;color:var(--muted);cursor:pointer;">
+              🏠 귀가 배정
+            </button>
+            <button id="btn-sr-reload"
+              onclick="srRosterReload()"
+              style="height:32px;background:#1a6b45;color:#fff;border:none;border-radius:6px;
+                     padding:0 14px;font-size:.82rem;font-weight:600;cursor:pointer;
+                     display:flex;align-items:center;gap:5px;">
+              🔍 조회
+            </button>
+            <button id="btn-sr-export"
+              onclick="srExportBusSchedule()"
+              style="height:32px;background:#fff;color:#1a6b45;border:1.5px solid #1a6b45;
+                     border-radius:6px;padding:0 14px;font-size:.82rem;font-weight:600;
+                     cursor:pointer;display:flex;align-items:center;gap:5px;">
+              📥 <span id="btn-sr-export-label">참석 배차표 다운로드</span>
+            </button>
+          </div>
+
+          <div id="sr-empty" class="empty-state" style="padding:24px 20px;">
+            <div class="icon">🚌</div>
+            <p>아직 버스 배정이 완료되지 않았습니다.<br>조회 버튼을 눌러 확인해주세요.</p>
+          </div>
+          <div id="sr-content" style="display:none;">
+            <div id="sr-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:14px;"></div>
+            <div id="sr-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+          </div>
+        </div>
+
         <!-- EXCEL -->
         <div class="panel" id="panel-excel">
           <!-- ① Google Sheets 연동 카드 -->
@@ -9838,7 +9919,7 @@ function _busviewGetFilter(){
   };
 }
 
-function busviewReload(){
+function busviewReload(onDone){
   var btn = $id('btn-busview-reload');
   if(btn){ btn.disabled=true; btn.textContent='로딩 중...'; }
   showLoading(true);
@@ -9855,6 +9936,7 @@ function busviewReload(){
         : '버스 배정 데이터가 없습니다.',
       (busArriveBuses.length||busLeaveBuses.length) ? 'success' : 'info'
     );
+    if(typeof onDone==='function') onDone(); // [v401] 탑승자 명단(sr) 등 외부 호출자용 완료 콜백
     return;
   }
 
@@ -9933,8 +10015,182 @@ function busviewReload(){
         _bvwCalcSheetStats('leave',  filteredLvSum,  filteredLvRst);
 
         busRenderView();
+        if(typeof onDone==='function') onDone(); // [v401] 탑승자 명단(sr) 등 외부 호출자용 완료 콜백
       });
   });
+}
+
+// ══════════════════════════════════════════════════════════
+// [v401] 버스신청 - 탑승자 명단(sr) 탭
+// "버스 배정 현황"(busview)과 동일한 조건행 UI/데이터 파이프라인을 재사용하되,
+// 이 탭 전용 필터(sr-*)로 조회하고 카드는 헤더정보+인원배지+탑승자보기 버튼만 있는
+// 간결한 형태로 렌더링한다. 데이터 새로고침은 busviewReload()를 그대로 재사용해
+// busArriveBuses/busLeaveBuses/busArriveTeams/busLeaveTeams(전역)를 채운다 —
+// busRosterOpenForBus()가 그 전역 상태를 그대로 읽으므로 "탑승자 보기" 버튼이
+// 별도 수정 없이 바로 동작한다.
+// ══════════════════════════════════════════════════════════
+var srType = 'arrive';
+function _srGetFilter(){
+  return {
+    year:   (($id('sr-sel-year')   ||{}).value||'').trim(),
+    season: (($id('sr-sel-season') ||{}).value||'').trim(),
+    event:  (($id('sr-sel-event')  ||{}).value||'').trim()
+  };
+}
+function srParishChange(){
+  var parish = $val('sr-s-parish');
+  populateDistrictSelect('sr-s-district', parish, '전체', '');
+}
+function srApplyDefaultScope(){
+  if(!currentUser) return;
+  var role = currentUser.role;
+  var isAdmin    = role==='admin';
+  var isParish    = role==='parish';
+  var isDistrict = role==='district';
+  if(!isAdmin){
+    if(currentUser.parish){
+      $set('sr-s-parish', currentUser.parish);
+      var sp=$id('sr-s-parish'); if(sp){ sp.disabled=(!isParish); sp.style.opacity=(!isParish)?'.7':''; }
+      srParishChange();
+    }
+    if(isDistrict && currentUser.district){
+      $set('sr-s-district', currentUser.district);
+      var sd=$id('sr-s-district'); if(sd){ sd.disabled=true; sd.style.opacity='.7'; }
+    }
+    if(isParish){
+      var sd2=$id('sr-s-district'); if(sd2){ sd2.disabled=false; sd2.style.opacity=''; }
+      if(currentUser.loginDistrict) $set('sr-s-district', currentUser.loginDistrict);
+    }
+  } else {
+    var ep=$id('sr-s-parish'); if(ep){ep.disabled=false;ep.style.opacity='';}
+    var ed=$id('sr-s-district'); if(ed){ed.disabled=false;ed.style.opacity='';}
+  }
+}
+function srInit(){
+  // 년도 콤보(당해년도 기준 ±5년) — initYearSelect()와 동일 로직을 sr-sel-year 대상으로 구성
+  var ySel = $id('sr-sel-year');
+  if(ySel && !ySel.options.length){
+    var cur = new Date().getFullYear();
+    var html = '';
+    for(var y=cur+5; y>=cur-5; y--){ html += '<option value="'+y+'"'+(y===cur?' selected':'')+'>'+y+'</option>'; }
+    ySel.innerHTML = html;
+  }
+  populateParishSelect('sr-s-parish','전체');
+  srApplyDefaultScope();
+  srRosterReload();
+}
+function srSetType(type){
+  srType = type;
+  var ta = $id('sr-tab-arrive'), tl = $id('sr-tab-leave');
+  if(ta){ ta.style.borderBottomColor = type==='arrive' ? 'var(--navy)' : 'transparent';
+          ta.style.color = type==='arrive' ? 'var(--navy)' : 'var(--muted)';
+          ta.style.fontWeight = type==='arrive' ? '700' : '600'; }
+  if(tl){ tl.style.borderBottomColor = type==='leave' ? 'var(--navy)' : 'transparent';
+          tl.style.color = type==='leave' ? 'var(--navy)' : 'var(--muted)';
+          tl.style.fontWeight = type==='leave' ? '700' : '600'; }
+  var expLbl = $id('btn-sr-export-label');
+  if(expLbl) expLbl.textContent = (type==='leave' ? '귀가' : '참석') + ' 배차표 다운로드';
+  srRosterRender();
+}
+function srRosterReload(){
+  var btn = $id('btn-sr-reload');
+  if(btn){ btn.disabled=true; btn.textContent='로딩 중...'; }
+  // sr- 전용 필터값을 busview-sel-* 로 동기화해 busviewReload()의 기존 조회 로직을 그대로 재사용
+  var f = _srGetFilter();
+  var yEl=$id('busview-sel-year'), sEl=$id('busview-sel-season'), eEl=$id('busview-sel-event');
+  if(yEl) yEl.value = f.year;
+  if(sEl) sEl.value = f.season;
+  if(eEl) eEl.value = f.event;
+  busviewReload(function(){
+    if(btn){ btn.disabled=false; btn.textContent='🔍 조회'; }
+    srRosterRender();
+  });
+}
+function srRosterRender(){
+  var empty = $id('sr-empty'), content = $id('sr-content');
+  var statsEl = $id('sr-stats'), listEl = $id('sr-list');
+  if(!empty||!content) return;
+  var curBuses = srType==='leave' ? busLeaveBuses : busArriveBuses;
+  var curTeams = srType==='leave' ? busLeaveTeams : busArriveTeams;
+  if(!curBuses.length && !curTeams.length){
+    empty.style.display=''; content.style.display='none'; return;
+  }
+  empty.style.display='none'; content.style.display='';
+
+  var selParish   = (($id('sr-s-parish')   ||{}).value||'').trim();
+  var selDistrict = (($id('sr-s-district') ||{}).value||'').trim();
+  var visibleTeamIds = null;
+  if(selDistrict){
+    var myLabel = (selParish||'') + ' ' + selDistrict;
+    visibleTeamIds = curTeams.filter(function(t){
+      return t.name === selDistrict || t.name === myLabel.trim() || t.name.indexOf(selDistrict) >= 0;
+    }).map(function(t){ return t.id; });
+  } else if(selParish){
+    visibleTeamIds = curTeams.filter(function(t){
+      return (t.parish && t.parish===selParish) || t.name.indexOf(selParish) >= 0;
+    }).map(function(t){ return t.id; });
+  }
+  var viewTeams = visibleTeamIds ? curTeams.filter(function(t){ return visibleTeamIds.indexOf(t.id)>=0; }) : curTeams;
+  var viewBuses = visibleTeamIds
+    ? curBuses.filter(function(b){ return b.slots.some(function(s){ return visibleTeamIds.indexOf(s.teamId)>=0; }); })
+    : curBuses;
+
+  var cap = busGetCap();
+  var total = viewTeams.reduce(function(s,t){ return s+t.count; },0);
+  var unassign = viewTeams.filter(function(t){ return busTeamAssigned(t.id, srType)===0; });
+  var active = viewBuses.filter(function(b){ return b.slots.length>0; });
+  var stats=[
+    {label:'배정 팀',   v:viewTeams.length, unit:'팀', c:'var(--navy)', bg:'var(--sky)',  bd:'var(--border2)'},
+    {label:'대상 인원', v:total,            unit:'명', c:'#2d8a5a',    bg:'#edf7f2',      bd:'#b8dfc8'},
+    {label:'운행 버스', v:active.length,    unit:'대', c:'#c89b30',    bg:'#fdf6e3',      bd:'#f0dea0'},
+    {label:'미배정 팀', v:unassign.length,  unit:'팀',
+      c:unassign.length>0?'#d94040':'#2d8a5a', bg:unassign.length>0?'#fff0f0':'#edf7f2', bd:unassign.length>0?'#f5c0c0':'#b8dfc8'},
+  ];
+  statsEl.innerHTML = stats.map(function(s){
+    return '<div style="background:'+s.bg+';border:1px solid '+s.bd+';border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);">'+
+      '<div style="font-size:.72rem;color:var(--muted);margin-bottom:4px;font-weight:600;">'+s.label+'</div>'+
+      '<div style="font-size:1.5rem;font-weight:900;color:'+s.c+';line-height:1;">'+s.v+'<span style="font-size:.78rem;margin-left:2px;">'+s.unit+'</span></div>'+
+      '</div>';
+  }).join('');
+
+  var renderBuses = viewBuses.slice().sort(_bvwBusSortCompare); // [v401] 출발일자+시간→배정유형→배차 순 정렬(복사본만 정렬)
+  listEl.innerHTML = renderBuses.map(function(bus){
+    var leaderName='';
+    if(bus.leaderId){
+      var lp=retreat.find(function(r){ return r.receiptId===bus.leaderId; });
+      if(lp) leaderName=lp.name;
+    }
+    var slots = visibleTeamIds ? bus.slots.filter(function(s){ return visibleTeamIds.indexOf(s.teamId)>=0; }) : bus.slots;
+    var load = slots.reduce(function(s,sl){ return s+sl.count; },0);
+    var over = load>cap;
+    return '<div style="background:#fff;border:1px solid '+(over?'#f5c0c0':'var(--border2)')+';border-radius:12px;padding:16px 20px;box-shadow:var(--shadow);">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">'+
+      '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">'+
+      '<div style="width:3px;height:15px;background:var(--navy);border-radius:2px;"></div>'+
+      '<span style="font-weight:700;font-size:.95rem;color:var(--navy);">'+esc(bus.name)+'</span>'+
+      '<span style="font-size:.77rem;color:var(--muted);">'+slots.length+'팀</span>'+
+      '<span style="font-size:.78rem;color:var(--text2);">승차위치: <strong style="color:var(--text);">'+esc(bus.boardLoc||'-')+'</strong></span>'+
+      '<span style="font-size:.78rem;color:var(--text2);">하차위치: <strong style="color:var(--text);">'+esc(bus.alightLoc||'-')+'</strong></span>'+
+      '<span style="font-size:.78rem;color:var(--text2);">출발일자: <strong style="color:var(--text);">'+esc(bus.departDate ? (_bvwFormatMD(bus.departDate)+'('+_bvwWeekdayKR(bus.departDate)+')') : '-')+'</strong></span>'+
+      '<span style="font-size:.78rem;color:var(--text2);">출발시간: <strong style="color:var(--text);">'+esc(bus.departTime||'-')+'</strong></span>'+
+      '<span style="font-size:.78rem;color:var(--text2);">운전자: <strong style="color:var(--text);">'+esc(bus.driverName||'-')+'</strong></span>'+
+      '<span style="font-size:.78rem;color:var(--text2);">선탑자: <strong style="color:var(--text);">'+esc(leaderName||'미지정')+'</strong></span>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'+
+      '<button onclick="busRosterOpenForBus(&quot;'+bus.id+'&quot;,&quot;'+srType+'&quot;)" style="background:var(--sky);border:1px solid var(--border2);color:var(--navy);border-radius:20px;padding:4px 14px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;">🚌 탑승자 보기</button>'+
+      '<span style="background:'+(over?'#fff0f0':'#edf7f2')+';color:'+(over?'#d94040':'#2d8a5a')+';border:1px solid '+(over?'#f5c0c0':'#b8dfc8')+';border-radius:20px;padding:3px 13px;font-weight:700;font-size:.85rem;white-space:nowrap;">'+load+' / '+cap+'명</span>'+
+      '</div></div></div>';
+  }).join('');
+}
+function srExportBusSchedule(){
+  // sr- 필터값을 busview-sel-*로 동기화 + bvwType을 srType으로 맞춰 기존 배차표 다운로드 로직 그대로 재사용
+  var f = _srGetFilter();
+  var yEl=$id('busview-sel-year'), sEl=$id('busview-sel-season'), eEl=$id('busview-sel-event');
+  if(yEl) yEl.value = f.year;
+  if(sEl) sEl.value = f.season;
+  if(eEl) eEl.value = f.event;
+  bvwType = srType;
+  bvwExportBusSchedule();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -11967,21 +12223,22 @@ function switchPanel(name, skipRender) {
   var panel=$id('panel-'+name); if(panel) panel.classList.add('active');
   var nav=$id('nav-'+name);     if(nav)   nav.classList.add('active');
   // [v342] 배정인원현황(search)은 버스신청 메뉴의 서브탭이므로, nav-search가 없어도 사이드바는 nav-enroll을 하이라이트
-  if(name==='search'){ var navE=$id('nav-enroll'); if(navE) navE.classList.add('active'); }
+  if(name==='search'||name==='busroster'){ var navE=$id('nav-enroll'); if(navE) navE.classList.add('active'); }
   // [v342] 버스신청/배정인원현황 서브탭 바 표시 및 활성 탭 스타일 처리
   var subtabBar=$id('enroll-subtabs');
   if(subtabBar){
-    if(name==='enroll'||name==='search'){
+    if(name==='enroll'||name==='search'||name==='busroster'){
       subtabBar.style.display='flex';
-      var stApply=$id('enroll-subtab-enroll'), stStatus=$id('enroll-subtab-search');
-      if(stApply)  stApply.className  = (name==='enroll') ? 'btn btn-navy btn-sm' : 'btn btn-primary btn-sm';
-      if(stStatus) stStatus.className = (name==='search') ? 'btn btn-navy btn-sm' : 'btn btn-primary btn-sm';
+      var stApply=$id('enroll-subtab-enroll'), stStatus=$id('enroll-subtab-search'), stRoster=$id('enroll-subtab-roster');
+      if(stApply)  stApply.className  = (name==='enroll')    ? 'btn btn-navy btn-sm' : 'btn btn-primary btn-sm';
+      if(stStatus) stStatus.className = (name==='search')    ? 'btn btn-navy btn-sm' : 'btn btn-primary btn-sm';
+      if(stRoster) stRoster.className = (name==='busroster')  ? 'btn btn-navy btn-sm' : 'btn btn-primary btn-sm';
     } else {
       subtabBar.style.display='none';
     }
   }
-  // [v343] 배정인원현황(search)은 버스신청 화면의 서브탭이므로 상단 title은 "버스신청"으로 고정
-  var tt=$id('topbar-title'); if(tt) tt.textContent = PANEL_TITLES[(name==='search')?'enroll':name] || '';
+  // [v343] 배정인원현황(search)/탑승자 명단(busroster)은 버스신청 화면의 서브탭이므로 상단 title은 "버스신청"으로 고정
+  var tt=$id('topbar-title'); if(tt) tt.textContent = PANEL_TITLES[(name==='search'||name==='busroster')?'enroll':name] || '';
   var ts=$id('topbar-sub');   if(ts) ts.textContent=PANEL_SUBS[name]||'';
   if(!skipRender){
     if(name==='accounts'){
@@ -12029,6 +12286,9 @@ function switchPanel(name, skipRender) {
         searchParishChange();
         loadRosterIndex();
       }
+    }
+    if(name==='busroster'){
+      srInit();
     }
     if(name==='home'){
       // ── 홈 배지 필터 확정 ──────────────────────────────────────────────
@@ -18994,9 +19254,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // [v349] 코드관리
     'codeLoadAll','codeSelectMajor','codeAddMajor','codeDeleteMajor','codeAddMinor','codeToggleUseYn','codeDeleteMinor','codeSaveUseYn',
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진 — onclick/onchange에서 직접 호출되는 함수만 등록
-    'spToggleTransport','spToggleCheck','spToggleAll','spStageAssignType',
+    'spToggleTransport','spToggleCheck','spToggleAll','spStageAssignType','spStageBus',
     'spEditDate','spStageDate','spCancelDateEdit',
     'spBulkUploadOpen','spBulkUploadHandleFile','spBulkUploadProcess','spBulkToggleTransport',
+    // [v401] 버스신청 - 탑승자 명단(sr) 탭
+    'srParishChange','srSetType','srRosterReload','srExportBusSchedule',
     'busTeamsSubTab','busAssignSubTab','busSummarySubTab','busSummaryShowAll','busSummaryShowSingle',
     'busLeaderSubTab','busLeaderRender','busLeaderRenderAll','busLeaderSave','busLeaderSaveAll','busLeaderSaveDispatch','busLeaderParishChange','busLeaderResetPrompt','busAssignTypeChanged',
     'vwReset','vwResetConfirm','vwFilter','vwOnSearch','vwOnArrDateChange',
@@ -19070,9 +19332,10 @@ document.addEventListener('DOMContentLoaded', function() {
     bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit, bpDownloadTemplate:bpDownloadTemplate, bpStageBus:bpStageBus, _bpileToggleBusFields:_bpileToggleBusFields,
     codeLoadAll:codeLoadAll, codeSelectMajor:codeSelectMajor, codeAddMajor:codeAddMajor, codeDeleteMajor:codeDeleteMajor, codeAddMinor:codeAddMinor, codeToggleUseYn:codeToggleUseYn, codeDeleteMinor:codeDeleteMinor, codeSaveUseYn:codeSaveUseYn,
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진
-    spToggleTransport:spToggleTransport, spToggleCheck:spToggleCheck, spToggleAll:spToggleAll, spStageAssignType:spStageAssignType,
+    spToggleTransport:spToggleTransport, spToggleCheck:spToggleCheck, spToggleAll:spToggleAll, spStageAssignType:spStageAssignType, spStageBus:spStageBus,
     spEditDate:spEditDate, spStageDate:spStageDate, spCancelDateEdit:spCancelDateEdit,
     spBulkUploadOpen:spBulkUploadOpen, spBulkUploadHandleFile:spBulkUploadHandleFile, spBulkUploadProcess:spBulkUploadProcess, spBulkToggleTransport:spBulkToggleTransport,
+    srParishChange:srParishChange, srSetType:srSetType, srRosterReload:srRosterReload, srExportBusSchedule:srExportBusSchedule,
     busTeamsSubTab:busTeamsSubTab, busAssignSubTab:busAssignSubTab, busSummarySubTab:busSummarySubTab, busSummaryShowAll:busSummaryShowAll, busSummaryShowSingle:busSummaryShowSingle,
     busLeaderSubTab:busLeaderSubTab, busLeaderRender:busLeaderRender, busLeaderRenderAll:busLeaderRenderAll, busLeaderSave:busLeaderSave, busLeaderSaveAll:busLeaderSaveAll, busLeaderSaveDispatch:busLeaderSaveDispatch, busLeaderParishChange:busLeaderParishChange, busLeaderResetPrompt:busLeaderResetPrompt, busAssignTypeChanged:busAssignTypeChanged,
     vwReset:vwReset, vwResetConfirm:vwResetConfirm, vwFilter:vwFilter,
