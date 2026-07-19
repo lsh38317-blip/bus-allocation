@@ -13261,15 +13261,104 @@ function spToggleTransport(id, kind){
   if(assignSel){ var isBus = next==='버스'; assignSel.disabled = !isBus; assignSel.style.opacity = isBus?'':'.5'; }
   spUpdateBulkBtnLabel();
 }
+// ══════════════════════════════════════════════════════════════════
+// [v396] 배정유형/배정버스 변경 시 정원초과 체크 — 버스신청(sp) 전용
+// 버스배정_기초정보 시트(배정대수·버스정원)를 세션 내 1회만 조회해 캐시하고,
+// 재조회 없이 재사용한다(검색조건이 바뀌면 캐시가 자동으로 다시 채워짐 — 조회 시점의
+// 연도/수양회종류/회차 필터를 조합키에 함께 넣어 구분).
+// ══════════════════════════════════════════════════════════════════
+var _spBaseInfoRowsPromise = null;
+var _spBaseInfoRowsFilterKey = null;
+function _spFetchBaseInfoRows(){
+  var sYear   = ($id('s-year')||{value:''}).value.trim();
+  var sSeason = ($id('s-retreat-type')||{value:''}).value.trim();
+  var sEvent  = ($id('s-event')||{value:''}).value.trim();
+  var filterKey = sYear+'|'+sSeason+'|'+sEvent;
+  if(_spBaseInfoRowsPromise && _spBaseInfoRowsFilterKey===filterKey) return _spBaseInfoRowsPromise;
+  _spBaseInfoRowsFilterKey = filterKey;
+  _spBaseInfoRowsPromise = apiCall({action:'getAll', sheetName:'버스배정_기초정보'}).then(function(res){
+    var rows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+    return rows.filter(function(r){
+      return (!sYear   || String(r['년도'])===String(sYear))
+          && (!sSeason || r['수양회종류']===sSeason)
+          && (!sEvent  || r['행사명']===sEvent);
+    });
+  }).catch(function(){ return []; });
+  return _spBaseInfoRowsPromise;
+}
+function _spFindBaseInfo(assignType, direction){
+  return _spFetchBaseInfoRows().then(function(rows){
+    return rows.find(function(r){ return r['운행방향']===direction && r['배정유형']===assignType; });
+  });
+}
+// 배정유형 변경 체크: 해당 배정유형의 등록된 배정대수가 1대(단일버스형 — 선발대/본대(봉사)/직장조/
+// 중고등부처럼 배정버스가 자동으로 하나뿐인 유형)일 때만 대상. 본인(r) 제외하고 이미 그 배정유형에
+// 배정된 인원수를 세어, 본인이 추가되면 버스정원을 넘는지 확인한다.
+function spCheckAssignTypeCapacity(newAssignType, kind, r){
+  if(!newAssignType) return Promise.resolve(false);
+  var direction = kind==='leave' ? '귀가' : '참석';
+  return _spFindBaseInfo(newAssignType, direction).then(function(base){
+    if(!base) return false; // 버스운행설정 미등록 → 체크 불가, 통과(경고 없음)
+    var busCount = parseInt(base['배정대수'],10)||0;
+    if(busCount !== 1) return false; // 배정버스 1대인 유형만 체크 대상
+    var cap = parseInt(base['버스정원'],10)||44;
+    var headcount = (retreat||[]).filter(function(m){
+      if(String(m.id)===String(r.id)) return false;
+      var t = String((kind==='arrive'?m.arriveTransport:m.leaveTransport)||'').trim();
+      var a = String((kind==='arrive'?m.arriveAssignType:m.leaveAssignType)||'').trim();
+      return t==='버스' && a===newAssignType;
+    }).length;
+    return (headcount+1) > cap;
+  });
+}
+// 배정버스 변경 체크: 이 행의 현재 배정유형이 "본대"일 때만 대상(선탑/직장조 등 단일버스형은 위
+// spCheckAssignTypeCapacity가 이미 커버). 선택한 특정 버스에 이미 탑승 중인 같은 배정유형 인원수를
+// 세어, 본인이 추가되면 그 버스의 정원을 넘는지 확인한다.
+function spCheckBusCapacity(busName, kind, r){
+  if(!busName) return Promise.resolve(false);
+  var assignType = String((kind==='arrive'?r.arriveAssignType:r.leaveAssignType)||'').trim();
+  if(assignType !== '본대') return Promise.resolve(false);
+  var direction = kind==='leave' ? '귀가' : '참석';
+  return _spFindBaseInfo(assignType, direction).then(function(base){
+    if(!base) return false;
+    var cap = parseInt(base['버스정원'],10)||44;
+    var fullIdx = kind==='leave' ? _rosterFullLv : _rosterFullArr;
+    var headcount = (retreat||[]).filter(function(m){
+      if(String(m.id)===String(r.id)) return false;
+      var t = String((kind==='arrive'?m.arriveTransport:m.leaveTransport)||'').trim();
+      var a = String((kind==='arrive'?m.arriveAssignType:m.leaveAssignType)||'').trim();
+      if(t!=='버스' || a!==assignType) return false;
+      var mrid = String(m.receiptId||'').trim(); if(!mrid) return false;
+      return (fullIdx[mrid]||'').trim() === busName;
+    }).length;
+    return (headcount+1) > cap;
+  });
+}
+var _SP_CAPACITY_OVER_MSG = '변경 배정유형의 버스 탑승자 정원이 초과 되었습니다. 관리자에게 문의해 주세요.';
 function spStageAssignType(id, kind, value){
   var idStr = String(id);
   var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
   if(!spCanEdit(r)){ showToast('본인 소속 범위 밖 데이터는 수정할 수 없습니다.','error'); return; }
   var staged = kind==='arrive' ? spStagedArriveAssign : spStagedLeaveAssign;
-  staged[idStr] = value;
-  spSelectedIds.add(idStr);
-  var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
-  spUpdateBulkBtnLabel();
+  var prevValue = staged.hasOwnProperty(idStr) ? staged[idStr] : ((kind==='arrive'?r.arriveAssignType:r.leaveAssignType)||'');
+  var sel = $id((kind==='arrive'?'sp-arrive-assign-':'sp-leave-assign-')+idStr);
+  function commitStage(){
+    staged[idStr] = value;
+    spSelectedIds.add(idStr);
+    var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+    spUpdateBulkBtnLabel();
+  }
+  if(sel) sel.disabled = true;
+  spCheckAssignTypeCapacity(value, kind, r).then(function(overCapacity){
+    if(overCapacity){
+      alert(_SP_CAPACITY_OVER_MSG);
+      if(sel) sel.value = prevValue; // [v396] 정원초과 시 변경 취소 — 원래값으로 되돌림(차단)
+    } else {
+      commitStage();
+    }
+  }).finally(function(){
+    if(sel) sel.disabled = !spCanEdit(r) || (((kind==='arrive'?(spStagedArrive.hasOwnProperty(idStr)?spStagedArrive[idStr]:r.arriveTransport):(spStagedLeave.hasOwnProperty(idStr)?spStagedLeave[idStr]:r.leaveTransport))||'').trim() !== '버스');
+  });
 }
 // [v392] 참석/귀가배정버스 select 변경 — 다른 셀들과 동일하게 서버 저장 없이 화면에만 예약(스테이징)
 function spStageBus(id, kind, value){
@@ -13277,12 +13366,26 @@ function spStageBus(id, kind, value){
   var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
   if(!spCanEdit(r)){ showToast('본인 소속 범위 밖 데이터는 수정할 수 없습니다.','error'); return; }
   var staged = kind==='arrive' ? spStagedArriveBus : spStagedLeaveBus;
-  staged[idStr] = value;
-  spSelectedIds.add(idStr);
-  var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+  var prevValue = staged.hasOwnProperty(idStr) ? staged[idStr] : '';
   var sel = $id('sp-'+kind+'-bus-'+idStr);
-  if(sel){ sel.style.borderColor = '#8a5a00'; sel.style.borderStyle = 'dashed'; }
-  spUpdateBulkBtnLabel();
+  function commitStage(){
+    staged[idStr] = value;
+    spSelectedIds.add(idStr);
+    var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+    if(sel){ sel.style.borderColor = '#8a5a00'; sel.style.borderStyle = 'dashed'; }
+    spUpdateBulkBtnLabel();
+  }
+  if(sel) sel.disabled = true;
+  spCheckBusCapacity(value, kind, r).then(function(overCapacity){
+    if(overCapacity){
+      alert(_SP_CAPACITY_OVER_MSG);
+      if(sel) sel.value = prevValue; // [v396] 정원초과 시 변경 취소 — 원래값으로 되돌림(차단)
+    } else {
+      commitStage();
+    }
+  }).finally(function(){
+    if(sel) sel.disabled = !spCanEdit(r);
+  });
 }
 function spEditDate(id, kind){
   var idStr = String(id);
@@ -14161,9 +14264,9 @@ function openDetail(id) {
   if(mb) mb.innerHTML=fields.map(function(f){
     return '<div class="detail-row"><span class="detail-label">'+f[0]+'</span><span class="detail-value">'+esc(String(f[1]))+'</span></div>';
   }).join('');
-  // 삭제 버튼: [hidden] 요청에 따라 그리드 삭제버튼과 동일하게 항상 숨김 (복원 시 아래 3줄로 되돌리면 됨)
+  // [v396] 삭제 버튼 복원 — 수정 버튼과 동일 범위(관리자+구역장)로 노출 (교구장은 조회 전용이라 계속 숨김)
   var delBtn=$id('btn-delete');
-  if(delBtn){ delBtn.style.display='none'; delBtn.onclick=function(){ deleteRow(id,true); }; }
+  if(delBtn){ delBtn.style.display = (isAdmin||isDistrict) ? '' : 'none'; delBtn.onclick=function(){ deleteRow(id,true); }; }
   // [v235] 수정 버튼: 관리자 + 구역장에게 활성화 (교구장은 조회 전용이라 계속 숨김)
   var editBtn=$id('btn-edit');
   if(editBtn){
