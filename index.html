@@ -13085,6 +13085,19 @@ function renderTable() {
       : '<span style="'+bpTransBadgeStyle(leaveDisp,false).replace('cursor:pointer;','cursor:default;')+'">'+esc(leaveDisp)+'</span>';
     var arriveAssignCell = '<select id="sp-arrive-assign-'+esc(idStr)+'" '+(arriveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(arriveAssignDisabled?'opacity:.5;':'')+'" onchange="spStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+_bpAssignOptionsHtml(arriveAssignDisp,'arrive')+'</select>';
     var leaveAssignCell  = '<select id="sp-leave-assign-'+esc(idStr)+'" '+(leaveAssignDisabled?'disabled':'')+' style="font-size:.78rem;border:1px solid var(--border);border-radius:6px;padding:2px 4px;'+(leaveAssignDisabled?'opacity:.5;':'')+'" onchange="spStageAssignType(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+_bpAssignOptionsHtml(leaveAssignDisp,'leave')+'</select>';
+    // [v392] 참석/귀가배정버스 — 스테이징 값 우선 표시, canEdit && 교통수단이 버스일 때만 활성화(버스배정 화면과 동일하게 전체 버스 목록 자유 선택)
+    var arriveBusDisp = spStagedArriveBus.hasOwnProperty(idStr) ? spStagedArriveBus[idStr] : arriveInfo.value;
+    var leaveBusDisp  = spStagedLeaveBus.hasOwnProperty(idStr)  ? spStagedLeaveBus[idStr]  : leaveInfo.value;
+    var arriveBusDisabled = !canEdit || (arriveDisp||'').trim() !== '버스';
+    var leaveBusDisabled  = !canEdit || (leaveDisp||'').trim()  !== '버스';
+    var arriveBusPending = spStagedArriveBus.hasOwnProperty(idStr);
+    var leaveBusPending  = spStagedLeaveBus.hasOwnProperty(idStr);
+    var arriveBusCell = canEdit
+      ? '<select id="sp-arrive-bus-'+esc(idStr)+'" '+(arriveBusDisabled?'disabled':'')+' style="font-size:.78rem;border:1.5px solid '+(arriveBusPending?'#8a5a00':'var(--border)')+';'+(arriveBusPending?'border-style:dashed;':'')+'border-radius:6px;padding:2px 4px;'+(arriveBusDisabled?'opacity:.5;':'')+'" onchange="spStageBus(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+busAssignOptionsHtml('arrive',arriveBusDisp,r,'all')+'</select>'
+      : '<span style="'+arriveBusStyle+'">'+esc(arriveInfo.value)+'</span>';
+    var leaveBusCell = canEdit
+      ? '<select id="sp-leave-bus-'+esc(idStr)+'" '+(leaveBusDisabled?'disabled':'')+' style="font-size:.78rem;border:1.5px solid '+(leaveBusPending?'#8a5a00':'var(--border)')+';'+(leaveBusPending?'border-style:dashed;':'')+'border-radius:6px;padding:2px 4px;'+(leaveBusDisabled?'opacity:.5;':'')+'" onchange="spStageBus(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+busAssignOptionsHtml('leave',leaveBusDisp,r,'all')+'</select>'
+      : '<span style="'+leaveBusStyle+'">'+esc(leaveInfo.value)+'</span>';
     return '<tr id="sptr-'+esc(idStr)+'">'+
       '<td>'+(canEdit?('<input type="checkbox" class="sp-chk-row" data-id="'+esc(idStr)+'" '+(isChecked?'checked':'')+' onchange="spToggleCheck(&quot;'+esc(idStr)+'&quot;,this.checked)">'):'')+'</td>'+
       '<td style="color:var(--text-dim);font-size:.74rem">'+((currentPage-1)*SEARCH_PAGE_SIZE+i+1)+'</td>'+
@@ -13098,11 +13111,11 @@ function renderTable() {
       '<td id="sp-arrive-date-cell-'+esc(idStr)+'">'+arriveDateCell+'</td>'+
       '<td>'+arriveTransCell+'</td>'+
       '<td>'+arriveAssignCell+'</td>'+
-      '<td style="'+arriveBusStyle+'">'+esc(arriveInfo.value)+'</td>'+
+      '<td>'+arriveBusCell+'</td>'+
       '<td id="sp-leave-date-cell-'+esc(idStr)+'">'+leaveDateCell+'</td>'+
       '<td>'+leaveTransCell+'</td>'+
       '<td>'+leaveAssignCell+'</td>'+
-      '<td style="'+leaveBusStyle+'">'+esc(leaveInfo.value)+'</td>'+
+      '<td>'+leaveBusCell+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
   }).join('');
@@ -13129,6 +13142,8 @@ var spStagedArriveAssign = {};
 var spStagedLeaveAssign  = {};
 var spStagedArriveDate = {};
 var spStagedLeaveDate  = {};
+var spStagedArriveBus = {}; // [v392] 예약된 참석배정버스
+var spStagedLeaveBus  = {}; // [v392] 예약된 귀가배정버스
 var spSelectedIds = new Set();
 
 // 편집 권한 스코프: 관리자=전체, 구역장=본인 구역만, 교구장=본인 교구 내 전체 구역만
@@ -13150,6 +13165,7 @@ function spToggleCheck(id, checked){
     delete spStagedArrive[idStr]; delete spStagedLeave[idStr];
     delete spStagedArriveAssign[idStr]; delete spStagedLeaveAssign[idStr];
     delete spStagedArriveDate[idStr]; delete spStagedLeaveDate[idStr];
+    delete spStagedArriveBus[idStr]; delete spStagedLeaveBus[idStr];
     spRefreshRowBadges(idStr);
   }
   spUpdateBulkBtnLabel();
@@ -13166,6 +13182,7 @@ function spToggleAll(cb){
       delete spStagedArrive[idStr]; delete spStagedLeave[idStr];
       delete spStagedArriveAssign[idStr]; delete spStagedLeaveAssign[idStr];
       delete spStagedArriveDate[idStr]; delete spStagedLeaveDate[idStr];
+      delete spStagedArriveBus[idStr]; delete spStagedLeaveBus[idStr];
       spRefreshRowBadges(idStr);
     }
   });
@@ -13190,6 +13207,27 @@ function spRefreshRowBadges(id){
     var isBusL = (r.leaveTransport||'').trim()==='버스';
     leaveAssignSel.disabled = !isBusL; leaveAssignSel.style.opacity = isBusL?'':'.5';
   }
+  // [v392] 참석/귀가배정버스 select도 서버 값으로 원복(스테이징 취소 시)
+  var _spArriveTeamsR = bpComputeAssignedTeams('arrive');
+  var _spLeaveTeamsR  = bpComputeAssignedTeams('leave');
+  var arriveBusSel = $id('sp-arrive-bus-'+idStr);
+  if(arriveBusSel){
+    var arriveInfoR = bpBusAssignInfo(r,'arrive', _spArriveTeamsR);
+    arriveBusSel.innerHTML = busAssignOptionsHtml('arrive', arriveInfoR.value, r, 'all');
+    var isBusA2 = (r.arriveTransport||'').trim()==='버스';
+    arriveBusSel.disabled = !spCanEdit(r) || !isBusA2;
+    arriveBusSel.style.opacity = arriveBusSel.disabled?'.5':'';
+    arriveBusSel.style.borderColor = 'var(--border)'; arriveBusSel.style.borderStyle = 'solid';
+  }
+  var leaveBusSel = $id('sp-leave-bus-'+idStr);
+  if(leaveBusSel){
+    var leaveInfoR = bpBusAssignInfo(r,'leave', _spLeaveTeamsR);
+    leaveBusSel.innerHTML = busAssignOptionsHtml('leave', leaveInfoR.value, r, 'all');
+    var isBusL2 = (r.leaveTransport||'').trim()==='버스';
+    leaveBusSel.disabled = !spCanEdit(r) || !isBusL2;
+    leaveBusSel.style.opacity = leaveBusSel.disabled?'.5':'';
+    leaveBusSel.style.borderColor = 'var(--border)'; leaveBusSel.style.borderStyle = 'solid';
+  }
   spRedrawDateBadge(idStr, 'arrive');
   spRedrawDateBadge(idStr, 'leave');
 }
@@ -13202,6 +13240,8 @@ function spUpdateBulkBtnLabel(){
   Object.keys(spStagedLeaveAssign).forEach(function(k){ ids[k]=true; });
   Object.keys(spStagedArriveDate).forEach(function(k){ ids[k]=true; });
   Object.keys(spStagedLeaveDate).forEach(function(k){ ids[k]=true; });
+  Object.keys(spStagedArriveBus).forEach(function(k){ ids[k]=true; });
+  Object.keys(spStagedLeaveBus).forEach(function(k){ ids[k]=true; });
   var n = Object.keys(ids).length;
   btn.textContent = n ? ('🔁 일괄변경 ('+n+')') : '🔁 일괄변경';
 }
@@ -13229,6 +13269,19 @@ function spStageAssignType(id, kind, value){
   staged[idStr] = value;
   spSelectedIds.add(idStr);
   var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+  spUpdateBulkBtnLabel();
+}
+// [v392] 참석/귀가배정버스 select 변경 — 다른 셀들과 동일하게 서버 저장 없이 화면에만 예약(스테이징)
+function spStageBus(id, kind, value){
+  var idStr = String(id);
+  var r = retreat.find(function(x){ return String(x.id)===idStr; }); if(!r) return;
+  if(!spCanEdit(r)){ showToast('본인 소속 범위 밖 데이터는 수정할 수 없습니다.','error'); return; }
+  var staged = kind==='arrive' ? spStagedArriveBus : spStagedLeaveBus;
+  staged[idStr] = value;
+  spSelectedIds.add(idStr);
+  var tr = $id('sptr-'+idStr); if(tr){ var chk = tr.querySelector('.sp-chk-row'); if(chk) chk.checked = true; }
+  var sel = $id('sp-'+kind+'-bus-'+idStr);
+  if(sel){ sel.style.borderColor = '#8a5a00'; sel.style.borderStyle = 'dashed'; }
   spUpdateBulkBtnLabel();
 }
 function spEditDate(id, kind){
@@ -13463,16 +13516,19 @@ function spBulkToggleTransport(){
   Object.keys(spStagedLeave).forEach(function(k){ idSet[k]=true; });
   Object.keys(spStagedArriveAssign).forEach(function(k){ idSet[k]=true; });
   Object.keys(spStagedLeaveAssign).forEach(function(k){ idSet[k]=true; });
+  Object.keys(spStagedArriveBus).forEach(function(k){ idSet[k]=true; }); // [v392]
+  Object.keys(spStagedLeaveBus).forEach(function(k){ idSet[k]=true; }); // [v392]
   var idList = Object.keys(idSet);
   if(!idList.length){ alert('변경 예약(배지/콤보/날짜 클릭)된 항목이 없습니다.'); return; }
 
   var arriveDateN=Object.keys(spStagedArriveDate).length, leaveDateN=Object.keys(spStagedLeaveDate).length;
   var arriveN=Object.keys(spStagedArrive).length, leaveN=Object.keys(spStagedLeave).length;
   var arriveAssignN=Object.keys(spStagedArriveAssign).length, leaveAssignN=Object.keys(spStagedLeaveAssign).length;
-  if(!confirm('참석일자 '+arriveDateN+'건 / 귀가일자 '+leaveDateN+'건 / 참석교통 '+arriveN+'건 / 귀가교통 '+leaveN+'건 / 참석배정유형 '+arriveAssignN+'건 / 귀가배정유형 '+leaveAssignN+'건의 변경사항을 저장하시겠습니까? (총 '+idList.length+'명)')) return;
+  var arriveBusN=Object.keys(spStagedArriveBus).length, leaveBusN=Object.keys(spStagedLeaveBus).length; // [v392]
+  if(!confirm('참석일자 '+arriveDateN+'건 / 귀가일자 '+leaveDateN+'건 / 참석교통 '+arriveN+'건 / 귀가교통 '+leaveN+'건 / 참석배정유형 '+arriveAssignN+'건 / 귀가배정유형 '+leaveAssignN+'건 / 참석배정버스 '+arriveBusN+'건 / 귀가배정버스 '+leaveBusN+'건의 변경사항을 저장하시겠습니까? (총 '+idList.length+'명)')) return;
 
   showLoading(true);
-  var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, failCount=0, blockedCount=0;
+  var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, arriveBusCount=0, leaveBusCount=0, failCount=0, blockedCount=0;
   var chain = idList.reduce(function(p, idStr){
     return p.then(function(){
       var r = retreat.find(function(x){ return String(x.id)===idStr; });
@@ -13487,14 +13543,48 @@ function spBulkToggleTransport(){
       if(spStagedLeaveAssign.hasOwnProperty(idStr))  changes.leaveAssign = spStagedLeaveAssign[idStr];
       return bpApplyRowChanges(r, changes)
         .then(function(res){
-          if(!res || !res.changed) return;
-          var f = res.fields;
-          if(f.arriveDate) arriveDateCount++;
-          if(f.leaveDate) leaveDateCount++;
-          if(f.arriveTransport) arriveCount++;
-          if(f.leaveTransport) leaveCount++;
-          if(f.arriveAssign) arriveAssignCount++;
-          if(f.leaveAssign) leaveAssignCount++;
+          if(res && res.changed){
+            var f = res.fields;
+            if(f.arriveDate) arriveDateCount++;
+            if(f.leaveDate) leaveDateCount++;
+            if(f.arriveTransport) arriveCount++;
+            if(f.leaveTransport) leaveCount++;
+            if(f.arriveAssign) arriveAssignCount++;
+            if(f.leaveAssign) leaveAssignCount++;
+          }
+        })
+        .then(function(){
+          // [v392] 참석/귀가배정버스 — 버스배정 화면(bp)과 동일하게 탑승자시트+요약시트 갱신
+          var rid = r.receiptId||'';
+          var teamKey = busGetTeamKey(r);
+          var jobs = [];
+          var nowArrive = (spStagedArrive.hasOwnProperty(idStr)?spStagedArrive[idStr]:r.arriveTransport||'').trim();
+          var nowLeave  = (spStagedLeave.hasOwnProperty(idStr) ?spStagedLeave[idStr] :r.leaveTransport ||'').trim();
+          if(spStagedArriveBus.hasOwnProperty(idStr) && rid && nowArrive==='버스'){
+            var newArrBus = spStagedArriveBus[idStr]||'';
+            var prevArrBus = _rosterFullArr[rid]||'';
+            if(newArrBus!==prevArrBus){
+              jobs.push(
+                _updateRosterBusAssign(rid, newArrBus, '탑승자_참석')
+                  .then(function(){ _rosterFullArr[rid]=newArrBus; arriveBusCount++; })
+                  .then(function(){ return _updateBusSummarySheet('arrive', teamKey, prevArrBus||'(미배정)', newArrBus||'(미배정)'); })
+                  .catch(function(e){ console.warn('[참석배정버스 변경 실패]', r.name, e&&e.message||e); })
+              );
+            }
+          }
+          if(spStagedLeaveBus.hasOwnProperty(idStr) && rid && nowLeave==='버스'){
+            var newLvBus = spStagedLeaveBus[idStr]||'';
+            var prevLvBus = _rosterFullLv[rid]||'';
+            if(newLvBus!==prevLvBus){
+              jobs.push(
+                _updateRosterBusAssign(rid, newLvBus, '탑승자_귀가')
+                  .then(function(){ _rosterFullLv[rid]=newLvBus; leaveBusCount++; })
+                  .then(function(){ return _updateBusSummarySheet('leave', teamKey, prevLvBus||'(미배정)', newLvBus||'(미배정)'); })
+                  .catch(function(e){ console.warn('[귀가배정버스 변경 실패]', r.name, e&&e.message||e); })
+              );
+            }
+          }
+          return jobs.reduce(function(pp, job){ return pp.then(function(){ return job; }); }, Promise.resolve());
         })
         .catch(function(e){ failCount++; console.warn('[일괄변경 실패]', r.name, e&&e.message||e); });
     });
@@ -13504,9 +13594,10 @@ function spBulkToggleTransport(){
     save(); updateStats(); updateBusUnassignedBadge();
     spStagedArrive = {}; spStagedLeave = {}; spStagedArriveAssign = {}; spStagedLeaveAssign = {};
     spStagedArriveDate = {}; spStagedLeaveDate = {};
+    spStagedArriveBus = {}; spStagedLeaveBus = {}; // [v392]
     spSelectedIds.clear();
     doSearch();
-    var msg = '✅ 일괄변경 완료 (참석일자 '+arriveDateCount+'건 / 귀가일자 '+leaveDateCount+'건 / 참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건)'
+    var msg = '✅ 일괄변경 완료 (참석일자 '+arriveDateCount+'건 / 귀가일자 '+leaveDateCount+'건 / 참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건 / 참석배정버스 '+arriveBusCount+'건 / 귀가배정버스 '+leaveBusCount+'건)'
       +(blockedCount?(' · 범위밖 제외 '+blockedCount+'건'):'')+(failCount?(' · 실패 '+failCount+'건'):'');
     showToast(msg, failCount ? 'error' : 'success');
   }).finally(function(){
