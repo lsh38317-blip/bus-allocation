@@ -456,6 +456,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
   .content-area{padding:12px 14px;}
   .card{padding:14px 16px;}
   .form-grid{grid-template-columns:1fr 1fr;}
+  /* [v391] 버스운행설정 "등록/조회" 2단 레이아웃 — 인라인 grid라 기존 반응형 처리를 못 받고 있었음.
+     좁은 화면에서 두 트랙이 짓눌려 글자가 한 글자씩 줄바꿈되는 등 화면이 깨지는 문제 수정. */
+  .bb-info-grid{grid-template-columns:1fr!important;}
   .search-row .form-group{min-width:100px;}
   .welcome-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
   .welcome-stat{padding:12px 8px;border-radius:10px;}
@@ -1068,7 +1071,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
           <!-- 탭1: 버스운행설정 — 왼쪽 조회 / 오른쪽 등록 -->
           <div id="bbbase-panel-info">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+            <div class="bb-info-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
 
               <!-- 왼쪽: 등록 -->
               <!-- [v387] min-width:0 — 내부 운전자/승하차위치/선탑자 표가 넓어져도 이 그리드 트랙 자체가
@@ -1301,14 +1304,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <option value="">배정유형: 전체</option>
             </select>
             <div style="width:1px;height:24px;background:var(--border);margin:0 2px;"></div>
-            <button id="bus-tab-leader"  class="btn btn-navy btn-sm"    onclick="busTab('leader')" style="display:none;">🎯 선탑자 지정</button>
-            <button id="bus-tab-teams"   class="btn btn-primary btn-sm" onclick="busTab('teams')">👥 버스신청자불러오기</button>
+            <button id="bus-tab-leader"  class="btn btn-primary btn-sm" onclick="busTab('leader')" style="display:none;">🎯 선탑자 지정</button>
+            <button id="bus-tab-teams"   class="btn btn-navy btn-sm" onclick="busTab('teams')">👥 버스신청자불러오기</button>
             <button id="bus-tab-assign"  class="btn btn-primary btn-sm" onclick="busTab('assign')">🚌 버스 배정</button>
             <button id="bus-tab-summary" class="btn btn-primary btn-sm" onclick="busTab('summary')">📋 배정 현황</button>
           </div>
 
           <!-- ③ 팀 관리 탭 -->
-          <div id="bus-panel-teams" style="display:none;">
+          <div id="bus-panel-teams">
             <div class="card" style="margin-bottom:14px;">
               <div class="card-header">
                 <div class="card-title" id="bus-import-card-title">🔗 참석자 데이터 연동</div>
@@ -1486,7 +1489,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           </div>
 
           <!-- ⑥ 선탑자 지정 탭 (관리자 전용) -->
-          <div id="bus-panel-leader">
+          <div id="bus-panel-leader" style="display:none;">
             <!-- [v285] 버스운행설정의 운행방향(=참석관리 토글)+배정유형(=상단 배정유형 콤보) 기준으로
                  매칭되는 등록의 "배정대수"만큼 선탑자 입력칸(교구/구역/이름)을 생성한다. -->
             <div style="display:flex;gap:6px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
@@ -4533,7 +4536,7 @@ var _busDragFromBusLast= null;
 var _busDragTypeLast   = '';
 var busDragType    = '';   // 'arrive' | 'leave'
 var busDragFromBus = null; // 출발 버스 ID (버스→버스 이동 시 설정)
-var busCurrentTab  = 'leader'; // [v284] 탭 순서 변경(선탑자 지정이 첫번째)에 맞춰 기본 탭도 선탑자 지정으로 변경
+var busCurrentTab  = 'teams'; // [v390] 선탑자 지정 탭 숨김에 맞춰 기본 탭을 버스신청자불러오기로 변경
 // [v41] 선탑자ID 캐시 — busLeaderRender()가 명시적 클릭(배정대수불러오기) 시 채워 넣음.
 // busAutoAssign()이 재배정 시 선탑자를 승계할 때 이 캐시를 참조한다(패널 진입만으로는 절대 채우지 않음 — v286 원칙 유지).
 // 키: '배정유형|참석또는귀가|버스명' → 선탑자ID
@@ -11186,7 +11189,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v389_leader_tab_hide_reset_move';
+var CACHE_VERSION = 'v391_bb_mobile_stack';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -12074,16 +12077,16 @@ function switchPanel(name, skipRender) {
       if(_goalLoaded){
         _busApplyGoalEvent('bus-sel-event', 'bus-sel-year');
         _doRestoreAfterGoal();
-        busTab('leader'); // [v284] 탭 순서 변경에 맞춰 기본 탭을 선탑자 지정으로 변경
+        busTab('teams'); // [v390] 선탑자 지정 탭 숨김에 맞춰 기본 탭을 버스신청자불러오기로 변경
       } else if(USE_SHEET()){
         _goalFetchFromSheet(function(){
           _busApplyGoalEvent('bus-sel-event', 'bus-sel-year');
           _doRestoreAfterGoal();
-          busTab('leader');
+          busTab('teams'); // [v390]
         }, {});
       } else {
         _doRestoreAfterGoal();
-        busTab('leader');
+        busTab('teams'); // [v390]
       }
     }
     if(name==='busview'){
