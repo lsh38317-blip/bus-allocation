@@ -14751,9 +14751,23 @@ function saveEdit() {
 // ══════════════════════════════════════════════════════════════════
 // [v398] 참석자 삭제 공용 유틸 — deleteRow(sp)/bpDeleteRow(bp) 양쪽에서 재사용
 // ══════════════════════════════════════════════════════════════════
+// [v404] 접수ID가 '99'로 시작하면 임시/수동 등록 건으로 간주해 실제 삭제, 그 외(정상 접수 건)는
+// 원본 접수 정보(이름·연락처·교구/구역 등)를 보존하고 버스신청 관련 필드만 초기화한다.
+function _deleteIsRealDelete(r){
+  return /^99/.test(String((r&&r.receiptId)||''));
+}
+// 초기화 대상 6개 필드(참석/귀가 일자·교통수단·배정유형) — deleteRow/bpDeleteRow 공용
+var _DELETE_RESET_FIELDS = {
+  arriveDate:'', arriveTransport:'', arriveAssignType:'',
+  leaveDate:'',  leaveTransport:'',  leaveAssignType:''
+};
 function _deleteConfirmMsg(r){
+  var who = r ? ((r.parish||'-')+' '+(r.district||'-')+' '+maskName(r.name||'-')) : '';
+  if(r && !_deleteIsRealDelete(r)){
+    return '정말 초기화하시겠습니까?\n\n'+who+'\n\n삭제 대신 참석·귀가 신청 정보(일자·교통수단·배정유형)만 초기화되며,\n접수 정보(이름·연락처·교구/구역 등)는 유지됩니다.\n되돌릴 수 없습니다.';
+  }
   if(!r) return '정말 삭제하시겠습니까?\n\n되돌릴 수 없습니다.';
-  return '정말 삭제하시겠습니까?\n\n'+(r.parish||'-')+' '+(r.district||'-')+' '+maskName(r.name||'-')+'\n\n되돌릴 수 없습니다.';
+  return '정말 삭제하시겠습니까?\n\n'+who+'\n\n되돌릴 수 없습니다.';
 }
 // 삭제 대상자가 참석/귀가 버스에 배정돼 있으면 탑승자_참석/귀가 시트의 해당 행과
 // 버스배정_참석/귀가요약의 탑승인원 카운트를 함께 정리한다. 캐스케이드 실패는 무시하고
@@ -14786,17 +14800,32 @@ function deleteRow(id, fromModal) {
     save(); if(fromModal) closeModal('detail-modal');
     doSearch(); updateStats(); showToast('삭제되었습니다.','info'); return;
   }
+  var isRealDelete = _deleteIsRealDelete(target);
   var deleteKey = (target && target.receiptId) ? target.receiptId : String(id);
   showLoading(true);
   _deleteBusRosterCascade(target).then(function(){
-    return apiCall({action:'delete', sheetName:'참석인원명단', id:deleteKey});
+    if(isRealDelete){
+      return apiCall({action:'delete', sheetName:'참석인원명단', id:deleteKey});
+    }
+    // [v404] 접수ID가 '99'로 시작하지 않으면 실제 삭제 대신 버스신청 관련 필드만 초기화(update)
+    var clearedRow = Object.assign({}, target, _DELETE_RESET_FIELDS);
+    var maskedRow = Object.assign({}, clearedRow, {name: maskName(clearedRow.name||'')});
+    return apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedRow)));
   })
     .then(function(res){
       if(res.success){
-        retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
+        if(isRealDelete){
+          retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
+        } else {
+          var idx = retreat.findIndex(function(x){ return String(x.id)===String(id); });
+          if(idx!==-1) retreat[idx] = Object.assign({}, retreat[idx], _DELETE_RESET_FIELDS);
+        }
         if(fromModal) closeModal('detail-modal');
-        doSearch(); updateStats(); showToast('삭제되었습니다.','info');
-      } else { showToast('삭제 실패: '+(res.message||res.error||'알 수 없는 오류'),'error'); }
+        doSearch(); updateStats();
+        showToast(isRealDelete ? '삭제되었습니다.' : '참석·귀가 신청 정보가 초기화되었습니다.', 'info');
+      } else {
+        showToast((isRealDelete?'삭제':'초기화')+' 실패: '+(res.message||res.error||'알 수 없는 오류'),'error');
+      }
     })
     .catch(function(e){ showToast('서버 오류: '+e.message,'error'); })
     .finally(function(){ showLoading(false); });
@@ -15991,17 +16020,32 @@ function bpDeleteRow(id, fromModal){
     save(); if(fromModal) closeModal('bp-detail-modal');
     bpDoSearch(); updateStats(); showToast('삭제되었습니다.','info'); return;
   }
+  var isRealDelete = _deleteIsRealDelete(target);
   var deleteKey=(target && target.receiptId) ? target.receiptId : String(id);
   showLoading(true);
   _deleteBusRosterCascade(target).then(function(){
-    return apiCall({action:'delete', sheetName:'참석인원명단', id:deleteKey});
+    if(isRealDelete){
+      return apiCall({action:'delete', sheetName:'참석인원명단', id:deleteKey});
+    }
+    // [v404] 접수ID가 '99'로 시작하지 않으면 실제 삭제 대신 버스신청 관련 필드만 초기화(update)
+    var clearedRow = Object.assign({}, target, _DELETE_RESET_FIELDS);
+    var maskedRow = Object.assign({}, clearedRow, {name: maskName(clearedRow.name||'')});
+    return apiCall(Object.assign({action:'update', sheetName:'참석인원명단'}, toSheetObj(maskedRow)));
   })
     .then(function(res){
       if(res.success){
-        retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
+        if(isRealDelete){
+          retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
+        } else {
+          var idx = retreat.findIndex(function(x){ return String(x.id)===String(id); });
+          if(idx!==-1) retreat[idx] = Object.assign({}, retreat[idx], _DELETE_RESET_FIELDS);
+        }
         if(fromModal) closeModal('bp-detail-modal');
-        bpDoSearch(); updateStats(); showToast('삭제되었습니다.','info');
-      } else { showToast('삭제 실패: '+(res.message||res.error||'알 수 없는 오류'),'error'); }
+        bpDoSearch(); updateStats();
+        showToast(isRealDelete ? '삭제되었습니다.' : '참석·귀가 신청 정보가 초기화되었습니다.', 'info');
+      } else {
+        showToast((isRealDelete?'삭제':'초기화')+' 실패: '+(res.message||res.error||'알 수 없는 오류'),'error');
+      }
     })
     .catch(function(e){ showToast('서버 오류: '+e.message,'error'); })
     .finally(function(){ showLoading(false); });
