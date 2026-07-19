@@ -1919,7 +1919,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
             </div>
             <div class="table-wrap">
-              <table style="width:100%;">
+              <table style="min-width:900px;">
                 <thead>
                   <tr>
                     <th><input type="checkbox" onchange="spToggleAll(this)" title="현재 페이지 전체 선택"></th>
@@ -13635,17 +13635,33 @@ function busAssignOptionsHtml(type, curVal, r, context){
       return _bvwSortKey(a) - _bvwSortKey(b);
     });
   } else if(context === 'all'){
-    // [v345] 버스배정인원관리(bp) 전용 — 소속 팀 제한 없이 전체 버스 목록 중 자유 선택.
-    // _rosterFullArr/Lv(전체 인덱스)의 distinct 배정호차 + 아직 아무도 안 탄 빈 버스(busArriveBuses/LeaveBuses,
-    // 로드돼 있는 경우만)까지 합쳐 목록을 구성한다.
+    // [v393] 버스배정인원관리(bp)/버스신청(sp)/상세수정모달 공용 — "전체 버스 목록 자유선택"이던
+    // 기존 로직이 배정유형 구분 없이 _rosterFullArr/Lv(모든 배정유형 통합 인덱스)와 전역
+    // busArriveBuses/LeaveBuses(다른 배정유형·다른 화면에서 마지막으로 로드된 값이 잔존 가능)를
+    // 그대로 합쳐 옵션을 만들다 보니 서로 다른 배정유형의 버스가 뒤섞여 표시되는 문제가 있었다.
+    // → 이 행(r) 자신의 배정유형(참석: arriveAssignType, 귀가: leaveAssignType)과 동일한
+    // 배정유형의 버스만 노출하도록 retreat 전체를 배정유형 기준으로 필터링한다.
     var fullIdx2 = type === 'leave' ? _rosterFullLv : _rosterFullArr;
+    var targetAssignType = r ? String((type==='leave' ? r.leaveAssignType : r.arriveAssignType)||'').trim() : '';
     var nameSet2 = {};
-    Object.keys(fullIdx2).forEach(function(rid){
-      var v = (fullIdx2[rid]||'').trim();
-      if(v && v !== '미배정') nameSet2[v] = true;
-    });
-    var busesAll = type==='leave' ? busLeaveBuses : busArriveBuses;
-    (busesAll||[]).forEach(function(b){ if(b && b.name) nameSet2[b.name] = true; });
+    if(targetAssignType){
+      (retreat||[]).forEach(function(m){
+        var mTransport = String((type==='leave' ? m.leaveTransport : m.arriveTransport)||'').trim();
+        if(mTransport !== '버스') return;
+        var mAssign = String((type==='leave' ? m.leaveAssignType : m.arriveAssignType)||'').trim();
+        if(mAssign !== targetAssignType) return;
+        var mrid = String(m.receiptId||'').trim(); if(!mrid) return;
+        var v = (fullIdx2[mrid]||'').trim();
+        if(v && v !== '미배정') nameSet2[v] = true;
+      });
+      // 등록됐지만 아직 아무도 안 탄 "빈 버스"는, 현재 화면에 배정유형 선택자(#bus-sel-assigntype)가
+      // 있고 그 값이 이 행의 배정유형과 일치할 때만 포함(다른 배정유형·다른 화면 잔존 데이터 오염 방지)
+      var curSelType = (($id('bus-sel-assigntype')||{value:''}).value||'').trim();
+      if(curSelType && curSelType === targetAssignType){
+        var busesAll = type==='leave' ? busLeaveBuses : busArriveBuses;
+        (busesAll||[]).forEach(function(b){ if(b && b.name) nameSet2[b.name] = true; });
+      }
+    }
     if(cur && cur !== '미배정') nameSet2[cur] = true;
     names = Object.keys(nameSet2).sort(function(a,b){
       return _bvwSortKey(a) - _bvwSortKey(b);
