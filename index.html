@@ -368,6 +368,20 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 .vw-inp option{background:var(--navy);color:#fff;}
 .vw-sep{width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 2px;}
 .vw-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+/* [v409] 대기중/파일/행 상태표시 + 수양회종류 + 파일업로드를 묶는 강조 그룹 —
+   툴바(네이비) 배경과 다른 밝은 배경을 줘서 구분되게 함 */
+.vw-intake-group{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--sky);
+  border:1px solid rgba(35,74,138,.3);
+  border-radius:10px;
+  padding:6px 12px;
+}
+.vw-inp-light{
+  background:#fff;border:1px solid rgba(26,58,107,.25);color:var(--navy);
+}
+.vw-inp-light:focus{border-color:var(--navy);}
+.vw-inp-light option{background:#fff;color:var(--navy);}
 .vw-search{
   background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:6px;
   padding:6px 10px;font-size:.78rem;color:#fff;outline:none;width:140px;
@@ -2050,30 +2064,31 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
             <!-- 뷰어 툴바 -->
             <div class="vw-toolbar">
-              <!-- [v406] 파일업로드 상태표시(구 Google Sheets 연동 카드에서 이동) -->
-              <div id="vw-dot-wrap" style="display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--muted);padding:0 16px;">
-                <span id="vwDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;transition:background .3s;"></span>
-                <span id="vwDotTxt">대기중</span>
-                <span style="margin-left:8px;">파일 <strong id="vwHdrFile" style="color:var(--text);">-</strong></span>
-                <span style="margin-left:6px;">행 <strong id="vwHdrRows" style="color:var(--text);">-</strong></span>
+              <!-- [v406] 대기중/파일/행 상태표시 -->
+              <div class="vw-intake-group">
+                <div id="vw-dot-wrap" style="display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--navy);">
+                  <span id="vwDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;transition:background .3s;"></span>
+                  <span id="vwDotTxt">대기중</span>
+                  <span style="margin-left:8px;">파일 <strong id="vwHdrFile" style="color:var(--navy);">-</strong></span>
+                  <span style="margin-left:6px;">행 <strong id="vwHdrRows" style="color:var(--navy);">-</strong></span>
+                </div>
               </div>
               <!-- 오른쪽 액션 버튼들 -->
               <div class="vw-actions" style="margin-left:auto;">
-                <!-- [v259] 수양회종류: 파일 업로드 버튼 바로 앞으로 이동 -->
+                <!-- [v411] 수양회종류/파일업로드/처리를 등록데이터 초기화 버튼 앞(오른쪽 그룹 맨 앞)으로 이동 -->
                 <div class="vw-igrp">
-                  <span class="vw-lbl">수양회종류</span>
+                  <span class="vw-lbl" style="color:#fff;opacity:1;font-weight:800;">수양회종류</span>
                   <select class="vw-inp" id="inpSeason" onchange="vwRenderTable()">
-                    <option value="">전체</option>
                     <option value="춘계">춘계</option>
                     <option value="하계" selected>하계</option>
                     <option value="추계">추계</option>
                     <option value="동계">동계</option>
                   </select>
                 </div>
-                <div class="vw-sep"></div>
                 <input type="file" id="vwFileInput" accept=".csv,.tsv,.txt"
                   style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
-                <button class="btn btn-navy btn-sm" onclick="document.getElementById('vwFileInput').click()">
+                <!-- [v411] 파일 업로드 버튼 배경색: 골드 → 하늘색 -->
+                <button class="btn btn-sm" style="background:var(--sky);color:var(--navy);font-weight:700;" onclick="document.getElementById('vwFileInput').click()">
                   📂 파일 업로드
                 </button>
                 <button id="vwBtnSheet" class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;"
@@ -2081,6 +2096,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px;margin-right:3px;"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
                   처리
                 </button>
+                <div class="vw-sep"></div>
                 <button class="btn btn-danger btn-sm" onclick="vwClearAllConfirm()">🗑 등록데이터 초기화</button>
                 <button class="btn btn-green btn-sm" onclick="exportExcel()">⬇️ 등록데이터 CSV</button>
                 <!-- [v260] 엑셀업로드시간: 등록데이터 CSV 버튼 뒤로 이동 -->
@@ -4034,6 +4050,37 @@ function _procTimeToStr(raw){
   if(m) return m[1]+'-'+m[2]+'-'+m[3]+' '+m[4]+':'+m[5]+':'+m[6];
   return null;
 }
+// [v409] 참석인원관리 수양회종류 콤보 — 기초정보관리(CODE_MAJOR/CODE_MINOR)에서 동적 로드.
+// 조회 실패/대상 없음 시 HTML에 이미 있는 고정 옵션(춘계/하계/추계/동계)을 그대로 유지(폴백).
+// 다른 화면의 수양회종류 콤보는 이번 변경 범위에 포함하지 않음(참석인원관리 한정).
+function vwLoadSeasonOptions(cb){
+  var sel = $id('inpSeason');
+  if(!sel || !USE_SHEET()){ if(cb) cb(); return; }
+  var curVal = sel.value;
+  apiCall({action:'getAll', sheetName:'CODE_MAJOR'})
+    .then(function(res){
+      var majors = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      var major = majors.find(function(m){ return String(m['대분류명']||'').trim()==='수양회종류'; });
+      if(!major) return null;
+      return apiCall({action:'getAll', sheetName:'CODE_MINOR'}).then(function(r2){
+        var minors = (r2&&r2.success) ? (r2.data||r2.rows||[]) : [];
+        return minors.filter(function(m){
+          return String(m['대분류ID'])===String(major['대분류ID']) && (m['사용여부']||'Y')==='Y';
+        }).sort(function(a,b){ return (Number(a['정렬순서'])||9999)-(Number(b['정렬순서'])||9999); });
+      });
+    })
+    .then(function(minors){
+      if(!minors || !minors.length){ if(cb) cb(); return; } // 폴백: 기존 하드코딩 옵션 유지
+      var names = minors.map(function(m){ return (m['중분류명']||'').trim(); }).filter(Boolean);
+      if(!names.length){ if(cb) cb(); return; }
+      var defaultVal = names.indexOf('하계')>=0 ? '하계' : names[0];
+      sel.innerHTML = names.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+      // 이미 유효하게 선택돼 있던 값이 새 목록에도 있으면 유지, 없으면 기본값(하계 우선) 적용
+      sel.value = names.indexOf(curVal)>=0 ? curVal : defaultVal;
+      if(cb) cb();
+    })
+    .catch(function(){ if(cb) cb(); }); // 조회 실패 → 폴백(기존 옵션 그대로)
+}
 // 엑셀업로드시간: 참석인원명단 시트의 처리일시 컬럼 중 최댓값 조회
 function vwLoadLastProcTime(){
   var el=document.getElementById('vwLastProcTime');
@@ -4079,6 +4126,13 @@ function vwSaveToSheet(){
   if(!vwAllRows.length){ vwToast('먼저 파일을 업로드해주세요','err'); return; }
   if(!USE_SHEET()){
     showToast('Google Sheets URL이 설정되지 않았습니다. 엑셀관리 메뉴에서 먼저 설정해 주세요.','error');
+    return;
+  }
+  // [v408] 수양회종류는 CSV가 아닌 상단 드롭다운 값을 그대로 신규 등록 행에 반영하므로,
+  // "전체"(공백) 상태로는 처리를 막아 신규 인원의 수양회종류가 빈 값으로 저장되는 사고를 방지한다.
+  var seasonVal = ($id('inpSeason')||{value:''}).value;
+  if(!seasonVal){
+    showToast('⚠️ 수양회종류를 선택해주세요. "전체" 상태로는 처리할 수 없습니다.','error');
     return;
   }
   vwCheckDuplicatesAndPreview();
@@ -4348,6 +4402,18 @@ function vwConfirmUpload(){
   var updItems = _vwUploadPending.filter(function(r){ return r._status==='upd'; });
   var delItems = _vwUploadPending.filter(function(r){ return r._status==='del'; });
   var dupCnt   = _vwUploadPending.filter(function(r){ return r._status==='dup'; }).length;
+
+  // [v408] 미리보기 배너를 검토하는 사이 상단 수양회종류 드롭다운이 "전체"(공백)로 바뀌었을 수
+  // 있으므로, 실제 신규 등록 직전에 한 번 더 확인한다. 배너/pending 상태는 유지해 재확인 후 다시
+  // 확정할 수 있게 한다.
+  if(newItems.length){
+    var seasonVal = ($id('inpSeason')||{value:''}).value;
+    if(!seasonVal){
+      showToast('⚠️ 수양회종류를 선택해주세요. "전체" 상태로는 신규 등록을 처리할 수 없습니다.','error');
+      return;
+    }
+  }
+
   var banner=document.getElementById('upload-preview-banner');
   var wrap=document.getElementById('upload-preview-wrap');
   if(banner) banner.style.display='none';
@@ -12304,6 +12370,7 @@ function switchPanel(name, skipRender) {
       codeLoadAll();
     }
     if(name==='excel'){
+      vwLoadSeasonOptions(function(){ vwRenderTable(); }); // [v409] 기초정보관리 수양회종류 코드 반영 후 필터 갱신
       vwLoadLastProcTime();
       vwRenderSheetWarn(); // [v406] 연동 미설정 시 경고 배너 노출
       if(USE_SHEET()){ loadData(); }  // 참석인원명단 재조회 — 로컬 캐시 유무와 무관하게 항상 최신화
