@@ -4930,6 +4930,7 @@ function _busRowsToBuses(rows, driverMap, opts){
         alightLoc:  dIsObj ? (dEntry.alightLoc||'')  : '',
         driverName: dIsObj ? (dEntry.driverName||'') : '',
         departTime: dIsObj ? (dEntry.departTime||'') : '',
+        departDate: dIsObj ? (dEntry.departDate||'') : '', // [v400] "버스 배정 현황" 카드 출발일자 표시/정렬용
         isExtra:   false,
         slots:     [],
         leaderId:  dIsObj ? (dEntry.leaderId||'') : (dEntry||'')
@@ -9949,6 +9950,21 @@ function _bvwSortKey(name){
   var m = String(name||'').match(/(\d+)/);
   return m ? parseInt(m[1],10) : 999999;
 }
+// [v400] "버스 배정 현황" 카드 정렬 — 기존 배차표 다운로드(CSV) 로직의 배정유형 고정순서와 동일하게 유지
+var _BUS_ASSIGN_TYPE_ORDER = ['선발대','본대(봉사)','본대','중고등부','직장조'];
+function _bvwAssignTypeRank(atype){
+  var idx = _BUS_ASSIGN_TYPE_ORDER.indexOf(atype);
+  return idx===-1 ? _BUS_ASSIGN_TYPE_ORDER.length : idx;
+}
+// 출발일자+출발시간 오름차순 → (같으면) 배정유형 고정순서 → (같으면) 배차 번호 오름차순
+function _bvwBusSortCompare(a, b){
+  var da = (a.departDate||'')+' '+(a.departTime||'');
+  var db = (b.departDate||'')+' '+(b.departTime||'');
+  if(da !== db) return da < db ? -1 : 1;
+  var ra = _bvwAssignTypeRank(a.assignType), rb = _bvwAssignTypeRank(b.assignType);
+  if(ra !== rb) return ra - rb;
+  return _bvwSortKey(a.rawName||a.name) - _bvwSortKey(b.rawName||b.name);
+}
 // [v358] 신규: 버스배정_기초정보 + 버스배정_운전자정보만으로 배정유형별 전체 버스(1호~배정대수) 메타 구성.
 // 요약시트(버스배정_참석/귀가요약)는 배정유형 컬럼이 비어있거나 신뢰할 수 없는 경우가 있어(예: 배정유형이
 // 공백인 상태로 저장된 과거 데이터) 조인 키가 충돌해 엉뚱한 배정유형의 기사/차량번호가 섞여 나오는
@@ -10610,7 +10626,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
   // bvwType 기반 현재 버스/팀 데이터
   var curBuses = bvwType==='leave' ? busLeaveBuses : busArriveBuses;
   var curTeams = bvwType==='leave' ? busLeaveTeams  : busArriveTeams;
-  var renderBuses = viewBuses || curBuses;
+  var renderBuses = (viewBuses || curBuses).slice().sort(_bvwBusSortCompare); // [v400] 출발일자+시간→배정유형→배차 순 정렬(복사본만 정렬)
   var html = renderBuses.map(function(bus){
     // 선탑자 이름
     var busLeaderName='';
@@ -10644,6 +10660,7 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
       '<span style="font-size:.77rem;color:var(--muted);">'+slots.length+'팀</span>'+
       '<span style="font-size:.78rem;color:var(--text2);">승차위치: <strong style="color:var(--text);">'+esc(bus.boardLoc||'-')+'</strong></span>'+
       '<span style="font-size:.78rem;color:var(--text2);">하차위치: <strong style="color:var(--text);">'+esc(bus.alightLoc||'-')+'</strong></span>'+
+      '<span style="font-size:.78rem;color:var(--text2);">출발일자: <strong style="color:var(--text);">'+esc(bus.departDate ? (_bvwFormatMD(bus.departDate)+'('+_bvwWeekdayKR(bus.departDate)+')') : '-')+'</strong></span>'+
       '<span style="font-size:.78rem;color:var(--text2);">출발시간: <strong style="color:var(--text);">'+esc(bus.departTime||'-')+'</strong></span>'+
       '<span style="font-size:.78rem;color:var(--text2);">운전자: <strong style="color:var(--text);">'+esc(bus.driverName||'-')+'</strong></span>'+
       '<span style="font-size:.78rem;color:var(--text2);">선탑자: <strong style="color:var(--text);">'+esc(busLeaderName||'미지정')+'</strong></span>'+
