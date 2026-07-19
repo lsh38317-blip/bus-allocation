@@ -1307,7 +1307,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <button id="bus-tab-leader"  class="btn btn-primary btn-sm" onclick="busTab('leader')" style="display:none;">🎯 선탑자 지정</button>
             <button id="bus-tab-teams"   class="btn btn-navy btn-sm" onclick="busTab('teams')">👥 버스신청자불러오기</button>
             <button id="bus-tab-assign"  class="btn btn-primary btn-sm" onclick="busTab('assign')">🚌 버스 배정</button>
-            <button id="bus-tab-summary" class="btn btn-primary btn-sm" onclick="busTab('summary')">📋 배정 현황</button>
+            <button id="bus-tab-summary" class="btn btn-primary btn-sm" style="display:none;" onclick="busTab('summary')">📋 배정 현황</button>
           </div>
 
           <!-- ③ 팀 관리 탭 -->
@@ -10077,7 +10077,19 @@ function srInit(){
   }
   populateParishSelect('sr-s-parish','전체');
   srApplyDefaultScope();
-  srRosterReload();
+  // [v402] 교회목표 행사명 자동 매핑 — 버스배정/버스배정현황 화면과 동일한 순서(행사명 적용 → 조회)로 처리.
+  // (이 순서를 지키지 않으면 회차가 기본값 "1차"로 남아 실제 진행 중인 회차 데이터가 조회에서 빠짐)
+  if(_goalLoaded){
+    _busApplyGoalEvent('sr-sel-event', 'sr-sel-year');
+    srRosterReload();
+  } else if(USE_SHEET()){
+    _goalFetchFromSheet(function(){
+      _busApplyGoalEvent('sr-sel-event', 'sr-sel-year');
+      srRosterReload();
+    }, {});
+  } else {
+    srRosterReload();
+  }
 }
 function srSetType(type){
   srType = type;
@@ -10098,7 +10110,16 @@ function srRosterReload(){
   // sr- 전용 필터값을 busview-sel-* 로 동기화해 busviewReload()의 기존 조회 로직을 그대로 재사용
   var f = _srGetFilter();
   var yEl=$id('busview-sel-year'), sEl=$id('busview-sel-season'), eEl=$id('busview-sel-event');
-  if(yEl) yEl.value = f.year;
+  if(yEl){
+    // [v402] "버스 배정 현황" 화면에 한 번도 진입하지 않으면 busview-sel-year가 빈 상태(옵션 없음)라
+    // value 대입이 조용히 실패해 연도 필터가 빈 값이 되던 버그 — 해당 옵션이 없으면 동적으로 추가한다.
+    if(f.year && ![].slice.call(yEl.options).some(function(o){ return o.value===f.year; })){
+      var opt = document.createElement('option');
+      opt.value = f.year; opt.textContent = f.year+'년';
+      yEl.appendChild(opt);
+    }
+    yEl.value = f.year;
+  }
   if(sEl) sEl.value = f.season;
   if(eEl) eEl.value = f.event;
   busviewReload(function(){
@@ -10186,7 +10207,15 @@ function srExportBusSchedule(){
   // sr- 필터값을 busview-sel-*로 동기화 + bvwType을 srType으로 맞춰 기존 배차표 다운로드 로직 그대로 재사용
   var f = _srGetFilter();
   var yEl=$id('busview-sel-year'), sEl=$id('busview-sel-season'), eEl=$id('busview-sel-event');
-  if(yEl) yEl.value = f.year;
+  if(yEl){
+    // [v402] srRosterReload()와 동일한 사유로 옵션 없을 시 동적 추가
+    if(f.year && ![].slice.call(yEl.options).some(function(o){ return o.value===f.year; })){
+      var opt = document.createElement('option');
+      opt.value = f.year; opt.textContent = f.year+'년';
+      yEl.appendChild(opt);
+    }
+    yEl.value = f.year;
+  }
   if(sEl) sEl.value = f.season;
   if(eEl) eEl.value = f.event;
   bvwType = srType;
