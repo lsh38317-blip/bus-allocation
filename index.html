@@ -342,6 +342,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 .bus-loc-inp{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:7px 11px;font-size:.82rem;color:var(--text);width:180px;outline:none;transition:border-color .15s;}
 .bus-loc-inp:focus{border-color:var(--navy2);}
 
+/* [v406] 코드관리 내부 탭바 */
+.code-tab-btn{background:transparent;border:none;border-bottom:3px solid transparent;padding:9px 16px;font-size:.88rem;font-weight:700;color:var(--muted);cursor:pointer;margin-bottom:-2px;}
+.code-tab-btn.active{color:var(--navy);border-bottom-color:var(--navy);}
+
 /* 뷰어 전용 CSS */
 /* 툴바 레이아웃 */
 .vw-toolbar{
@@ -716,7 +720,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <button class="nav-item" id="nav-bus"      onclick="switchPanel('bus')"      style="display:none"><span class="icon">🚌</span> 버스 배정</button>
         <button class="nav-item" id="nav-room"     onclick="switchPanel('room')"     style="display:none"><span class="icon">🏠</span> 숙소 배정</button>
         <button class="nav-item" id="nav-accounts" onclick="switchPanel('accounts')" style="display:none"><span class="icon">👥</span> 계정 관리</button>
-        <button class="nav-item" id="nav-codes"    onclick="switchPanel('codes')"    style="display:none"><span class="icon">🗂</span> 코드관리</button>
+        <button class="nav-item" id="nav-codes"    onclick="switchPanel('codes')"    style="display:none"><span class="icon">🗂</span> 기초정보관리</button>
         <button class="nav-item"        id="nav-register" onclick="switchPanel('register')" style="display:none"><span class="icon">✏️</span> 자료 등록</button>
       </nav>
       <div class="sidebar-footer">
@@ -2034,57 +2038,25 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
         <!-- EXCEL -->
         <div class="panel" id="panel-excel">
-          <!-- ① Google Sheets 연동 카드 -->
-          <div class="card" style="margin-bottom:14px;">
-            <div class="card-header">
-              <div class="card-title">🔗 Google Sheets 연동</div>
-              <div id="vw-dot-wrap" style="display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--muted);">
+          <!-- [v406] Google Sheets 연동 카드는 코드관리 > 데이터관리 탭으로 이동됨 -->
+          <!-- ① 뷰어 본체 -->
+          <div class="card" style="padding:0;overflow:hidden;">
+
+            <!-- [v406] Google Sheets 연동 미설정 경고 배너 (URL 저장 시 자동 숨김) -->
+            <div id="excel-sheet-warn" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 16px;background:#fdf3e7;border-bottom:1.5px solid #f0cf9a;font-size:.8rem;color:#8a5a00;cursor:pointer;"
+              onclick="switchPanel('codes');codeSwitchTab('data');">
+              ⚠️ Google Sheets 연동이 필요합니다. <span style="text-decoration:underline;font-weight:700;">기초정보관리 &gt; 데이터관리</span>에서 연동을 설정해주세요.
+            </div>
+
+            <!-- 뷰어 툴바 -->
+            <div class="vw-toolbar">
+              <!-- [v406] 파일업로드 상태표시(구 Google Sheets 연동 카드에서 이동) -->
+              <div id="vw-dot-wrap" style="display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--muted);padding:0 16px;">
                 <span id="vwDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;transition:background .3s;"></span>
                 <span id="vwDotTxt">대기중</span>
                 <span style="margin-left:8px;">파일 <strong id="vwHdrFile" style="color:var(--text);">-</strong></span>
                 <span style="margin-left:6px;">행 <strong id="vwHdrRows" style="color:var(--text);">-</strong></span>
               </div>
-            </div>
-            <!-- 저장된 URL 표시 행 (URL 있을 때) -->
-            <div id="api-url-saved-row" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;background:#edf7f2;border:1.5px solid #b8dfc8;border-radius:9px;padding:9px 13px;">
-              <span style="font-size:.72rem;font-weight:700;color:#1a6b45;white-space:nowrap;">✅ 연동 URL 저장됨</span>
-              <span id="api-url-saved-text" style="flex:1;font-size:.78rem;color:#2c4a2c;word-break:break-all;min-width:0;"></span>
-              <div style="display:flex;gap:6px;flex-shrink:0;">
-                <button class="btn btn-primary btn-sm" onclick="testApiUrl()">연결 테스트</button>
-                <button class="btn btn-sm" style="background:#fff;border:1.5px solid var(--border);color:var(--text2);" onclick="apiUrlEditMode(true)">🖊 변경</button>
-              </div>
-            </div>
-            <!-- URL 입력 행 (URL 없거나 편집 모드) -->
-            <div id="api-url-edit-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-              <input type="text" id="api-url-input"
-                placeholder="https://script.google.com/macros/s/.../exec"
-                style="flex:1;min-width:240px;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:9px 13px;font-size:.83rem;outline:none;color:var(--text);"
-                onkeydown="if(event.key==='Enter') saveApiUrl()">
-              <button class="btn btn-navy btn-sm" onclick="saveApiUrl()">💾 저장</button>
-              <button class="btn btn-primary btn-sm" onclick="testApiUrl()">연결 테스트</button>
-              <button id="api-url-cancel-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="apiUrlEditMode(false)">취소</button>
-            </div>
-            <div id="api-status" style="font-size:.78rem;margin-bottom:10px;"></div>
-            <!-- T3: GAS API Key 설정 -->
-            <div style="margin-bottom:12px;padding:10px 13px;background:#f4f6fc;border:1.5px solid var(--border);border-radius:9px;">
-              <div style="font-size:.75rem;font-weight:700;color:var(--navy);margin-bottom:6px;">🔐 GAS API Key <span style="font-weight:400;color:var(--muted);">(선택 — 보안 강화 시 설정)</span></div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <input type="password" id="gas-api-key-input"
-                  placeholder="GAS PropertiesService에 설정한 키 값"
-                  style="flex:1;min-width:200px;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.83rem;outline:none;color:var(--text);"
-                  onkeydown="if(event.key==='Enter') saveGasApiKey()">
-                <button class="btn btn-navy btn-sm" onclick="saveGasApiKey()">💾 저장</button>
-                <button class="btn btn-primary btn-sm" onclick="clearGasApiKey()">초기화</button>
-              </div>
-              <div id="gas-api-key-status" style="font-size:.75rem;margin-top:5px;color:var(--muted);"></div>
-            </div>
-          </div>
-
-          <!-- ② 뷰어 본체 -->
-          <div class="card" style="padding:0;overflow:hidden;">
-
-            <!-- 뷰어 툴바 -->
-            <div class="vw-toolbar">
               <!-- 오른쪽 액션 버튼들 -->
               <div class="vw-actions" style="margin-left:auto;">
                 <!-- [v259] 수양회종류: 파일 업로드 버튼 바로 앞으로 이동 -->
@@ -2468,6 +2440,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
         <!-- CODE MANAGEMENT -->
         <div class="panel" id="panel-codes">
+          <!-- [v406] 내부 탭바: 코드관리 / 데이터관리 -->
+          <div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:2px solid var(--border2);">
+            <button class="code-tab-btn active" id="code-tab-btn-main" onclick="codeSwitchTab('main')">🗂 코드관리</button>
+            <button class="code-tab-btn" id="code-tab-btn-data" onclick="codeSwitchTab('data')">🔗 데이터관리</button>
+          </div>
+
+          <!-- TAB1: 코드관리 (기존 내용) -->
+          <div id="code-subtab-main">
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;">
             <button class="btn btn-sm" style="background:#eef2f7;color:var(--navy);border:1px solid var(--border2);" onclick="codeLoadAll()">🔄 새로고침</button>
             <button class="btn btn-navy btn-sm" onclick="codeSaveUseYn()" id="code-btn-save">☁️ 구글시트 저장</button>
@@ -2477,7 +2457,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <div class="card">
               <div class="card-header">
                 <div class="card-title">🗂 대분류</div>
-                <button class="btn btn-primary btn-sm" onclick="codeAddMajor()">＋ 대분류 추가</button>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-sm" style="background:#eef2f7;color:var(--navy);border:1px solid var(--border2);" onclick="codeLoadAll()">🔍 조회</button>
+                  <button class="btn btn-primary btn-sm" onclick="codeAddMajor()">＋ 대분류 추가</button>
+                </div>
               </div>
               <div id="code-major-list" style="display:flex;flex-direction:column;gap:4px;"></div>
               <div id="code-major-empty" class="empty-state" style="display:none;padding:20px;">
@@ -2506,6 +2489,49 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
             </div>
           </div>
+          </div><!-- /#code-subtab-main -->
+
+          <!-- TAB2: 데이터관리 (신규, 참석인원관리에서 이동) -->
+          <div id="code-subtab-data" style="display:none;">
+            <div class="card" style="margin-bottom:14px;">
+              <div class="card-header">
+                <div class="card-title">🔗 Google Sheets 연동</div>
+              </div>
+              <!-- 저장된 URL 표시 행 (URL 있을 때) -->
+              <div id="api-url-saved-row" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;background:#edf7f2;border:1.5px solid #b8dfc8;border-radius:9px;padding:9px 13px;">
+                <span style="font-size:.72rem;font-weight:700;color:#1a6b45;white-space:nowrap;">✅ 연동 URL 저장됨</span>
+                <span id="api-url-saved-text" style="flex:1;font-size:.78rem;color:#2c4a2c;word-break:break-all;min-width:0;"></span>
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                  <button class="btn btn-primary btn-sm" onclick="testApiUrl()">연결 테스트</button>
+                  <button class="btn btn-sm" style="background:#fff;border:1.5px solid var(--border);color:var(--text2);" onclick="apiUrlEditMode(true)">🖊 변경</button>
+                </div>
+              </div>
+              <!-- URL 입력 행 (URL 없거나 편집 모드) -->
+              <div id="api-url-edit-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+                <input type="text" id="api-url-input"
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  style="flex:1;min-width:240px;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:9px 13px;font-size:.83rem;outline:none;color:var(--text);"
+                  onkeydown="if(event.key==='Enter') saveApiUrl()">
+                <button class="btn btn-navy btn-sm" onclick="saveApiUrl()">💾 저장</button>
+                <button class="btn btn-primary btn-sm" onclick="testApiUrl()">연결 테스트</button>
+                <button id="api-url-cancel-btn" class="btn btn-primary btn-sm" style="display:none;" onclick="apiUrlEditMode(false)">취소</button>
+              </div>
+              <div id="api-status" style="font-size:.78rem;margin-bottom:10px;"></div>
+              <!-- T3: GAS API Key 설정 -->
+              <div style="margin-bottom:12px;padding:10px 13px;background:#f4f6fc;border:1.5px solid var(--border);border-radius:9px;">
+                <div style="font-size:.75rem;font-weight:700;color:var(--navy);margin-bottom:6px;">🔐 GAS API Key <span style="font-weight:400;color:var(--muted);">(선택 — 보안 강화 시 설정)</span></div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                  <input type="password" id="gas-api-key-input"
+                    placeholder="GAS PropertiesService에 설정한 키 값"
+                    style="flex:1;min-width:200px;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.83rem;outline:none;color:var(--text);"
+                    onkeydown="if(event.key==='Enter') saveGasApiKey()">
+                  <button class="btn btn-navy btn-sm" onclick="saveGasApiKey()">💾 저장</button>
+                  <button class="btn btn-primary btn-sm" onclick="clearGasApiKey()">초기화</button>
+                </div>
+                <div id="gas-api-key-status" style="font-size:.75rem;margin-top:5px;color:var(--muted);"></div>
+              </div>
+            </div>
+          </div><!-- /#code-subtab-data -->
         </div>
 
         <!-- ROOM ASSIGN -->
@@ -12122,7 +12148,7 @@ function closeSidebar(){
 }
 
 // ── 초기화 ──
-var PANEL_TITLES={home:'수양회집계현황',goalstatus:'수양회목표달성현황',register:'자료 등록',enroll:'버스신청',search:'배정인원현황',busview:'버스 배정 현황',bus:'버스 배정',busbase:'버스운행설정',excel:'참석인원관리',goal:'교회 목표 관리',accounts:'계정 관리',codes:'코드관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
+var PANEL_TITLES={home:'수양회집계현황',goalstatus:'수양회목표달성현황',register:'자료 등록',enroll:'버스신청',search:'배정인원현황',busview:'버스 배정 현황',bus:'버스 배정',busbase:'버스운행설정',excel:'참석인원관리',goal:'교회 목표 관리',accounts:'계정 관리',codes:'기초정보관리',room:'숙소 배정',roomview:'숙소 배정 현황',mypage:'내 계정'};
 var PANEL_SUBS={
   home:'수양회 참석자 현황을 확인합니다.',
   goalstatus:'구역별 목표 대비 접수·성도·전도 달성 현황을 확인합니다.',
@@ -12274,10 +12300,12 @@ function switchPanel(name, skipRender) {
       if(USE_SHEET()){ loadAccountsFromSheet(); }  // 계정목록 재조회 (완료 시 내부에서 renderAccounts() 자동 호출)
     }
     if(name==='codes'){
+      codeSwitchTab('main'); // [v406] 패널 재진입 시 항상 코드관리 탭부터 시작
       codeLoadAll();
     }
     if(name==='excel'){
       vwLoadLastProcTime();
+      vwRenderSheetWarn(); // [v406] 연동 미설정 시 경고 배너 노출
       if(USE_SHEET()){ loadData(); }  // 참석인원명단 재조회 — 로컬 캐시 유무와 무관하게 항상 최신화
     }
     if(name==='goal'){
@@ -18175,6 +18203,12 @@ function apiUrlRefreshUI() {
     keyStatus.textContent = k ? '✅ API Key 설정됨 (저장된 키: '+k.slice(0,4)+'…'+k.slice(-4)+')' : '⚪ API Key 미설정 (설정 없이도 동작)';
     keyStatus.style.color = k ? '#2e7d32' : '#8896aa';
   }
+  vwRenderSheetWarn(); // [v406] URL 저장/변경 즉시 참석인원관리 경고 배너도 함께 갱신
+}
+// [v406] 참석인원관리 뷰어 카드 상단 "Google Sheets 연동 필요" 경고 배너 표시/숨김
+function vwRenderSheetWarn(){
+  var w = $id('excel-sheet-warn'); if(!w) return;
+  w.style.display = USE_SHEET() ? 'none' : 'flex';
 }
 
 // T3: GAS API Key 저장 / 초기화
@@ -19040,6 +19074,18 @@ var codeMinorList = [];   // [{중분류ID, 대분류ID, 중분류명, 사용여
 var codeSelectedMajorId = '';
 var codeStagedUseYn = {}; // {중분류ID: 'Y'|'N'} — 저장 전 임시 변경분
 
+// [v406] 코드관리 패널 내부 탭 전환 (코드관리 / 데이터관리)
+var codeActiveTab = 'main';
+function codeSwitchTab(tab){
+  codeActiveTab = tab;
+  var btnMain=$id('code-tab-btn-main'), btnData=$id('code-tab-btn-data');
+  var subMain=$id('code-subtab-main'), subData=$id('code-subtab-data');
+  if(subMain) subMain.style.display = tab==='main' ? '' : 'none';
+  if(subData) subData.style.display = tab==='data' ? '' : 'none';
+  if(btnMain) btnMain.classList.toggle('active', tab==='main');
+  if(btnData) btnData.classList.toggle('active', tab==='data');
+  if(tab==='data') apiUrlRefreshUI(); // 데이터관리 탭 진입 시 URL/Key 상태 최신화
+}
 function codeLoadAll(){
   if(!USE_SHEET()){
     showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error');
@@ -19232,28 +19278,100 @@ function codeAddMinor(){
     .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
     .finally(function(){ showLoading(false); });
 }
+// [v405] 코드관리 → 오늘 날짜 기준 연도(문자열) 반환. 공주행/하행 배정유형 중분류
+// 삭제 시 버스배정내역 존재여부 체크에 사용한다.
+function _codeSysYear(){
+  return String(new Date().getFullYear());
+}
+// [v405] minorName(배정유형명)의 버스배정내역이 "오늘 연도" 기준으로 teamSheetName에
+// 존재하는지 조회한다. 중고등부 특례 매칭은 _busRowMatchesAssignType()을 그대로 재사용.
+function _codeCheckBusAssignUsage(minorName, teamSheetName, cb){
+  if(!USE_SHEET()){ cb(false); return; }
+  apiCall({action:'getAll', sheetName:teamSheetName})
+    .then(function(res){
+      var rows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      var sysYear = _codeSysYear();
+      var exists = rows.some(function(r){
+        return String(r['년도']||'').trim()===sysYear && _busRowMatchesAssignType(r, minorName);
+      });
+      cb(exists);
+    })
+    .catch(function(){ cb(false); });
+}
+// [v405] minorName(배정유형명)의 "오늘 연도" 데이터를 팀내역·요약·탑승자 3개 시트에서
+// 완전 삭제한다. 기존 버스배정 화면의 배정유형별 초기화(_busFilteredClear)를 그대로 재사용하되,
+// season/event는 비워 해당 연도의 모든 회차를 대상으로 한다.
+function _codeResetBusAssignByType(minorName, direction, cb){
+  var teamSheet    = direction==='leave' ? '버스배정_귀가팀내역' : '버스배정_참석팀내역';
+  var summarySheet = direction==='leave' ? '버스배정_귀가요약'  : '버스배정_참석요약';
+  var rosterSheet  = direction==='leave' ? '탑승자_귀가'        : '탑승자_참석';
+  var summaryHdr = ['년도','수양회종류','행사명','배정유형','버스명','배정팀수','탑승인원','정원','팀 목록'];
+  var rosterHdr  = ['NO','년도','수양회종류','행사명','배정유형','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
+  var teamHdr    = ['NO','년도','수양회종류','행사명','배정유형','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
+  var bf = {year:_codeSysYear(), season:'', event:'', assignType:minorName};
+  var targets = [{sheetName:teamSheet, headers:teamHdr}, {sheetName:summarySheet, headers:summaryHdr}, {sheetName:rosterSheet, headers:rosterHdr}];
+  var done=0, failed=null;
+  targets.forEach(function(p){
+    _busFilteredClear(p.sheetName, p.headers, bf, function(err){
+      if(err) failed = err;
+      done++;
+      if(done>=targets.length) cb(failed);
+    }, true);
+  });
+}
 function codeDeleteMinor(minorId){
   var m = codeMinorList.find(function(x){ return String(x['중분류ID'])===minorId; }); if(!m) return;
-  // [v349] 참조중 여부 체크 — 현재는 코드값을 실제로 참조하는 화면이 없어 항상 미참조로 판정됨
-  // (향후 기존 드롭다운을 코드관리로 이관할 때 retreat 등 실데이터 대상 검사 로직을 채워야 함)
-  var inUse = false;
-  if(inUse){
-    alert('사용 중인 코드입니다. 완전 삭제 대신 사용여부를 OFF로 변경해 주세요.');
+  var major = codeMajorList.find(function(x){ return String(x['대분류ID'])===String(m['대분류ID']); });
+  var majorName = (major&&major['대분류명']||'').trim();
+  var minorName = (m['중분류명']||'').trim();
+
+  var direction = null, teamSheet = null;
+  if(majorName==='공주행배정유형'){ direction='arrive'; teamSheet='버스배정_참석팀내역'; }
+  else if(majorName==='하행배정유형'){ direction='leave'; teamSheet='버스배정_귀가팀내역'; }
+
+  function doDeleteCodeOnly(){
+    if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
+    showLoading(true);
+    apiCall({action:'delete', sheetName:'CODE_MINOR', id:minorId})
+      .then(function(res){
+        if(!(res&&res.success)){ showToast('⚠️ 삭제 실패: '+(res&&(res.error||res.message)||'알 수 없는 오류'),'error'); return; }
+        codeMinorList = codeMinorList.filter(function(x){ return String(x['중분류ID'])!==minorId; });
+        delete codeStagedUseYn[minorId];
+        codeRenderMinorList();
+        showToast('✅ 중분류가 삭제되었습니다.','success');
+      })
+      .catch(function(e){ showToast('⚠️ 삭제 실패: '+(e&&e.message||e),'error'); })
+      .finally(function(){ showLoading(false); });
+  }
+
+  function doResetThenDelete(){
+    showLoading(true);
+    _codeResetBusAssignByType(minorName, direction, function(err){
+      showLoading(false);
+      if(err){ showToast('⚠️ 버스배정 초기화 실패: '+(err.message||err),'error'); return; }
+      doDeleteCodeOnly();
+    });
+  }
+
+  if(!direction){
+    if(!confirm('선택하신 중분류를 삭제 하시겠습니까?')) return;
+    doDeleteCodeOnly();
     return;
   }
-  if(!confirm('"'+(m['중분류명']||'')+'" 중분류를 삭제하시겠습니까?')) return;
+
   if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
   showLoading(true);
-  apiCall({action:'delete', sheetName:'CODE_MINOR', id:minorId})
-    .then(function(res){
-      if(!(res&&res.success)){ showToast('⚠️ 삭제 실패: '+(res&&(res.error||res.message)||'알 수 없는 오류'),'error'); return; }
-      codeMinorList = codeMinorList.filter(function(x){ return String(x['중분류ID'])!==minorId; });
-      delete codeStagedUseYn[minorId];
-      codeRenderMinorList();
-      showToast('✅ 중분류가 삭제되었습니다.','success');
-    })
-    .catch(function(e){ showToast('⚠️ 삭제 실패: '+(e&&e.message||e),'error'); })
-    .finally(function(){ showLoading(false); });
+  _codeCheckBusAssignUsage(minorName, teamSheet, function(exists){
+    showLoading(false);
+    if(exists){
+      var label = direction==='arrive' ? '공주행' : '하행';
+      if(!confirm('선택하신 '+label+' 배정유형의 버스 배정내역이 있습니다. 버스배정이 초기화 됩니다. 진행하시겠습니까?')) return;
+      doResetThenDelete();
+    } else {
+      if(!confirm('선택하신 중분류를 삭제 하시겠습니까?')) return;
+      doDeleteCodeOnly();
+    }
+  });
 }
 // [v349] 사용여부 변경 확정저장 — 스테이징된 항목을 접수ID 없이 중분류ID 기준으로 순차 update
 function codeSaveUseYn(){
@@ -19325,7 +19443,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport','bpBulkUploadOpen','bpBulkUploadHandleFile','bpBulkUploadParseCSV','bpBulkUploadProcess','bpStageAssignType',
     'bpEditDate','bpStageDate','bpCancelDateEdit','bpDownloadTemplate','bpStageBus','_bpileToggleBusFields',
     // [v349] 코드관리
-    'codeLoadAll','codeSelectMajor','codeAddMajor','codeDeleteMajor','codeAddMinor','codeToggleUseYn','codeDeleteMinor','codeSaveUseYn',
+    'codeLoadAll','codeSelectMajor','codeAddMajor','codeDeleteMajor','codeAddMinor','codeToggleUseYn','codeDeleteMinor','codeSaveUseYn','codeSwitchTab',
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진 — onclick/onchange에서 직접 호출되는 함수만 등록
     'spToggleTransport','spToggleCheck','spToggleAll','spStageAssignType','spStageBus',
     'spEditDate','spStageDate','spCancelDateEdit',
@@ -19403,7 +19521,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
     bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport, bpBulkUploadOpen:bpBulkUploadOpen, bpBulkUploadHandleFile:bpBulkUploadHandleFile, bpBulkUploadParseCSV:bpBulkUploadParseCSV, bpBulkUploadProcess:bpBulkUploadProcess, bpStageAssignType:bpStageAssignType,
     bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit, bpDownloadTemplate:bpDownloadTemplate, bpStageBus:bpStageBus, _bpileToggleBusFields:_bpileToggleBusFields,
-    codeLoadAll:codeLoadAll, codeSelectMajor:codeSelectMajor, codeAddMajor:codeAddMajor, codeDeleteMajor:codeDeleteMajor, codeAddMinor:codeAddMinor, codeToggleUseYn:codeToggleUseYn, codeDeleteMinor:codeDeleteMinor, codeSaveUseYn:codeSaveUseYn,
+    codeLoadAll:codeLoadAll, codeSelectMajor:codeSelectMajor, codeAddMajor:codeAddMajor, codeDeleteMajor:codeDeleteMajor, codeAddMinor:codeAddMinor, codeToggleUseYn:codeToggleUseYn, codeDeleteMinor:codeDeleteMinor, codeSaveUseYn:codeSaveUseYn, codeSwitchTab:codeSwitchTab,
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진
     spToggleTransport:spToggleTransport, spToggleCheck:spToggleCheck, spToggleAll:spToggleAll, spStageAssignType:spStageAssignType, spStageBus:spStageBus,
     spEditDate:spEditDate, spStageDate:spStageDate, spCancelDateEdit:spCancelDateEdit,
