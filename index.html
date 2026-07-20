@@ -12297,7 +12297,6 @@ function initApp() {
   apiUrlRefreshUI(); // 저장된 URL 있으면 표시 행, 없으면 입력 행
   renderAccounts();
   busRestore();
-  roomRestore();
 
   switchPanel('home', true);
   // 참석자 데이터 로드 (시트 or 로컬)
@@ -12555,7 +12554,7 @@ function switchPanel(name, skipRender) {
       }
     }
     if(name==='room'){
-      // 년도 콤보 동적 생성 (당해년도 ~ +5)
+      // 년도 콤보 동적 생성 (당해년도 ~ +5), 첫 진입 1회만
       var yrSel = $id('room-sel-year');
       if(yrSel && !yrSel.options.length){
         var curYr = new Date().getFullYear();
@@ -12563,10 +12562,24 @@ function switchPanel(name, skipRender) {
           var opt=document.createElement('option');
           opt.value = String(curYr+yi);
           opt.textContent = String(curYr+yi)+'년';
+          if(yi===0) opt.selected=true;
           yrSel.appendChild(opt);
         }
       }
-      roomTab(roomCurrentTab||'buildings');
+      // [v418] 로그인 시 roomRestore() 선반입을 제거했으므로, 숙소배정 메뉴 진입 시점이
+      // 데이터를 불러오는 유일한 지점이 됨. roomview/busview와 동일한 패턴으로 교회목표
+      // 행사명을 room-sel-event(회차)에 먼저 적용한 뒤 roomRestore()로 실제 로드/렌더.
+      if(_goalLoaded){
+        _busApplyGoalEvent('room-sel-event', 'room-sel-year');
+        roomRestore();
+      } else if(USE_SHEET()){
+        _goalFetchFromSheet(function(){
+          _busApplyGoalEvent('room-sel-event', 'room-sel-year');
+          roomRestore();
+        }, {});
+      } else {
+        roomRestore();
+      }
     }
     if(name==='mypage')   mypageRender();
   }
