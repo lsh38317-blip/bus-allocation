@@ -19468,11 +19468,20 @@ function codeSaveUseYn(){
   var chain = ids.reduce(function(p, id){
     return p.then(function(){
       var newYn = codeStagedUseYn[id];
-      return apiCall({action:'update', sheetName:'CODE_MINOR', '중분류ID':id, '사용여부':newYn})
+      var m = codeMinorList.find(function(x){ return String(x['중분류ID'])===id; });
+      if(!m){ failCount++; return; }
+      // [v415] GAS update는 CODE_MINOR 행의 필수 컬럼이 모두 있어야 정상 반영됨 —
+      // 사용여부 2개 필드만 보내던 기존 방식(원인) 대신, 다른 update 호출(toSheetObj 전체 필드 전송)과
+      // 동일하게 해당 행의 전체 컬럼을 함께 보내고 사용여부만 새 값으로 덮어쓴다.
+      var data = {
+        '중분류ID': m['중분류ID'], '대분류ID': m['대분류ID'], '중분류명': m['중분류명'],
+        '사용여부': newYn, '정렬순서': m['정렬순서'],
+        '등록일시': m['등록일시'], '등록자': m['등록자']
+      };
+      return apiCall(Object.assign({action:'update', sheetName:'CODE_MINOR'}, data))
         .then(function(res){
           if(res&&res.success){
-            var m = codeMinorList.find(function(x){ return String(x['중분류ID'])===id; });
-            if(m) m['사용여부'] = newYn;
+            m['사용여부'] = newYn;
             okCount++;
           } else { failCount++; }
         })
