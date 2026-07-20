@@ -1810,9 +1810,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             </div>
 
             <!-- [v255] 초기화/신청(구 저장) 버튼을 연락처 필드 아래로 이동 -->
+            <!-- [v414] 삭제 버튼 신규 추가 — 순서: 초기화 → 신청 → 삭제 -->
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
               <button class="btn btn-sm" style="border:1px solid var(--border2);background:#fff;white-space:nowrap;" onclick="enrollFormReset()">↺ 초기화</button>
               <button class="btn btn-navy" id="enroll-save-btn" onclick="enrollSave()">📨 신청</button>
+              <button class="btn btn-danger btn-sm" id="enroll-delete-btn" onclick="enrollDeleteConfirm()">🗑 삭제</button>
             </div>
 
           </div>
@@ -14899,13 +14901,15 @@ function _deleteBusRosterCascade(r){
   }
   return chain;
 }
-function deleteRow(id, fromModal) {
+function deleteRow(id, fromModal, afterCb) {
   var target = retreat.find(function(x){ return String(x.id)===String(id); });
   if(!confirm(_deleteConfirmMsg(target))) return;
   if(!USE_SHEET()){
     retreat=retreat.filter(function(x){ return String(x.id)!==String(id); });
     save(); if(fromModal) closeModal('detail-modal');
-    doSearch(); updateStats(); showToast('삭제되었습니다.','info'); return;
+    doSearch(); updateStats(); showToast('삭제되었습니다.','info');
+    if(afterCb) afterCb();
+    return;
   }
   var isRealDelete = _deleteIsRealDelete(target);
   var deleteKey = (target && target.receiptId) ? target.receiptId : String(id);
@@ -14930,6 +14934,7 @@ function deleteRow(id, fromModal) {
         if(fromModal) closeModal('detail-modal');
         doSearch(); updateStats();
         showToast(isRealDelete ? '삭제되었습니다.' : '참석·귀가 신청 정보가 초기화되었습니다.', 'info');
+        if(afterCb) afterCb();
       } else {
         showToast((isRealDelete?'삭제':'초기화')+' 실패: '+(res.message||res.error||'알 수 없는 오류'),'error');
       }
@@ -20799,6 +20804,27 @@ function enrollHistorySelectRow(idx){
   showToast('✅ '+(row.name||'')+' ('+row.receiptId+') 정보를 불러왔습니다.','success');
 }
 
+// [v414] 개별신청 화면 "삭제" 버튼 — 조회/로드된 접수ID(_enrollEditingId)가 없으면 안내 후 중단,
+// 있으면 자료검색/일괄신청 화면의 "참석자 상세 정보" 팝업 삭제와 동일한 deleteRow()를 재사용한다.
+function enrollDeleteConfirm(){
+  if(!_enrollEditingId){
+    alert('버스배정 신청자 내역을 조회후 처리해주세요');
+    return;
+  }
+  var row = retreat.find(function(r){ return String(r.receiptId)===String(_enrollEditingId); });
+  if(!row){
+    alert('버스배정 신청자 내역을 조회후 처리해주세요');
+    return;
+  }
+  if(!_enrollCheckDistrictScope(row.parish, row.district)){
+    showToast('본인 소속 범위(교구/구역)의 데이터만 삭제할 수 있습니다.','error');
+    return;
+  }
+  deleteRow(row.id, false, function(){
+    enrollFormReset();
+    enrollRenderList();
+  });
+}
 function enrollDeleteRow(id){
   var row = retreat.find(function(r){ return String(r.receiptId)===String(id); });
   if(!row){ showToast('데이터를 찾을 수 없습니다.','error'); return; }
@@ -20906,6 +20932,7 @@ window.enrollFormReset       = enrollFormReset;
 window.enrollSave            = enrollSave;
 window.enrollEditRow         = enrollEditRow;
 window.enrollDeleteRow       = enrollDeleteRow;
+window.enrollDeleteConfirm   = enrollDeleteConfirm;
 window.enrollRenderList      = enrollRenderList;
 window.enrollSearchClick     = enrollSearchClick;
 window.enrollParishChange    = enrollParishChange;
