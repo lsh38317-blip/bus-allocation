@@ -12566,19 +12566,23 @@ function switchPanel(name, skipRender) {
           yrSel.appendChild(opt);
         }
       }
-      // [v418] 로그인 시 roomRestore() 선반입을 제거했으므로, 숙소배정 메뉴 진입 시점이
+      // [v419] 로그인 시 roomRestore() 선반입을 제거했으므로, 숙소배정 메뉴 진입 시점이
       // 데이터를 불러오는 유일한 지점이 됨. roomview/busview와 동일한 패턴으로 교회목표
       // 행사명을 room-sel-event(회차)에 먼저 적용한 뒤 roomRestore()로 실제 로드/렌더.
+      // [v420] 메뉴 진입 시 roomInputReset(true)로 토스트 억제 (버튼 직접 클릭 시에만 노출)
       if(_goalLoaded){
         _busApplyGoalEvent('room-sel-event', 'room-sel-year');
-        roomRestore();
+        // roomRestore();
+        roomInputReset(true);
       } else if(USE_SHEET()){
         _goalFetchFromSheet(function(){
           _busApplyGoalEvent('room-sel-event', 'room-sel-year');
-          roomRestore();
+          // roomRestore();
+          roomInputReset(true);
         }, {});
       } else {
-        roomRestore();
+        // roomRestore();
+        roomInputReset(true);
       }
     }
     if(name==='mypage')   mypageRender();
@@ -18725,11 +18729,13 @@ function roomExportCSV(){
 }
 
 // [v254] 입력항목초기화 — 화면(로컬)만 초기화, 구글시트는 건드리지 않음. 위험도가 낮아 확인절차 없이 즉시 실행.
-function roomInputReset(){
+// [v420] silent=true면 토스트를 띄우지 않음 — 숙소배정 메뉴 진입 시(switchPanel) 자동 호출용,
+// 버튼을 직접 클릭했을 때만("입력항목초기화" onclick, 인자 없음) 토스트가 뜨도록 분리.
+function roomInputReset(silent){
   roomData=[]; roomCurrentBuilding='';
   _ls.remove('room_data');
   roomRenderTabs();
-  showToast('✅ 화면 입력항목이 초기화되었습니다. (구글시트는 변경되지 않았습니다)','success');
+  if(!silent) showToast('✅ 화면 입력항목이 초기화되었습니다. (구글시트는 변경되지 않았습니다)','success');
 }
 
 // [v254] 숙소배정초기화 — 구글시트 '숙소배정내역'에서 현재 선택된 연도+수양회종류+행사명 데이터만 삭제(다른 회차는 보존)
