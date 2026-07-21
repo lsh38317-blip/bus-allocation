@@ -1659,7 +1659,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <!-- [v343] 상단 title "버스신청" 고정으로 카드헤더 내 중복 텍스트/아이콘 삭제 -->
               <!-- [v427] 버스배정 이후 수정 경로 안내문구 추가 -->
               <div style="display:flex;align-items:center;gap:8px;">
-                <span style="color:var(--muted);font-size:.78rem;font-weight:700;white-space:nowrap;">ℹ️ 버스 배정 이후 수정은 [ 일괄 배정 및 수정 ] 화면에서 진행하시면 됩니다</span>
+                <span style="font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Serif KR',serif;font-size:.95rem;font-weight:700;color:var(--navy);white-space:nowrap;">ℹ️ 버스 배정 이후 수정은 [ 일괄 배정 및 수정 ] 화면에서 진행하시면 됩니다</span>
                 <button class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;white-space:nowrap;" onclick="enrollHistoryOpen()">📋 수양회접수내역</button>
               </div>
             </div>
@@ -2807,7 +2807,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <thead style="position:sticky;top:0;background:#f5f7fb;">
           <tr>
             <th style="padding:8px;text-align:left;display:none;">접수ID</th>
-            <th id="eh-name-th" style="padding:8px;text-align:left;cursor:pointer;" onclick="ehSortByName()">성명 ▼</th>
+            <th id="eh-name-th" style="padding:8px;text-align:left;cursor:pointer;" onclick="ehSortByName()">성명 ▲</th>
             <th style="padding:8px;text-align:left;">교구</th>
             <th style="padding:8px;text-align:left;">구역</th>
             <th style="padding:8px;text-align:left;">회별</th>
@@ -20891,8 +20891,8 @@ function enrollHistoryOpen(){
   }
 
   _ehRows = [];
-  _ehNameSortDir = 'desc'; // [v430] 팝업 오픈 시 이름 내림차순으로 초기화
-  var thN=$id('eh-name-th'); if(thN) thN.textContent = '성명 ▼';
+  _ehNameSortDir = 'asc'; // [v431] 팝업 오픈 시 이름 오름차순으로 초기화
+  var thN=$id('eh-name-th'); if(thN) thN.textContent = '성명 ▲';
   var tbody=$id('eh-grid-body');
   if(tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">조회 조건을 선택하고 조회 버튼을 눌러주세요.</td></tr>';
   $id('enroll-history-modal').classList.add('show');
@@ -20924,8 +20924,8 @@ function enrollHistoryQuery(){
         return true;
       });
       // [v430] 조회 결과는 항상 이름 내림차순으로 정렬해 표시(원본 이름 기준, 마스킹 전 값)
-      _ehNameSortDir = 'desc';
-      var thN=$id('eh-name-th'); if(thN) thN.textContent = '성명 ▼';
+      _ehNameSortDir = 'asc';
+      var thN=$id('eh-name-th'); if(thN) thN.textContent = '성명 ▲';
       _ehRows = _ehSortByName(filtered, _ehNameSortDir);
       enrollHistoryRenderGrid(_ehRows);
     })
@@ -20936,7 +20936,7 @@ function enrollHistoryQuery(){
     });
 }
 // [v430] 이름(원본값) 기준 오름/내림차순 정렬
-var _ehNameSortDir = 'desc';
+var _ehNameSortDir = 'asc';
 function _ehSortByName(rows, dir){
   return rows.slice().sort(function(a,b){
     var c = (a.name||'').localeCompare(b.name||'','ko');
