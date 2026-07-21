@@ -1649,7 +1649,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         <!-- [v342] 버스신청/배정인원현황 서브탭 바 — enroll·search 패널 진입 시에만 노출 -->
         <div id="enroll-subtabs" style="display:none;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
           <button id="enroll-subtab-enroll" class="btn btn-navy btn-sm"    onclick="switchPanel('enroll')">📝 개별신청</button>
-          <button id="enroll-subtab-search" class="btn btn-primary btn-sm" onclick="switchPanel('search')">🔍 일괄신청</button>
+          <button id="enroll-subtab-search" class="btn btn-primary btn-sm" onclick="switchPanel('search')">🔍 일괄 신청 및 배정</button>
           <button id="enroll-subtab-roster" class="btn btn-primary btn-sm" onclick="switchPanel('busroster')">🚌 탑승자 명단</button>
         </div>
 
@@ -1657,7 +1657,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div class="card">
             <div class="card-header" style="justify-content:flex-end;">
               <!-- [v343] 상단 title "버스신청" 고정으로 카드헤더 내 중복 텍스트/아이콘 삭제 -->
-              <div style="display:flex;gap:8px;">
+              <!-- [v427] 버스배정 이후 수정 경로 안내문구 추가 -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="color:var(--muted);font-size:.78rem;font-weight:700;white-space:nowrap;">ℹ️ 버스 배정 이후 수정은 [ 일괄 배정 및 수정 ] 화면에서 진행하시면 됩니다</span>
                 <button class="btn btn-sm" style="background:#1a6b45;color:#fff;border:none;white-space:nowrap;" onclick="enrollHistoryOpen()">📋 수양회접수내역</button>
               </div>
             </div>
@@ -20753,6 +20755,47 @@ function enrollSave(){
     regBy: (currentUser && currentUser.name) || '', regDate: existing ? (existing.regDate||'') : _enrollNowStr(),
   };
 
+  // [v427] 접수ID가 이미 존재하는 케이스(수정건/동일인 중복매칭건)에 한해 버스배정 완료 여부를 확인.
+  // 완전 신규(최초) 접수건은 이 시점에 새로 채번된 접수ID이므로 배정 시트에 존재할 수 없어 체크를 생략한다.
+  if(existing){
+    showLoading(true);
+    _enrollIsBusAssigned(existing.receiptId)
+      .then(function(assigned){
+        showLoading(false);
+        if(assigned){
+          alert('버스 배정이 완료된 신청자입니다. 신청 처리할 수 없습니다.');
+          return;
+        }
+        _enrollSaveProceed(row, isNew, receiptId, name, viaDupMatch);
+      })
+      .catch(function(){
+        // 배정상태 조회 실패 시에는 기존 동작을 보존해 저장을 계속 진행한다.
+        showLoading(false);
+        _enrollSaveProceed(row, isNew, receiptId, name, viaDupMatch);
+      });
+    return;
+  }
+  _enrollSaveProceed(row, isNew, receiptId, name, viaDupMatch);
+}
+
+// [v427] 참석인원명단 접수ID의 버스배정 완료 여부를 실시간 조회.
+// 탑승자_참석/탑승자_귀가 시트 중 하나라도 해당 접수ID 행이 있으면 배정 완료로 판단한다.
+function _enrollIsBusAssigned(receiptId){
+  if(!receiptId || !USE_SHEET()) return Promise.resolve(false);
+  var rid = String(receiptId);
+  return Promise.all([
+    apiCall({action:'getAll', sheetName:'탑승자_참석'}),
+    apiCall({action:'getAll', sheetName:'탑승자_귀가'})
+  ]).then(function(results){
+    return results.some(function(res){
+      var rows = (res && (res.data||res.rows)) || [];
+      return rows.some(function(r){ return String(r['접수ID']||'').trim() === rid; });
+    });
+  }).catch(function(){ return false; });
+}
+
+// [v427] enrollSave()의 실제 저장(add/update) 처리부 — 배정상태 체크 통과 후 호출됨
+function _enrollSaveProceed(row, isNew, receiptId, name, viaDupMatch){
   showLoading(true);
   var apiAction = isNew ? 'add' : 'update';
   apiCall(Object.assign({action:apiAction, sheetName:'참석인원명단'}, toSheetObj(row)))
