@@ -3866,8 +3866,39 @@ function busRosterOpenForBus(busId, type){
   var bus = curBuses.find(function(b){ return b.id===busId; });
   if(!bus){ showToast('버스 정보를 찾을 수 없습니다.','error'); return; }
 
-  var built = buildBusRoster(busId, type);
-  var pax = (built[0] && built[0].passengers) || [];
+  // [v440] 탑승자_참석/귀가 원본 시트(실제 저장된 접수ID→버스명 매핑)를 최우선 사용한다.
+  // buildBusRoster()는 참석인원명단을 재계산해 "이 팀의 몇 번째 인원인지" 위치(slice) 기반으로
+  // 추정하므로, 저장 이후 참석인원명단 순서/구성이 조금이라도 달라지면 실제 배정된 사람과
+  // 다른 사람이 표시될 수 있다(예: "김쌍임"으로 저장된 자리에 "고재찬"이 표시되는 문제).
+  // busRosterOpen()(단일 팀 조회 팝업)이 이미 쓰는 "방법 A2"와 동일한 원칙을 여기(버스 단위
+  // 전체 조회)에도 적용 — 원본 시트에 해당 버스 데이터가 없으면(저장 전 등) 기존 방식으로 폴백.
+  var matchBusName = bus.rawName || bus.name;
+  var rawRosterRows = type==='leave' ? _bvwRosterLeaveRows : _bvwRosterArriveRows;
+  var pax = null;
+  if(rawRosterRows && rawRosterRows.length && matchBusName){
+    var busAssignType = (bus.assignType||'').trim();
+    var directRows = rawRosterRows.filter(function(r){
+      var rBus = String(r['버스명']||r['배정호차']||'').trim();
+      if(rBus !== matchBusName.trim()) return false;
+      var rType = String(r['배정유형']||'').trim();
+      if(busAssignType && rType && rType !== busAssignType) return false;
+      return true;
+    }).map(function(r){
+      return {
+        receiptId: String(r['접수ID']||'').trim(),
+        parish:    String(r['교구']||'').trim(),
+        district:  String(r['구역']||'').trim(),
+        name:      String(r['이름']||'').trim(),
+        group:     String(r['회별']||'').trim(),
+        gender:    String(r['성별']||'').trim(),
+      };
+    });
+    if(directRows.length > 0) pax = directRows;
+  }
+  if(!pax){
+    var built = buildBusRoster(busId, type);
+    pax = (built[0] && built[0].passengers) || [];
+  }
 
   // 정렬: 선탑자 최우선 → 교구 > 구역 > 성명
   var leaderId = bus.leaderId || '';
@@ -10806,6 +10837,9 @@ function buildBusRoster(filterBusId, busType){
   // (수정 전: 매 버스마다 pax.slice(0, slot.count)로 항상 0번부터 잘라 앞쪽 인원이
   //  버스마다 중복 포함되고, 뒤쪽 인원은 어디에도 안 들어가 "미배정"으로 누락되던 버그)
   var teamOffset = {};
+  // [v439] 팀별 "총 필요 인원"(모든 버스 슬롯 합) 캐시 — 시각선교부 병합 보정에서 매 버스마다
+  // 재계산하지 않도록 1회 계산 후 재사용.
+  var _teamNeededTotalCache = {};
   // [v221] 중고등부 27&M 균등배치 결과를 팀별로 1회만 계산해 재사용하기 위한 캐시
   var _jhReorderCache = {};
   // [v173] 분산배정 팀이 등장하는 "마지막" 버스를 미리 계산 — 그 버스에서는
@@ -10845,6 +10879,28 @@ function buildBusRoster(filterBusId, busType){
       var team = teams.find(function(t){ return t.id===slot.teamId; });
       if(!team) return;
       var pax = getBusPaxByTeam(team, busType);
+      // [v439] 시각선교부 병합 보정 — 시각선교부 인원이 "본대" 버스/팀 요약에는 포함되지만
+      // 참석인원명단 원본의 배정유형이 '시각선교부'로 남아있는 경우, getBusPaxByTeam()의
+      // 엄격한 배정유형 필터(team.assignType='본대')에 걸려 조용히 누락될 수 있다(재조회 시에만
+      // 재현 — 실시간 세션은 자동배정 당시 확정된 목록을 그대로 쓰므로 영향 없음).
+      // 이 팀이 필요로 하는 총원(모든 버스 슬롯 합)보다 조회된 pax가 부족하면, 같은 팀명(교구/구역)의
+      // '시각선교부' 배정유형 인원을 추가 조회해 보충한다.
+      if(team.assignType==='본대'){
+        if(_teamNeededTotalCache[team.id]===undefined){
+          _teamNeededTotalCache[team.id] = allBuses.reduce(function(s,b2){
+            var sl = b2.slots.find(function(s2){ return s2.teamId===team.id; });
+            return s + (sl ? sl.count : 0);
+          }, 0);
+        }
+        var neededTotal = _teamNeededTotalCache[team.id];
+        if(pax.length < neededTotal){
+          var havingIds = {};
+          pax.forEach(function(p){ if(p.receiptId) havingIds[p.receiptId]=true; });
+          var extra = getBusPaxByTeam(Object.assign({}, team, {assignType:'시각선교부'}), busType)
+            .filter(function(p){ return !p.receiptId || !havingIds[p.receiptId]; });
+          if(extra.length) pax = pax.concat(extra);
+        }
+      }
       // 분산배정인 경우 slot.count명까지만 포함 (팀별 누적 오프셋 기준으로 이어서 슬라이스)
       var isSplit = allBuses.filter(function(b2){
         return b2.slots.some(function(s){ return s.teamId===slot.teamId; });
