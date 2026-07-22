@@ -1331,9 +1331,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <!-- ③ 팀 관리 탭 -->
           <div id="bus-panel-teams">
             <div class="card" style="margin-bottom:14px;">
-              <div class="card-header">
-                <div class="card-title" id="bus-import-card-title">🔗 참석자 데이터 연동</div>
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <div class="card-header" style="flex-wrap:wrap;row-gap:10px;">
+                <div class="card-title" id="bus-import-card-title" style="flex:1 0 100%;">🔗 참석자 데이터 연동</div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto;">
                   <!-- [v364] 배정버스1대 일괄 내역조회/저장 — 배정대수=1이면서 아직 팀내역 미등록인 배정유형만 골라 일괄 처리 -->
                   <button id="bus-bulk1-import-btn" class="btn btn-sm" onclick="busBulk1ImportOpen()" style="background:#eaf7f0;border:1px solid #2d8a5a;color:#1a6b45;font-weight:700;" title="배정대수=1로 등록됐지만 아직 팀내역이 없는 배정유형만 골라 참석/귀가인원명단에서 일괄 조회합니다">
                     🚍🔗 배정버스1대 일괄 내역조회
@@ -5906,10 +5906,15 @@ function busMainTypeTab(type){
 }
 // [v312] "전체"(빈값) 옵션 제거 — 배정유형 미지정 상태에서 팀/최소대수/내역조회 등이
 // 여러 유형 데이터를 뒤섞어 처리하던 문제들의 근본 원인이라, 항상 구체적 유형이 선택되도록 강제.
+// [v441] 옵션 소스를 버스운행설정(bbTypeOptionsRefresh)과 동일한 공통코드 캐시(_bbTypeOptionsCache)로
+// 통일 — 완전 동기(API 호출 없음), 캐시가 없으면(미로딩/조회실패) 기존 ASSIGN_TYPES_ARRIVE/LEAVE로 폴백.
 function busAssignTypeOptionsRefresh(){
   var sel = $id('bus-sel-assigntype'); if(!sel) return;
   var prev = sel.value;
-  var list = (busMainType==='leave') ? ASSIGN_TYPES_LEAVE : ASSIGN_TYPES_ARRIVE;
+  var isLeave = (busMainType==='leave');
+  var fallback = isLeave ? ASSIGN_TYPES_LEAVE : ASSIGN_TYPES_ARRIVE;
+  var cached = isLeave ? _bbTypeOptionsCache.leave : _bbTypeOptionsCache.arrive;
+  var list = (cached && cached.length) ? cached : fallback;
   sel.innerHTML = list.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
   sel.value = (list.indexOf(prev)>=0) ? prev : (list[0]||'');
 }
@@ -12559,6 +12564,10 @@ function switchPanel(name, skipRender) {
         }
       }
       busAssignTypeOptionsRefresh(); // [v283] 패널 진입 시 배정유형 옵션(현재 모드 기준) 초기화
+      // [v441] 공통코드 캐시(버스운행설정과 공유) — 이 화면에 먼저 들어와도 캐시를 확보하도록
+      // 로딩을 트리거하고, 완료되면 이미 그려진 배정유형 콤보에 즉시 반영한다(캐시가 이미
+      // 있으면 재조회 없이 그대로 재사용).
+      _bbLoadTypeOptionsCache(function(){ busAssignTypeOptionsRefresh(); });
       // [v423] 수양회종류/회차 옵션을 코드관리(기초정보관리) 기준으로 먼저 로드(기본값 하계/3차),
       // 그 다음 기존과 동일하게 _busApplyGoalEvent()로 교회목표 등록 행사명을 최종 반영한다.
       // ── 교회목표 행사명 자동 적용 후 버스배정 복원 + rosterIndex 로드 ──
