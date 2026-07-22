@@ -3733,7 +3733,10 @@ function busRosterOpen(teamId, teamName, busName, busType){
   // 걸러내 명단이 통째로 비어 보이는 문제가 있었음 — busview 팝업(방법A·방법B 공통)에서는 이
   // 필터를 끄고, 교구/구역 문자열 매칭만으로 원본 pax 풀을 구성한다(방법A는 그 위에 탑승자
   // 시트 인덱스로, 방법B는 슬롯 카운트로 각각 다시 정확히 좁힌다).
-  var teamForPax = Object.assign({}, team, {assignType:''});
+  // [v438] assignType:'' 만으로는 getBusPaxByTeam()이 "버스 배정 관리" 화면 콤보(_busGetFilter())
+  // 값으로 대체해버려(그 화면에서 다른 배정유형을 선택해둔 상태면 여기서도 오염됨), 의도한 대로
+  // "필터 완전히 끔"이 되지 않는 문제가 있었다 — _skipAssignTypeFilter로 명시적으로 신호한다.
+  var teamForPax = Object.assign({}, team, {assignType:'', _skipAssignTypeFilter:true});
   var pax = getBusPaxByTeam(teamForPax, busType, bvFilter);
   var usedIndexMatch = false;
 
@@ -3742,9 +3745,13 @@ function busRosterOpen(teamId, teamName, busName, busType){
   // 받지 않는다 — 배차표 다운로드(bvwExportBusSchedule)가 쓰는 것과 동일한 원본 소스.
   // 배정유형이 같은 원본 버스명이 여러 배정유형에 걸쳐 재사용될 수 있어(예: "본대(봉사) 버스
   // 1호"와 "본대(참석자) 버스 1호"가 둘 다 원본 버스명 "버스 1호") 배정유형 컬럼까지 함께 매칭한다.
+  // [v438] 중고등부(team.isJH)는 실제 교구/구역이 제각각인 인원을 하나로 묶은 가상 팀이므로,
+  // 문자열 "중고등부"를 교구/구역과 비교하면 항상 불일치해 전원 탈락하던 버그를 수정 —
+  // isJuniorHighBus(row) 기준으로 매칭한다(getBusPaxByTeam의 중고등부 처리와 동일 기준).
   var rawRosterRows = busType==='leave' ? _bvwRosterLeaveRows : _bvwRosterArriveRows;
   if(rawRosterRows && rawRosterRows.length && matchBusName){
     var teamAssignType = (team.assignType||'').trim();
+    var teamIsJH = !!team.isJH || team.name==='중고등부';
     var teamParts = _busParseParish(team.name);
     var teamParish = (team.parish || teamParts.parish || '').trim();
     var teamDistrict = (teamParts.district || '').trim();
@@ -3753,6 +3760,11 @@ function busRosterOpen(teamId, teamName, busName, busType){
       if(rBus !== matchBusName.trim()) return false;
       var rType = String(r['배정유형']||'').trim();
       if(teamAssignType && rType && rType !== teamAssignType) return false;
+      if(teamIsJH){
+        // 탑승자_참석/귀가 시트에는 봉사코드 컬럼이 없어(회별만 존재) 회별로 직접 판정한다.
+        // (참석인원명단 원본에만 있는 봉사코드=27 케이스는 getBusPaxByTeam 기반 방법A/B가 보완)
+        return String(r['회별']||'').trim()==='중고등부';
+      }
       if(teamDistrict && String(r['구역']||'').trim() !== teamDistrict) return false;
       if(teamParish){
         var rParish = String(r['교구']||'').trim();
@@ -10727,7 +10739,11 @@ function getBusPaxByTeam(team, busType, filterOverride){
   // 배정유형(_busGetFilter().assignType)을 사용. 이게 없으면 "1교구 11구역"처럼 같은 구역명이
   // 다른 배정유형에도 등록돼 있을 때 그 인원까지 섞여 들어오는 문제(탑승자내역·배차표·자동배정
   // 슬라이스 전반에 영향)를 막는다.
-  var _at = team.assignType || (_busGetFilter().assignType||'');
+  // [v438] team._skipAssignTypeFilter가 true면(busRosterOpen이 "버스 배정 현황" 팝업에서 배정유형
+  // 표기 불일치 회피용으로 명시적으로 필터를 끈 경우) _busGetFilter()(다른 화면인 "버스 배정 관리"
+  // 콤보) 폴백조차 적용하지 않는다 — 그 화면에서 선택된 배정유형이 여기로 새어 들어와 무관한
+  // 인원을 걸러내던(중고등부 등) 문제를 막기 위함.
+  var _at = team._skipAssignTypeFilter ? '' : (team.assignType || (_busGetFilter().assignType||''));
   var _kind = busType==='leave' ? 'leave' : 'arrive';
   if(_at){
     _src = _src.filter(function(r){ return _busMatchesAssignType(r, _kind, {assignType:_at}); });
