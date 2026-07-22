@@ -20725,6 +20725,29 @@ function enrollEventOptionsRefresh(){
   _busApplyGoalEvent('enroll-event', 'enroll-year');
 }
 
+// [v437] 개별신청 폼 — 접수ID 기준 필드 잠금.
+// - 접수ID가 비어있거나("신규 등록") "99"로 시작(enrollGenId()가 발급하는 버스신청 화면 자체
+//   임시 접수 ID, 9900001~)하면 전 항목 수정 가능.
+// - 그 외(수양회접수내역에서 연동된 실제 접수ID)는 참석/귀가 관련 6개 필드(참석일자·참석교통수단·
+//   참석배정유형·귀가일자·귀가교통수단·귀가배정유형)만 수정 가능, 나머지는 읽기전용.
+// 10~15번(참석/귀가 6개 필드)은 이 함수가 건드리지 않는다 — enrollToggleAssignType() 등 기존
+// 로직이 그대로 담당(교통수단=버스일 때만 배정유형 활성화하는 동작과 독립적으로 항상 정상 동작).
+var ENROLL_LOCK_FIELD_IDS = [
+  'enroll-year','enroll-retreat-type','enroll-event','enroll-parish','enroll-district',
+  'enroll-name','enroll-group','enroll-salv-code','enroll-gender',
+  'enroll-guardian','enroll-contact'
+];
+function enrollApplyEditLock(){
+  var id = _enrollEditingId;
+  var isNew = !id || String(id).trim()==='' || /^99/.test(String(id).trim());
+  ENROLL_LOCK_FIELD_IDS.forEach(function(fid){
+    var el = $id(fid);
+    if(!el) return;
+    el.disabled = !isNew;
+    el.style.opacity = isNew ? '' : '.5';
+  });
+}
+
 function enrollFormReset(){
   _enrollEditingId = null;
   // 연도/수양회종류/행사명/교구/구역은 조회 그리드 필터를 겸하므로 초기화 시 유지한다
@@ -20744,6 +20767,7 @@ function enrollFormReset(){
   $set('enroll-guardian','');
   enrollToggleAssignType('arrive');
   enrollToggleAssignType('leave');
+  enrollApplyEditLock(); // [v437] 신규 등록 모드 — 항상 전체 해제 상태로 초기화
 }
 
 // 구역장 소속 검증(등록/수정/삭제 공통 안전장치) — 폼이 잠겨있어 정상 흐름에서는
@@ -20942,6 +20966,7 @@ function enrollEditRow(id){
   $set('enroll-guardian', row.guardian);
   enrollToggleAssignType('arrive');
   enrollToggleAssignType('leave');
+  enrollApplyEditLock(); // [v437] 접수ID 기준(신규/99접두 vs 실접수) 필드 잠금 적용
   enrollRenderList();
   // [v252] 그리드 행 클릭 등 여러 경로에서 호출되므로, 상단 등록폼으로 스크롤 + 안내를 여기서 공통 처리
   var formCard = document.querySelector('#panel-enroll .card');
