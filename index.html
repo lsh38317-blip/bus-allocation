@@ -1359,6 +1359,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                        참석/귀가 모드별 텍스트 자동전환은 busTeamsSubTab()이 그대로 처리) 그대로 유지 -->
                   <button id="bus-teams-reset-btn" onclick="busResetConfirm()" style="background:transparent;border:1px solid #d94040;color:#d94040;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 참석배정 전체 초기화</button>
                   <button id="bus-teams-reset-bytype-btn" onclick="busResetByAssignTypeConfirm()" style="background:transparent;border:1px solid #d97a1f;color:#d97a1f;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 배정유형별 초기화</button>
+                  <div style="width:1px;height:20px;background:var(--border2);"></div>
+                  <!-- [v444] 배정정보 업로드 — 확정 배차표(CSV, 호차별 wide 포맷)를 업로드해 개인별 배정버스(호차)를 일괄 반영.
+                       팀단위 집계(요약/팀내역)는 _updateBusSummarySheet()가 함께 갱신(기존 패턴 재사용). -->
+                  <button id="bus-upload-open-btn" class="btn btn-sm" onclick="busUploadOpen()" style="background:#eef4ff;border:1px solid #3f66b0;color:#1a3d8f;font-weight:700;" title="확정된 배차표(CSV)를 업로드해 개인별 배정버스(호차)를 일괄 반영합니다">⬆ 배정정보 업로드</button>
                 </div>
               </div>
               <!-- [v364] 배정버스1대 일괄 내역조회 결과 미리보기 — 배정유형별 구분선 + 배정내역 테이블 -->
@@ -3277,6 +3281,35 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <button class="btn btn-primary btn-sm" onclick="_navGuardCancel()">취소</button>
       <button class="btn btn-sm" style="background:#fff;border:1.5px solid var(--border);color:var(--text2);" onclick="_navGuardLeave()">그냥 이동</button>
       <button class="btn btn-navy btn-sm" id="nav-guard-save-btn" onclick="_navGuardSaveAndLeave()">💾 저장 후 이동</button>
+    </div>
+  </div>
+</div>
+
+<!-- [v444] 배정정보 업로드 모달 -->
+<div class="modal-overlay" id="bus-upload-modal">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-header">
+      <div class="modal-title">⬆ 배정정보 업로드 (호차별 확정 배차표 CSV)</div>
+      <button class="modal-close" onclick="busUploadClose()">✕</button>
+    </div>
+    <div style="padding:8px 0 18px;">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="bus-upload-dir" id="bus-upload-dir-arrive" checked> 하행(참석)</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="bus-upload-dir" id="bus-upload-dir-leave"> 상행(귀가)</label>
+        <button class="btn btn-sm" style="background:#fff;border:1px solid var(--border);" onclick="busUploadDownloadTemplate()">📄 CSV 양식 다운로드</button>
+        <button class="btn btn-sm" style="background:#1a4d8f;color:#fff;border:none;" onclick="busUploadTriggerFile()">📂 CSV 파일 선택</button>
+        <input type="file" id="bus-upload-csv-input" accept=".csv" style="display:none;" onchange="busUploadHandleFile(this)">
+      </div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">
+        CSV 3행=호차명(선발대/본대/중고등부/직장조 등 배정유형 포함), 4행=일시+구분, 6행=NO/구역/이름 헤더, 7행부터 실 데이터입니다.
+        기사/차량번호(5행)는 반영하지 않습니다. 기존 배정과 다르면 CSV 내용으로 <b>덮어쓰기</b>됩니다.
+      </div>
+      <div id="bus-upload-preview" style="font-size:.82rem;max-height:340px;overflow:auto;border:1px solid var(--border2);border-radius:8px;padding:10px;background:#fafbfc;"></div>
+      <div id="bus-upload-summary" style="margin-top:8px;font-size:.8rem;color:var(--muted);"></div>
+    </div>
+    <div class="modal-footer" style="gap:8px;">
+      <button class="btn btn-sm" style="background:#fff;border:1.5px solid var(--border);color:var(--text2);" onclick="busUploadClose()">취소</button>
+      <button class="btn btn-navy btn-sm" id="bus-upload-commit-btn" onclick="busUploadCommit()" disabled>☁️ 확정저장</button>
     </div>
   </div>
 </div>
@@ -14665,6 +14698,279 @@ function _updateRosterBusAssign(receiptId, busName, sheetName){
   });
 }
 
+// ============================================================================
+// [v444] 배정정보 업로드 — 확정 배차표(CSV, 호차별 wide 포맷)를 업로드해
+// 개인별 배정버스(호차)를 일괄 반영.
+// - 파일형식: CSV. 3행=호차명(배정유형 텍스트 포함), 4행=일시+구분, 5행=기사/차량(미반영),
+//   6행=NO/구역/이름 헤더, 7행~=데이터. 4열(NO/구역/이름/공백) 주기로 호차 블록 반복.
+// - 매칭: 구역+이름 키로 retreat[]와 매칭 (동명이인/미매칭은 반영 제외, 화면에 목록 표시).
+// - 반영 범위: "배정버스"(호차)만 CSV로 덮어쓰기. 배정유형 자체는 변경하지 않음
+//   (CSV의 배정유형 텍스트는 미리보기 표시/검증 참고용).
+// - 저장: 기존 established 패턴인 _updateRosterBusAssign()(개인) + _updateBusSummarySheet()
+//   (팀단위 요약·팀내역 자동 반영)를 인당 순차 호출 — Google Sheets 행 인덱스 경쟁 방지 원칙 준수.
+// ============================================================================
+var _busUploadState = { direction:'arrive', blocks:[], matched:[], unmatched:[], ambiguous:[] };
+
+function busUploadOpen(){
+  _busUploadState = { direction:'arrive', blocks:[], matched:[], unmatched:[], ambiguous:[] };
+  var dirArrive = $id('bus-upload-dir-arrive'); if(dirArrive) dirArrive.checked = true;
+  var dirLeave  = $id('bus-upload-dir-leave');  if(dirLeave)  dirLeave.checked  = false;
+  var prev = $id('bus-upload-preview'); if(prev) prev.innerHTML = '';
+  var summary = $id('bus-upload-summary'); if(summary) summary.textContent = '';
+  var commitBtn = $id('bus-upload-commit-btn'); if(commitBtn) commitBtn.disabled = true;
+  var modal = $id('bus-upload-modal'); if(modal) modal.classList.add('show');
+}
+function busUploadClose(){
+  var modal = $id('bus-upload-modal'); if(modal) modal.classList.remove('show');
+}
+function busUploadTriggerFile(){
+  var inp = $id('bus-upload-csv-input'); if(inp) inp.click();
+}
+
+function busUploadHandleFile(input){
+  var file = input.files[0]; if(!file){ return; }
+  var ext = (file.name.split('.').pop()||'').toLowerCase();
+  if(ext!=='csv'){
+    showToast('⚠️ CSV 파일만 업로드 가능합니다. (엑셀 → 다른 이름으로 저장 → CSV)','error');
+    input.value=''; return;
+  }
+  var readAs = function(enc){ return new Promise(function(res,rej){
+    var r = new FileReader();
+    r.onload = function(e){ res(e.target.result); };
+    r.onerror = function(){ rej(new Error('파일을 읽을 수 없습니다')); };
+    r.readAsText(file, enc);
+  }); };
+  readAs('UTF-8').then(function(text){
+    var cleaned = text.replace(/^\uFEFF/,'');
+    var bad = (cleaned.match(/\ufffd/g)||[]).length;
+    if(bad>5) return readAs('EUC-KR').then(function(t){ return t.replace(/^\uFEFF/,''); });
+    return cleaned;
+  }).then(function(text){
+    busUploadProcessCsv(text);
+  }).catch(function(){
+    showToast('⚠️ 파일을 읽을 수 없습니다.','error');
+  });
+  input.value = '';
+}
+
+// CSV 전체 텍스트 → 2차원 행배열. 따옴표로 감싼 셀 내부의 줄바꿈(예: 병합된 안내문 셀에
+// Alt+Enter로 입력된 여러 줄 메모)도 하나의 셀 값으로 안전하게 처리한다.
+// [실제 샘플파일(3차하계 배차표) 검증 중 발견] 단순 text.split(/\r?\n/) 방식은 이런 셀에서
+// 줄바꿈을 행 구분으로 오인해 이후 모든 행 번호가 밀리는 정렬 오류를 일으켰음 — 반드시 이 파서 사용.
+function _busUploadParseCsvText(text){
+  var rows = []; var row = []; var field = ''; var inQ = false;
+  for(var i=0; i<text.length; i++){
+    var c = text[i];
+    if(inQ){
+      if(c==='"'){
+        if(text[i+1]==='"'){ field+='"'; i++; } else { inQ=false; }
+      } else { field += c; }
+      continue;
+    }
+    if(c==='"'){ inQ = true; }
+    else if(c===','){ row.push(field.trim()); field=''; }
+    else if(c==='\r'){ /* skip, \n에서 행 종료 처리 */ }
+    else if(c==='\n'){ row.push(field.trim()); rows.push(row); row=[]; field=''; }
+    else { field += c; }
+  }
+  if(field.length || row.length){ row.push(field.trim()); rows.push(row); }
+  return rows;
+}
+
+// 3행(호차명)/4행(일시+구분) 텍스트로 배정유형 산출.
+// 우선순위: 선발대 → 본대(봉사) → 중고등부 → 직장조 → 본대 (memory의 CSV export 순서 원칙과 동일)
+function _busUploadDeriveAssignType(busNameText, dateTypeText){
+  var t = (busNameText||'') + ' ' + (dateTypeText||'');
+  if(/선발대/.test(t)) return '선발대';
+  if(/본대\s*\(?\s*봉사/.test(t) || /봉사자/.test(t)) return '본대(봉사)';
+  if(/중고등부/.test(t)) return '중고등부';
+  if(/직장조/.test(t)) return '직장조';
+  if(/본대/.test(t)) return '본대';
+  return '';
+}
+
+// 호차명 텍스트 → 시스템 버스명("버스 N호") 변환. "N호차" 패턴이면 표준 버스명으로,
+// 아니면(카니발/스타리아 등 특수차량) 원문에서 차량명만 추출해 그대로 사용.
+function _busUploadNormalizeBusName(busNameText){
+  var t = (busNameText||'').trim();
+  var m = t.match(/^(\d+)\s*호차/);
+  if(m) return '버스 '+m[1]+'호';
+  var m2 = t.match(/([가-힣A-Za-z]+)\s*\(/) || t.match(/^\d*호?\s*([가-힣A-Za-z]+)/);
+  return m2 ? m2[1].trim() : t;
+}
+
+// 이름 셀에서 "(선탑자N)" 표기 분리
+function _busUploadParseRiderName(nameCell){
+  var t = (nameCell||'').trim();
+  var m = t.match(/^(.*?)\s*\(\s*선탑자\s*(\d*)\s*\)\s*$/);
+  if(m) return { name:m[1].trim(), isRider:true, riderSeq:m[2]||'' };
+  return { name:t, isRider:false, riderSeq:'' };
+}
+
+// wide 포맷 CSV 파싱: 3행=호차명, 4행=일시+구분, 5행=기사/차량(skip), 6행=NO/구역/이름 헤더,
+// 7행~=데이터(4열 주기 블록 반복). "탑승인원" 행에서 해당 블록 데이터 종료로 판단(검증용).
+function busUploadParseCsvWide(text){
+  var rows = _busUploadParseCsvText(text);
+  if(rows.length < 7) return { error:'행이 부족합니다. 서식(3행=호차명, 6행=NO/구역/이름)이 맞는지 확인해주세요.' };
+  var busNameRow  = rows[2] || []; // 3행 (0-based idx2)
+  var dateTypeRow = rows[3] || []; // 4행
+
+  var blockStarts = [];
+  for(var c=0; c<busNameRow.length; c++){
+    if((busNameRow[c]||'').trim()) blockStarts.push(c);
+  }
+  if(!blockStarts.length) return { error:'호차명(3행)을 찾을 수 없습니다. 서식이 맞는지 확인해주세요.' };
+
+  var blocks = blockStarts.map(function(startCol){
+    var busLabel   = (busNameRow[startCol]||'').trim();
+    var dateType   = (dateTypeRow[startCol]||'').trim();
+    var assignType = _busUploadDeriveAssignType(busLabel, dateType);
+    var busName    = _busUploadNormalizeBusName(busLabel);
+    return { startCol:startCol, busLabel:busLabel, dateType:dateType, assignType:assignType, busName:busName, entries:[], footerCount:null };
+  });
+
+  for(var r=6; r<rows.length; r++){ // 7행부터(0-based idx6)
+    var row = rows[r]; if(!row) continue;
+    blocks.forEach(function(b){
+      var noCell   = (row[b.startCol]  ||'').trim();
+      var distCell = (row[b.startCol+1]||'').trim();
+      var nameCell = (row[b.startCol+2]||'').trim();
+      if(noCell==='탑승인원'){ b.footerCount = parseInt(distCell||nameCell||'0',10)||0; return; }
+      if(!nameCell) return;               // 빈 셀 스킵(블록별 데이터 길이가 다를 수 있음)
+      if(!/^\d+$/.test(noCell)) return;   // NO가 숫자 아니면(헤더/안내문 등) 스킵
+      var parsedName = _busUploadParseRiderName(nameCell);
+      b.entries.push({ no:noCell, district:distCell, name:parsedName.name, isRider:parsedName.isRider, riderSeq:parsedName.riderSeq });
+    });
+  }
+  return { blocks: blocks };
+}
+
+// 파싱된 블록들을 retreat[]와 구역+이름 키로 매칭
+function busUploadMatchRoster(blocks){
+  var matched=[], unmatched=[], ambiguous=[];
+  blocks.forEach(function(b){
+    b.entries.forEach(function(e){
+      var district = String(e.district||'').trim();
+      var name = String(e.name||'').trim();
+      if(!name) return;
+      var candidates = retreat.filter(function(x){
+        return (x.district||'').trim()===district && (x.name||'').trim()===name;
+      });
+      if(candidates.length===0){ unmatched.push({block:b, entry:e}); return; }
+      if(candidates.length>1){ ambiguous.push({block:b, entry:e, candidates:candidates}); return; }
+      matched.push({ block:b, entry:e, r:candidates[0] });
+    });
+  });
+  return { matched:matched, unmatched:unmatched, ambiguous:ambiguous };
+}
+
+function busUploadProcessCsv(text){
+  var parsed = busUploadParseCsvWide(text);
+  if(parsed.error){ showToast('⚠️ '+parsed.error,'error'); return; }
+  var direction = ($id('bus-upload-dir-leave')||{}).checked ? 'leave' : 'arrive';
+  var m = busUploadMatchRoster(parsed.blocks);
+  var totalEntries = parsed.blocks.reduce(function(s,b){ return s+b.entries.length; },0);
+  if(!totalEntries){ showToast('⚠️ 인식된 데이터가 없습니다. 서식을 확인해주세요.','error'); return; }
+  _busUploadState = { direction:direction, blocks:parsed.blocks, matched:m.matched, unmatched:m.unmatched, ambiguous:m.ambiguous };
+  busUploadRenderPreview();
+}
+
+function busUploadRenderPreview(){
+  var st = _busUploadState;
+  var wrap = $id('bus-upload-preview'); if(!wrap) return;
+  var html = '';
+  st.blocks.forEach(function(b){
+    var mismatch = (b.footerCount!=null && b.footerCount!==b.entries.length);
+    html += '<div style="margin-bottom:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;">'
+      + '<b>'+esc(b.busLabel)+'</b> → <span style="color:#1a6b45;font-weight:700;">'+esc(b.busName)+'</span>'
+      + ' · 배정유형: <span style="color:#1a4d8f;font-weight:700;">'+esc(b.assignType||'(자동인식 실패 — 수동확인 필요)')+'</span>'
+      + ' · 인원 '+b.entries.length+'명'
+      + (mismatch ? (' <span style="color:#d94040;">⚠ 시트 하단 "탑승인원"('+b.footerCount+')과 불일치</span>') : '')
+      + '</div>';
+  });
+  var mCount=st.matched.length, uCount=st.unmatched.length, aCount=st.ambiguous.length;
+  html += '<div style="margin-top:6px;font-weight:700;">매칭 '+mCount+'건 · 미매칭 '+uCount+'건 · 동명이인 '+aCount+'건</div>';
+  if(uCount){
+    html += '<div style="color:#d94040;margin-top:4px;">미매칭(참석인원명단에 없음): '
+      + st.unmatched.map(function(x){ return esc((x.entry.district||'')+' '+x.entry.name); }).join(', ') + '</div>';
+  }
+  if(aCount){
+    html += '<div style="color:#d97a1f;margin-top:4px;">동명이인(구역+이름 중복, 반영 제외): '
+      + st.ambiguous.map(function(x){ return esc((x.entry.district||'')+' '+x.entry.name); }).join(', ') + '</div>';
+  }
+  wrap.innerHTML = html;
+  var summary = $id('bus-upload-summary');
+  if(summary) summary.textContent = '방향: '+(st.direction==='leave'?'상행(귀가)':'하행(참석)')+' · 대상 반영 '+mCount+'건 (기존과 동일한 건은 확정저장 시 자동 제외)';
+  var commitBtn = $id('bus-upload-commit-btn');
+  if(commitBtn) commitBtn.disabled = !mCount;
+}
+
+// 확정저장 — 매칭된 인원의 배정버스(호차)를 CSV 내용으로 덮어쓰기 반영.
+// 기존 established 패턴 재사용: _updateRosterBusAssign()(개인, 탑승자_참석/귀가) →
+// _updateBusSummarySheet()(팀단위 요약·팀내역 카운트 보정) 순차 호출.
+function busUploadCommit(){
+  var st = _busUploadState;
+  if(!st.matched || !st.matched.length){ showToast('⚠️ 반영할 매칭 데이터가 없습니다.','error'); return; }
+  var direction  = st.direction;
+  var sheetName  = direction==='leave' ? '탑승자_귀가' : '탑승자_참석';
+  var fullIdx    = direction==='leave' ? _rosterFullLv : _rosterFullArr;
+  var dirLabel   = direction==='leave' ? '상행(귀가)' : '하행(참석)';
+  if(!confirm('['+dirLabel+'] 매칭된 '+st.matched.length+'명의 배정버스를 CSV 내용으로 덮어쓰기 저장하시겠습니까?\n(기존 배정과 다르면 CSV 값으로 교체됩니다. 배정유형 자체는 변경하지 않습니다.)')) return;
+
+  showLoading(true);
+  var okCount=0, skipCount=0, failCount=0;
+  var chain = st.matched.reduce(function(p, item){
+    return p.then(function(){
+      var r = item.r;
+      var rid = r.receiptId||'';
+      if(!rid){ skipCount++; return; }
+      var newBus  = item.block.busName;
+      var prevBus = fullIdx[rid]||'';
+      if(newBus===prevBus){ skipCount++; return; }
+      var teamKey = busGetTeamKey(r);
+      return _updateRosterBusAssign(rid, newBus, sheetName)
+        .then(function(){ fullIdx[rid]=newBus; okCount++; })
+        .then(function(){ return _updateBusSummarySheet(direction, teamKey, prevBus||'(미배정)', newBus||'(미배정)'); })
+        .catch(function(e){ failCount++; console.warn('[배정정보 업로드] 반영 실패', r.name, e&&e.message||e); });
+    });
+  }, Promise.resolve());
+
+  chain.then(function(){
+    showToast('✅ 배정정보 업로드 완료 (반영 '+okCount+'건 · 변경없음 '+skipCount+'건'+(failCount?(' · 실패 '+failCount+'건'):'')+')', failCount?'error':'success', true);
+    busUploadClose();
+    if(typeof busTab==='function' && typeof busCurrentTab!=='undefined') busTab(busCurrentTab||'teams');
+  }).finally(function(){
+    showLoading(false);
+  });
+}
+
+// CSV 양식 다운로드 — 현재 등록된 호차(버스운행설정 기준)로 3~6행 구조가 채워진 빈 CSV 생성
+function busUploadDownloadTemplate(){
+  var direction = ($id('bus-upload-dir-leave')||{}).checked ? 'leave' : 'arrive';
+  var buses = direction==='leave' ? busLeaveBuses : busArriveBuses;
+  if(!buses || !buses.length){ showToast('⚠️ 먼저 [버스운행설정]에서 호차를 등록해주세요.','error'); return; }
+
+  var ncols = 1 + buses.length*4;
+  function blankRow(){ return new Array(ncols).fill(''); }
+  var row1=blankRow(), row2=blankRow(), row3=blankRow(), row4=blankRow(), row5=blankRow(), row6=blankRow();
+  buses.forEach(function(b, idx){
+    var start = 1 + idx*4;
+    row2[start] = '배정정보 '+(direction==='leave'?'상행':'하행')+'버스 배차';
+    row3[start] = b.name || ('버스 '+(idx+1)+'호');
+    row6[start]='NO'; row6[start+1]='구역'; row6[start+2]='이름';
+  });
+  var rows = [row1,row2,row3,row4,row5,row6];
+  var csv = rows.map(function(r){
+    return r.map(function(v){ v=String(v||''); return /[",\r\n]/.test(v) ? ('"'+v.replace(/"/g,'""')+'"') : v; }).join(',');
+  }).join('\r\n');
+  var blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = '배정정보업로드_양식_'+(direction==='leave'?'상행':'하행')+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function renderPagination(pages) {
   var el=$id('pagination'); if(!el) return;
   if(pages<=1){ el.innerHTML=''; return; }
@@ -19702,6 +20008,10 @@ function codeSaveUseYn(){
 
 document.addEventListener('DOMContentLoaded', function() {
   var _expose = [
+    // [v444] 배정정보 업로드
+    'busUploadOpen','busUploadClose','busUploadTriggerFile','busUploadHandleFile',
+    'busUploadProcessCsv','busUploadCommit','busUploadDownloadTemplate',
+    'busUploadParseCsvWide','busUploadMatchRoster',
     'doLogin','doLogout','onLoginIdInput','onLoginParishChange','switchPanel',
     'renderHome','updateStats','loadData','sheetRowToObj',
     'initHomeYearSelect','initHomeParishSelect','initHomeDistrictSelect','homeAggParishChange','homeAggQuery','homeAggExportCSV',
@@ -19770,6 +20080,10 @@ document.addEventListener('DOMContentLoaded', function() {
     'goalStatusYearChange','goalStatusQuery','renderGoalStatusPanel','goalStatusExportCSV'
   ];
   var _self = {
+    // [v444] 배정정보 업로드
+    busUploadOpen:busUploadOpen, busUploadClose:busUploadClose, busUploadTriggerFile:busUploadTriggerFile, busUploadHandleFile:busUploadHandleFile,
+    busUploadProcessCsv:busUploadProcessCsv, busUploadCommit:busUploadCommit, busUploadDownloadTemplate:busUploadDownloadTemplate,
+    busUploadParseCsvWide:busUploadParseCsvWide, busUploadMatchRoster:busUploadMatchRoster,
     doLogin:doLogin, doLogout:doLogout, onLoginIdInput:onLoginIdInput, onLoginParishChange:onLoginParishChange, switchPanel:switchPanel,
     renderHome:renderHome, updateStats:updateStats, loadData:loadData, sheetRowToObj:sheetRowToObj,
     initHomeYearSelect:initHomeYearSelect, initHomeParishSelect:initHomeParishSelect, initHomeDistrictSelect:initHomeDistrictSelect, homeAggParishChange:homeAggParishChange, homeAggQuery:homeAggQuery, homeAggExportCSV:homeAggExportCSV,
