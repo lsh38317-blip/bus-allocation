@@ -1325,6 +1325,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <button id="bus-tab-leader"  class="btn btn-primary btn-sm" onclick="busTab('leader')" style="display:none;">🎯 선탑자 지정</button>
             <button id="bus-tab-teams"   class="btn btn-navy btn-sm" onclick="busTab('teams')">👥 버스신청자불러오기</button>
             <button id="bus-tab-assign"  class="btn btn-primary btn-sm" onclick="busTab('assign')">🚌 버스 배정</button>
+            <!-- [v446] 배정정보 업로드 — 모달 방식에서 탭 방식으로 전환 -->
+            <button id="bus-tab-upload"  class="btn btn-primary btn-sm" onclick="busTab('upload')">⬆ 배정정보 업로드</button>
             <button id="bus-tab-summary" class="btn btn-primary btn-sm" style="display:none;" onclick="busTab('summary')">📋 배정 현황</button>
           </div>
 
@@ -1359,10 +1361,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                        참석/귀가 모드별 텍스트 자동전환은 busTeamsSubTab()이 그대로 처리) 그대로 유지 -->
                   <button id="bus-teams-reset-btn" onclick="busResetConfirm()" style="background:transparent;border:1px solid #d94040;color:#d94040;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 참석배정 전체 초기화</button>
                   <button id="bus-teams-reset-bytype-btn" onclick="busResetByAssignTypeConfirm()" style="background:transparent;border:1px solid #d97a1f;color:#d97a1f;border-radius:6px;padding:5px 12px;font-size:.77rem;cursor:pointer;font-weight:600;">🗑 배정유형별 초기화</button>
-                  <div style="width:1px;height:20px;background:var(--border2);"></div>
-                  <!-- [v444] 배정정보 업로드 — 확정 배차표(CSV, 호차별 wide 포맷)를 업로드해 개인별 배정버스(호차)를 일괄 반영.
-                       팀단위 집계(요약/팀내역)는 _updateBusSummarySheet()가 함께 갱신(기존 패턴 재사용). -->
-                  <button id="bus-upload-open-btn" class="btn btn-sm" onclick="busUploadOpen()" style="background:#eef4ff;border:1px solid #3f66b0;color:#1a3d8f;font-weight:700;" title="확정된 배차표(CSV)를 업로드해 개인별 배정버스(호차)를 일괄 반영합니다">⬆ 배정정보 업로드</button>
                 </div>
               </div>
               <!-- [v364] 배정버스1대 일괄 내역조회 결과 미리보기 — 배정유형별 구분선 + 배정내역 테이블 -->
@@ -1481,6 +1479,34 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
               <div id="bus-buses-leave-grid">
                 <div class="empty-state" style="padding:32px;"><div class="icon">🏠</div><p>귀가버스 팀 등록 후 자동 배정을 눌러주세요</p></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ④-2 배정정보 업로드 탭 [v446: 모달 → 탭 전환] -->
+          <div id="bus-panel-upload" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">⬆ 배정정보 업로드 (호차별 확정 배차표 CSV)</div>
+              </div>
+              <div style="padding:8px 0 18px;">
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+                  <span id="bus-upload-dir-badge" style="font-weight:700;color:var(--navy);background:var(--sky);border-radius:6px;padding:6px 12px;font-size:.85rem;">📍 현재 모드: 하행(참석)</span>
+                  <button class="btn btn-sm" style="background:#fff;border:1px solid var(--border);" onclick="busUploadDownloadTemplate()">📄 CSV 양식 다운로드</button>
+                  <button class="btn btn-sm" style="background:#1a4d8f;color:#fff;border:none;" onclick="busUploadTriggerFile()">📂 CSV 파일 선택</button>
+                  <input type="file" id="bus-upload-csv-input" accept=".csv" style="display:none;" onchange="busUploadHandleFile(this)">
+                </div>
+                <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">
+                  방향은 화면 상단의 "🚌 참석 관리 / 🏠 귀가 관리" 토글을 따릅니다(하행=참석 관리, 상행=귀가 관리).
+                  CSV 3행=호차명(선발대/본대/중고등부/직장조 등 배정유형 포함), 4행=일시+구분, 6행=NO/구역/이름 헤더, 7행부터 실 데이터입니다.
+                  기사/차량번호(5행)는 반영하지 않습니다. 기존 배정과 다르면 CSV 내용으로 <b>덮어쓰기</b>됩니다.
+                </div>
+                <div id="bus-upload-preview" style="font-size:.82rem;max-height:340px;overflow:auto;border:1px solid var(--border2);border-radius:8px;padding:10px;background:#fafbfc;"></div>
+                <div id="bus-upload-summary" style="margin-top:8px;font-size:.8rem;color:var(--muted);"></div>
+                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+                  <button class="btn btn-sm" style="background:#fff;border:1.5px solid var(--border);color:var(--text2);" onclick="busUploadReset()">🔄 초기화</button>
+                  <button class="btn btn-navy btn-sm" id="bus-upload-commit-btn" onclick="busUploadCommit()" disabled>☁️ 확정저장</button>
+                </div>
               </div>
             </div>
           </div>
@@ -3285,34 +3311,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
   </div>
 </div>
 
-<!-- [v444] 배정정보 업로드 모달 -->
-<div class="modal-overlay" id="bus-upload-modal">
-  <div class="modal" style="max-width:720px;">
-    <div class="modal-header">
-      <div class="modal-title">⬆ 배정정보 업로드 (호차별 확정 배차표 CSV)</div>
-      <button class="modal-close" onclick="busUploadClose()">✕</button>
-    </div>
-    <div style="padding:8px 0 18px;">
-      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="bus-upload-dir" id="bus-upload-dir-arrive" checked> 하행(참석)</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="bus-upload-dir" id="bus-upload-dir-leave"> 상행(귀가)</label>
-        <button class="btn btn-sm" style="background:#fff;border:1px solid var(--border);" onclick="busUploadDownloadTemplate()">📄 CSV 양식 다운로드</button>
-        <button class="btn btn-sm" style="background:#1a4d8f;color:#fff;border:none;" onclick="busUploadTriggerFile()">📂 CSV 파일 선택</button>
-        <input type="file" id="bus-upload-csv-input" accept=".csv" style="display:none;" onchange="busUploadHandleFile(this)">
-      </div>
-      <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">
-        CSV 3행=호차명(선발대/본대/중고등부/직장조 등 배정유형 포함), 4행=일시+구분, 6행=NO/구역/이름 헤더, 7행부터 실 데이터입니다.
-        기사/차량번호(5행)는 반영하지 않습니다. 기존 배정과 다르면 CSV 내용으로 <b>덮어쓰기</b>됩니다.
-      </div>
-      <div id="bus-upload-preview" style="font-size:.82rem;max-height:340px;overflow:auto;border:1px solid var(--border2);border-radius:8px;padding:10px;background:#fafbfc;"></div>
-      <div id="bus-upload-summary" style="margin-top:8px;font-size:.8rem;color:var(--muted);"></div>
-    </div>
-    <div class="modal-footer" style="gap:8px;">
-      <button class="btn btn-sm" style="background:#fff;border:1.5px solid var(--border);color:var(--text2);" onclick="busUploadClose()">취소</button>
-      <button class="btn btn-navy btn-sm" id="bus-upload-commit-btn" onclick="busUploadCommit()" disabled>☁️ 확정저장</button>
-    </div>
-  </div>
-</div>
 
 <!-- 계정 삭제 확인 모달 -->
 <div class="modal-overlay" id="acc-delete-modal">
@@ -5693,11 +5691,14 @@ function busCheckBusCountWarning(){
 // ── 탭 전환 ─────────────────────────────────────────
 function busTab(name){
   busCurrentTab=name;
-  ['teams','assign','summary','leader'].forEach(function(t){
+  ['teams','assign','upload','summary','leader'].forEach(function(t){
     var p=$id('bus-panel-'+t); if(p) p.style.display=(t===name)?'':'none';
     var b=$id('bus-tab-'+t);
     if(b) b.className=(t===name)?'btn btn-navy btn-sm':'btn btn-primary btn-sm';
   });
+  if(name==='upload'){
+    busUploadPanelInit();
+  }
   if(name==='assign'){
     _busRenderJHIncludeMainVisibility(); // [v371] 탭 전환만으로 진입한 경우에도 노출 동기화
     // 버스 배정 탭: 구글시트 재조회 후 렌더 (연동 시)
@@ -5934,6 +5935,7 @@ function busMainTypeTab(type){
   // 현재 열려있는 Lv2 메뉴만 새 타입 기준으로 재렌더링 (다른 메뉴로 강제 이동하지 않음)
   if(busCurrentTab==='teams')   busTeamsSubTab(type);
   if(busCurrentTab==='assign')  busAssignSubTab(type);
+  if(busCurrentTab==='upload')  busUploadSubTab(type);
   if(busCurrentTab==='summary') busSummarySubTab(type);
   if(busCurrentTab==='leader')  busLeaderSubTab(type);
 }
@@ -14711,17 +14713,28 @@ function _updateRosterBusAssign(receiptId, busName, sheetName){
 // ============================================================================
 var _busUploadState = { direction:'arrive', blocks:[], matched:[], unmatched:[], ambiguous:[] };
 
-function busUploadOpen(){
-  _busUploadState = { direction:'arrive', blocks:[], matched:[], unmatched:[], ambiguous:[] };
-  var dirArrive = $id('bus-upload-dir-arrive'); if(dirArrive) dirArrive.checked = true;
-  var dirLeave  = $id('bus-upload-dir-leave');  if(dirLeave)  dirLeave.checked  = false;
+// [v446] 방향 배지("현재 모드: 하행(참석)/상행(귀가)") 텍스트를 busMainType 기준으로 갱신
+function _busUploadUpdateDirBadge(){
+  var badge = $id('bus-upload-dir-badge'); if(!badge) return;
+  badge.textContent = '📍 현재 모드: ' + (busMainType==='leave' ? '상행(귀가)' : '하행(참석)');
+}
+// [v446] 업로드 패널 진입(탭 전환) 시 상태 초기화 — 기존 모달 busUploadOpen()의 역할을 대체
+function busUploadPanelInit(){
+  busUploadReset();
+}
+// [v446] 선택값/미리보기 결과만 리셋(모달이 아니므로 "닫기" 개념 없음). 확정저장 완료 후에도 재사용.
+function busUploadReset(){
+  _busUploadState = { direction: busMainType, blocks:[], matched:[], unmatched:[], ambiguous:[] };
+  _busUploadUpdateDirBadge();
   var prev = $id('bus-upload-preview'); if(prev) prev.innerHTML = '';
   var summary = $id('bus-upload-summary'); if(summary) summary.textContent = '';
   var commitBtn = $id('bus-upload-commit-btn'); if(commitBtn) commitBtn.disabled = true;
-  var modal = $id('bus-upload-modal'); if(modal) modal.classList.add('show');
+  var fileInp = $id('bus-upload-csv-input'); if(fileInp) fileInp.value = '';
 }
-function busUploadClose(){
-  var modal = $id('bus-upload-modal'); if(modal) modal.classList.remove('show');
+// [v446] 상단 참석/귀가 토글 전환 시(busMainTypeTab 경유) 호출 — 배지 갱신 + 이전 방향의
+// 매칭 결과가 남아있지 않도록 상태 초기화
+function busUploadSubTab(type){
+  busUploadReset();
 }
 function busUploadTriggerFile(){
   var inp = $id('bus-upload-csv-input'); if(inp) inp.click();
@@ -14867,7 +14880,7 @@ function busUploadMatchRoster(blocks){
 function busUploadProcessCsv(text){
   var parsed = busUploadParseCsvWide(text);
   if(parsed.error){ showToast('⚠️ '+parsed.error,'error'); return; }
-  var direction = ($id('bus-upload-dir-leave')||{}).checked ? 'leave' : 'arrive';
+  var direction = busMainType; // [v446] 라디오 대신 상단 참석/귀가 토글 값을 그대로 사용
   var m = busUploadMatchRoster(parsed.blocks);
   var totalEntries = parsed.blocks.reduce(function(s,b){ return s+b.entries.length; },0);
   if(!totalEntries){ showToast('⚠️ 인식된 데이터가 없습니다. 서식을 확인해주세요.','error'); return; }
@@ -14937,8 +14950,7 @@ function busUploadCommit(){
 
   chain.then(function(){
     showToast('✅ 배정정보 업로드 완료 (반영 '+okCount+'건 · 변경없음 '+skipCount+'건'+(failCount?(' · 실패 '+failCount+'건'):'')+')', failCount?'error':'success', true);
-    busUploadClose();
-    if(typeof busTab==='function' && typeof busCurrentTab!=='undefined') busTab(busCurrentTab||'teams');
+    busUploadReset(); // [v446] 모달이 아니므로 닫지 않고 상태만 리셋(탭은 그대로 유지)
   }).finally(function(){
     showLoading(false);
   });
@@ -14946,7 +14958,7 @@ function busUploadCommit(){
 
 // CSV 양식 다운로드 — 현재 등록된 호차(버스운행설정 기준)로 3~6행 구조가 채워진 빈 CSV 생성
 function busUploadDownloadTemplate(){
-  var direction = ($id('bus-upload-dir-leave')||{}).checked ? 'leave' : 'arrive';
+  var direction = busMainType; // [v446] 라디오 대신 상단 참석/귀가 토글 값을 그대로 사용
   var buses = direction==='leave' ? busLeaveBuses : busArriveBuses;
   if(!buses || !buses.length){ showToast('⚠️ 먼저 [버스운행설정]에서 호차를 등록해주세요.','error'); return; }
 
@@ -20019,7 +20031,7 @@ function codeSaveUseYn(){
 document.addEventListener('DOMContentLoaded', function() {
   var _expose = [
     // [v444] 배정정보 업로드
-    'busUploadOpen','busUploadClose','busUploadTriggerFile','busUploadHandleFile',
+    'busUploadPanelInit','busUploadReset','busUploadSubTab','busUploadTriggerFile','busUploadHandleFile',
     'busUploadProcessCsv','busUploadCommit','busUploadDownloadTemplate',
     'busUploadParseCsvWide','busUploadMatchRoster',
     'doLogin','doLogout','onLoginIdInput','onLoginParishChange','switchPanel',
@@ -20091,7 +20103,7 @@ document.addEventListener('DOMContentLoaded', function() {
   ];
   var _self = {
     // [v444] 배정정보 업로드
-    busUploadOpen:busUploadOpen, busUploadClose:busUploadClose, busUploadTriggerFile:busUploadTriggerFile, busUploadHandleFile:busUploadHandleFile,
+    busUploadPanelInit:busUploadPanelInit, busUploadReset:busUploadReset, busUploadSubTab:busUploadSubTab, busUploadTriggerFile:busUploadTriggerFile, busUploadHandleFile:busUploadHandleFile,
     busUploadProcessCsv:busUploadProcessCsv, busUploadCommit:busUploadCommit, busUploadDownloadTemplate:busUploadDownloadTemplate,
     busUploadParseCsvWide:busUploadParseCsvWide, busUploadMatchRoster:busUploadMatchRoster,
     doLogin:doLogin, doLogout:doLogout, onLoginIdInput:onLoginIdInput, onLoginParishChange:onLoginParishChange, switchPanel:switchPanel,
