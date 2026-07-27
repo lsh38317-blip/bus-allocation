@@ -1486,16 +1486,15 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <!-- ④-2 배정정보 업로드 탭 [v446: 모달 → 탭 전환] -->
           <div id="bus-panel-upload" style="display:none;">
             <div class="card">
-              <div class="card-header">
+              <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
                 <div class="card-title">⬆ 배정정보 업로드 (호차별 확정 배차표 CSV)</div>
-              </div>
-              <div style="padding:8px 0 18px;">
-                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
-                  <span id="bus-upload-dir-badge" style="font-weight:700;color:var(--navy);background:var(--sky);border-radius:6px;padding:6px 12px;font-size:.85rem;">📍 현재 모드: 하행(참석)</span>
+                <div style="display:flex;align-items:center;gap:8px;">
                   <button class="btn btn-sm" style="background:#fff;border:1px solid var(--border);" onclick="busUploadDownloadTemplate()">📄 CSV 양식 다운로드</button>
                   <button class="btn btn-sm" style="background:#1a4d8f;color:#fff;border:none;" onclick="busUploadTriggerFile()">📂 CSV 파일 선택</button>
                   <input type="file" id="bus-upload-csv-input" accept=".csv" style="display:none;" onchange="busUploadHandleFile(this)">
                 </div>
+              </div>
+              <div style="padding:8px 0 18px;">
                 <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">
                   방향은 화면 상단의 "🚌 참석 관리 / 🏠 귀가 관리" 토글을 따릅니다(하행=참석 관리, 상행=귀가 관리).
                   CSV 3행=호차명(선발대/본대/중고등부/직장조 등 배정유형 포함), 4행=일시+구분, 6행=NO/구역/이름 헤더, 7행부터 실 데이터입니다.
@@ -14876,7 +14875,13 @@ function busUploadMatchRoster(blocks){
       var candidates = retreat.filter(function(x){
         return _busUploadNormalizeDistrict(x.district)===district && (x.name||'').trim()===name;
       });
-      if(candidates.length===0){ unmatched.push({block:b, entry:e}); return; }
+      if(candidates.length===0){
+        // [v448] 진단정보 — 구역은 다르지만 이름이 일치하는 후보를 함께 찾아 원인 파악을 돕는다
+        // (예: CSV 구역표기 오류/공백 등으로 인한 실제 등록자 매칭 실패 케이스)
+        var nameOnly = retreat.filter(function(x){ return (x.name||'').trim()===name; });
+        unmatched.push({ block:b, entry:e, nameOnlyCandidates:nameOnly });
+        return;
+      }
       if(candidates.length>1){ ambiguous.push({block:b, entry:e, candidates:candidates}); return; }
       matched.push({ block:b, entry:e, r:candidates[0] });
     });
@@ -14911,8 +14916,17 @@ function busUploadRenderPreview(){
   var mCount=st.matched.length, uCount=st.unmatched.length, aCount=st.ambiguous.length;
   html += '<div style="margin-top:6px;font-weight:700;">매칭 '+mCount+'건 · 미매칭 '+uCount+'건 · 동명이인 '+aCount+'건</div>';
   if(uCount){
-    html += '<div style="color:#d94040;margin-top:4px;">미매칭(참석인원명단에 없음): '
-      + st.unmatched.map(function(x){ return esc((x.entry.district||'')+' '+x.entry.name); }).join(', ') + '</div>';
+    html += '<div style="color:#d94040;margin-top:4px;">미매칭(참석인원명단에 없음):<br>'
+      + st.unmatched.map(function(x){
+          var label = esc((x.entry.district||'')+' '+x.entry.name);
+          var cands = x.nameOnlyCandidates || [];
+          if(cands.length){
+            // [v448] 이름은 일치하지만 구역이 달라 매칭 실패한 케이스 — 실제 등록된 구역값을 함께 노출해 원인 파악
+            var realDistricts = cands.map(function(c){ return esc(c.district||'(구역없음)'); }).join('/');
+            return label + ' <span style="color:#8a4a00;">(이름은 일치 · 참석인원명단상 구역: '+realDistricts+')</span>';
+          }
+          return label + ' <span style="color:#999;">(이름 후보 없음 — 미등록 인원)</span>';
+        }).join('<br>') + '</div>';
   }
   if(aCount){
     html += '<div style="color:#d97a1f;margin-top:4px;">동명이인(구역+이름 중복, 반영 제외): '
