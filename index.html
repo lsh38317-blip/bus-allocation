@@ -3312,6 +3312,20 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
 
 <!-- 계정 삭제 확인 모달 -->
+<!-- [v453] "(미상 구역)" 진단 모달 -->
+<div class="modal-overlay" id="jh-diag-modal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title" id="jh-diag-title">🔍 "(미상 구역)" 진단정보</div>
+      <button class="modal-close" onclick="busJHDiagClose()">✕</button>
+    </div>
+    <div id="jh-diag-body" style="padding:8px 0 4px;max-height:420px;overflow:auto;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-navy btn-sm" onclick="busJHDiagClose()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="acc-delete-modal">
   <div class="modal" style="max-width:360px;">
     <div class="modal-header">
@@ -4764,6 +4778,130 @@ function isJuniorHighBus(r){
   var svc = (r.svcCode||'').trim();
   return grp === '중고등부' || svc === '27';
 }
+
+// [v451] 중고등부(가상 팀) 슬롯을 실제 교구/구역 pill에 합산해 표시하기 위한 공용 헬퍼.
+// - 대상 버스의 배정유형이 '중고등부'인 경우(전용버스)는 건드리지 않고 원본 slots 그대로 반환.
+// - 그 외 버스는 slots 중 '중고등부' 팀 슬롯을 제외한 뒤, 이 버스에 실제 배정된 중고등부 인원을
+//   retreat + _rosterFullArr/_rosterFullLv(접수ID→배정호차 인덱스)로 찾아 진짜 교구/구역별로 재집계,
+//   기존 같은 구역 pill에 합산(없으면 신규 pill 생성)한다.
+// - 원본 bus.slots/team.count는 변경하지 않고, 화면에 그릴 배열만 새로 만들어 반환한다(표시 전용).
+// [v453] "(미상 구역)" pill 클릭 시 보여줄 진단 정보 저장소. _busRenderSummaryList가 매 렌더링마다 초기화한다.
+var _busJHDiagRegistry = [];
+
+function _busMergeJHIntoDistrictPills(bus, slots, curTeams, direction){
+  if(!bus || (bus.assignType||'')==='중고등부') return slots; // 중고등부 전용버스는 그대로
+
+  var jhSlot = null;
+  var restSlots = [];
+  slots.forEach(function(s){
+    var t = curTeams.find(function(x){ return x.id===s.teamId; });
+    if(t && t.name==='중고등부') jhSlot = s; else restSlots.push(s);
+  });
+  if(!jhSlot) return slots; // 이 버스엔 중고등부 인원 없음
+
+  var fullIdx = direction==='leave' ? _rosterFullLv : _rosterFullArr;
+  var jhMembers = (typeof retreat!=='undefined' ? retreat : []).filter(function(r){
+    return isJuniorHighBus(r) && fullIdx && fullIdx[r.receiptId]===bus.name;
+  });
+
+  // 진짜 교구/구역별 재집계 (조회 실패 인원은 '(미상 구역)')
+  var byDistrict = {};
+  jhMembers.forEach(function(r){
+    var key = (String(r.parish||'').trim()+' '+String(r.district||'').trim()).trim() || '(미상 구역)';
+    if(!byDistrict[key]) byDistrict[key] = { parish:r.parish||'', district:r.district||'', count:0 };
+    byDistrict[key].count++;
+  });
+  var jhCountResolved = Object.keys(byDistrict).reduce(function(s,k){ return s+byDistrict[k].count; },0);
+  var diagIdx = null;
+  // 개인별 조회가 안 되는 경우(참석인원명단 미로딩 등) — 원래 집계 숫자만이라도 보존해 데이터 유실 방지
+  if(jhCountResolved < (jhSlot.count||0)){
+    var short = (jhSlot.count||0) - jhCountResolved;
+    var k2 = '(미상 구역)';
+    if(!byDistrict[k2]) byDistrict[k2] = { parish:'', district:'', count:0 };
+    byDistrict[k2].count += short;
+
+    // [v453] 진단정보 등록 — 이 버스에서 왜 "(미상 구역)"이 발생했는지 클릭 시 확인 가능하도록
+    var orphans = (typeof retreat!=='undefined' ? retreat : []).filter(function(r){
+      if(!isJuniorHighBus(r)) return false;
+      var assigned = fullIdx && fullIdx[r.receiptId];
+      return !assigned || assigned===bus.name; // 배정 기록이 아예 없거나(누락), 이 버스로 기록된 사람 중 이미 확인목록에 없는 경우
+    }).filter(function(r){ return jhMembers.indexOf(r)<0; }).slice(0,20);
+
+    diagIdx = _busJHDiagRegistry.length;
+    _busJHDiagRegistry.push({
+      busName: bus.name, direction: direction,
+      teamCount: jhSlot.count||0, resolvedCount: jhCountResolved, shortfall: short,
+      resolvedMembers: jhMembers.map(function(r){ return { name:r.name, parish:r.parish, district:r.district }; }),
+      orphanCandidates: orphans.map(function(r){ return { name:r.name, parish:r.parish, district:r.district, assignedBus: (fullIdx&&fullIdx[r.receiptId])||'(배정기록 없음)' }; })
+    });
+  }
+
+  var merged = restSlots.map(function(s){ return s; }); // 얕은 복사(표시 전용이므로 원본 team 객체 그대로 참조해도 무방)
+  Object.keys(byDistrict).forEach(function(key){
+    var info = byDistrict[key];
+    // 이미 해당 구역 pill이 있는 팀이면 표시용 합산 슬롯으로 교체
+    var existing = merged.find(function(s){
+      var t = curTeams.find(function(x){ return x.id===s.teamId; });
+      return t && !t.isJH && (t.parish+' '+t.district).trim()===key;
+    });
+    if(existing){
+      var origTeam = curTeams.find(function(x){ return x.id===existing.teamId; });
+      merged = merged.map(function(s){
+        if(s!==existing) return s;
+        return Object.assign({}, s, {
+          count: s.count + info.count,
+          _jhTeamOverride: Object.assign({}, origTeam, { count:(origTeam.count||0)+info.count })
+        });
+      });
+    } else {
+      // 해당 구역의 다른 인원은 이 버스에 없는 경우 — 신규 표시용 pill 생성(가상 팀 id)
+      var isUnresolved = (key==='(미상 구역)');
+      merged.push({
+        teamId: '__jhMerge__'+key,
+        count: info.count,
+        _jhTeamOverride: { id:'__jhMerge__'+key, name:isUnresolved?'(미상 구역)':key, color:isUnresolved?'#c89b30':'#6b8fc4', parish:info.parish, district:info.district, isJH:false, count:info.count, diagIdx:(isUnresolved?diagIdx:null) }
+      });
+    }
+  });
+  return merged;
+}
+
+// [v453] "(미상 구역)" pill 클릭 시 진단 정보 모달 표시
+function busJHDiagOpen(diagIdx){
+  var d = _busJHDiagRegistry[diagIdx];
+  if(!d){ showToast('진단정보를 찾을 수 없습니다. 화면을 다시 조회해주세요.','error'); return; }
+  var html = '<div style="font-size:.85rem;line-height:1.7;">'
+    + '<div style="margin-bottom:10px;"><b>'+esc(d.busName)+'</b> ('+(d.direction==='leave'?'상행/귀가':'하행/참석')+')</div>'
+    + '<div style="background:#fdf6e3;border:1px solid #f0dea0;border-radius:8px;padding:10px 14px;margin-bottom:12px;">'
+    + '팀 집계(버스배정_'+(d.direction==='leave'?'귀가':'참석')+'요약) 기준 중고등부: <b>'+d.teamCount+'명</b><br>'
+    + '개인별 원장(탑승자_'+(d.direction==='leave'?'귀가':'참석')+')에서 이 버스로 확인된 인원: <b>'+d.resolvedCount+'명</b><br>'
+    + '<span style="color:#c89b30;font-weight:700;">미상(원인 확인 필요): '+d.shortfall+'명</span>'
+    + '</div>';
+  if(d.resolvedMembers.length){
+    html += '<div style="font-weight:700;margin-bottom:4px;">✅ 이 버스로 확인된 중고등부 인원</div>'
+      + '<div style="margin-bottom:12px;">'+d.resolvedMembers.map(function(m){ return esc((m.parish||'')+' '+(m.district||'')+' '+m.name); }).join(', ')+'</div>';
+  }
+  if(d.orphanCandidates.length){
+    html += '<div style="font-weight:700;margin-bottom:4px;color:#d94040;">⚠️ 원인 후보 (배정기록이 없거나 이 버스로 애매하게 기록된 중고등부 대상자, 최대 20명)</div>'
+      + '<div style="display:flex;flex-direction:column;gap:3px;">'+d.orphanCandidates.map(function(m){
+          return '<div>'+esc((m.parish||'')+' '+(m.district||'')+' '+m.name)+' <span style="color:var(--muted);">— 탑승자_'+(d.direction==='leave'?'귀가':'참석')+' 기록: '+esc(m.assignedBus)+'</span></div>';
+        }).join('')+'</div>'
+      + '<div style="margin-top:8px;font-size:.76rem;color:var(--muted);">※ 위 후보들은 시스템이 스스로 진단할 수 없는 데이터 정합성 문제(팀집계 시트와 개인별 배정 시트 간 불일치)입니다. 참석인원명단·탑승자 시트를 직접 대조 확인해주세요.</div>';
+  } else {
+    html += '<div style="color:var(--muted);">전역에서 후보를 찾지 못했습니다. 시트를 새로고침(조회) 후 다시 확인해주세요.</div>';
+  }
+  html += '</div>';
+  var body = $id('jh-diag-body');
+  var titleEl = $id('jh-diag-title');
+  if(titleEl) titleEl.textContent = '🔍 "(미상 구역)" 진단정보';
+  if(body) body.innerHTML = html;
+  var modal = $id('jh-diag-modal');
+  if(modal) modal.classList.add('show');
+}
+function busJHDiagClose(){
+  var modal = $id('jh-diag-modal'); if(modal) modal.classList.remove('show');
+}
+
 
 // ── busTeams/busBuses: 버스배정 메뉴 현재 서브탭 기반 alias ──
 // 버스배정 메뉴 내부 함수들이 busTeams/busBuses를 직접 참조하므로
@@ -9421,7 +9559,6 @@ function busRenderBuses(type){
     html+='<div ondragover="event.preventDefault();busDragOverEnter(this)" ondragleave="busDragOverLeave(this)" ondrop="busDrop(\''+bus.id+'\',this)" '+
       'style="background:#fff;border:1.5px solid '+(over?'#f5c0c0':bus.isExtra?'#f0dea0':hasJH?'#d4a8e8':'var(--border2)')+';border-radius:12px;padding:14px;box-shadow:var(--shadow);position:relative;">'+
       (bus.isExtra?'<div style="position:absolute;top:-10px;left:12px;background:linear-gradient(90deg,#c89b30,#a07820);color:#fff;font-size:.65rem;font-weight:700;border-radius:20px;padding:2px 10px;">+ 추가 버스</div>':'')+
-      (hasJH?'<div style="position:absolute;top:-10px;right:12px;background:linear-gradient(90deg,#7b5ea7,#5a3d8a);color:#fff;font-size:.65rem;font-weight:700;border-radius:20px;padding:2px 10px;">🎒 중고등부</div>':'')+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'+(bus.isExtra||hasJH?'margin-top:8px;':'')+'">'+
       '<input value="'+esc(bus.name)+'" onchange="busRenameBus(\''+bus.id+'\',this.value)" style="background:transparent;border:none;font-weight:700;font-size:.88rem;color:'+(bus.isExtra?'#c89b30':hasJH?'#7b5ea7':'var(--navy)')+';width:calc(100% - 90px);outline:none;">'+
       '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">'+
@@ -9598,7 +9735,6 @@ function busRenderSummary(type){
     });
     html+='<div style="background:#fff;border:1px solid '+(over?'#f5c0c0':bus.isExtra?'#f0dea0':hasJH2?'#d4a8e8':'var(--border2)')+';border-radius:12px;padding:16px 20px;box-shadow:var(--shadow);position:relative;">'+
       (bus.isExtra?'<div style="position:absolute;top:-10px;left:14px;background:linear-gradient(90deg,#c89b30,#a07820);color:#fff;font-size:.65rem;font-weight:700;border-radius:20px;padding:2px 10px;">+ 추가 버스</div>':'')+
-      (hasJH2?'<div style="position:absolute;top:-10px;right:14px;background:linear-gradient(90deg,#7b5ea7,#5a3d8a);color:#fff;font-size:.65rem;font-weight:700;border-radius:20px;padding:2px 10px;">🎒 중고등부</div>':'')+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'+(bus.isExtra||hasJH2?'margin-top:8px;':'')+'">'+
       '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">'+
       '<div style="width:3px;height:15px;background:'+(bus.isExtra?'#c89b30':hasJH2?'#7b5ea7':'var(--navy)')+';border-radius:2px;"></div>'+
@@ -11135,6 +11271,7 @@ function busRenderView(){
 // ── 배정 현황 렌더 ────────────────────────────────────
 function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses, visibleTeamIds, sheetUnassignTeams){
   if(!listEl) return;
+  _busJHDiagRegistry = []; // [v453] 매 렌더링마다 "(미상 구역)" 진단 레지스트리 초기화
   // [v327] "분산 배정"은 운행 버스가 2대 이상일 때만 의미가 있으므로, 1대 이하면 태그/리스트를 숨긴다.
   var showSplitStat = (active && active.length>=2);
   // bvwType 기반 현재 버스/팀 데이터
@@ -11151,26 +11288,22 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
     var slots = visibleTeamIds
       ? bus.slots.filter(function(s){ return visibleTeamIds.indexOf(s.teamId)>=0; })
       : bus.slots;
+    // [v451] 중고등부 인원을 실제 교구/구역 pill에 합산한 "표시 전용" 배열 — pill 렌더링에만 사용
+    var pillSlots = _busMergeJHIntoDistrictPills(bus, slots, curTeams, bvwType);
     var load = slots.reduce(function(s,sl){ return s+sl.count; },0);
     var over=load>cap; var pct=Math.min(100,(load/cap)*100);
     var hasMyTeam = visibleTeamIds
       ? bus.slots.some(function(s){ return visibleTeamIds.indexOf(s.teamId)>=0; })
       : false;
-    // 중고등부 배정 여부
-    var hasJH = bus.slots.some(function(s){
-      var t=curTeams.find(function(x){ return x.id===s.teamId; });
-      return t && t.name==='중고등부';
-    });
-    var cardBorder = over ? '#f5c0c0' : hasMyTeam ? '#2d8a5a' : hasJH ? '#d4a8e8' : bus.isExtra ? '#f0dea0' : 'var(--border2)';
-    var cardBorderWidth = (hasMyTeam || hasJH) ? '2px' : '1px';
+    var cardBorder = over ? '#f5c0c0' : hasMyTeam ? '#2d8a5a' : bus.isExtra ? '#f0dea0' : 'var(--border2)';
+    var cardBorderWidth = hasMyTeam ? '2px' : '1px';
     return '<div style="background:#fff;border:'+cardBorderWidth+' solid '+cardBorder+';border-radius:12px;padding:16px 20px;box-shadow:var(--shadow);position:relative;">'+
       (bus.isExtra?'<div style="position:absolute;top:-10px;left:14px;background:linear-gradient(90deg,#c89b30,#a07820);color:#fff;font-size:.65rem;font-weight:700;border-radius:20px;padding:2px 10px;">+ 추가 버스</div>':'')+
-      (hasJH&&!hasMyTeam?'<div style="position:absolute;top:-10px;right:14px;background:linear-gradient(90deg,#7b5ea7,#5a3d8a);color:#fff;font-size:.65rem;font-weight:700;border-radius:20px;padding:2px 10px;">🎒 중고등부</div>':'')+
       (hasMyTeam?'<div style="position:absolute;top:-10px;right:14px;background:linear-gradient(90deg,#2d8a5a,#1a6b40);color:#fff;font-size:.65rem;font-weight:700;border-radius:20px;padding:2px 10px;">✅ 내 구역 탑승</div>':'')+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'+(bus.isExtra||hasMyTeam||hasJH?'margin-top:8px;':'')+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'+(bus.isExtra||hasMyTeam?'margin-top:8px;':'')+'">'+
       '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">'+
-      '<div style="width:3px;height:15px;background:'+(bus.isExtra?'#c89b30':hasJH&&!hasMyTeam?'#7b5ea7':hasMyTeam?'#2d8a5a':'var(--navy)')+';border-radius:2px;"></div>'+
-      '<span style="font-weight:700;font-size:.95rem;color:'+(bus.isExtra?'#c89b30':hasJH&&!hasMyTeam?'#7b5ea7':hasMyTeam?'#2d8a5a':'var(--navy)')+';">'+esc(bus.name)+'</span>'+
+      '<div style="width:3px;height:15px;background:'+(bus.isExtra?'#c89b30':hasMyTeam?'#2d8a5a':'var(--navy)')+';border-radius:2px;"></div>'+
+      '<span style="font-weight:700;font-size:.95rem;color:'+(bus.isExtra?'#c89b30':hasMyTeam?'#2d8a5a':'var(--navy)')+';">'+esc(bus.name)+'</span>'+
       '<span style="font-size:.77rem;color:var(--muted);">'+slots.length+'팀</span>'+
       '<span style="font-size:.78rem;color:var(--text2);">승차위치: <strong style="color:var(--text);">'+esc(bus.boardLoc||'-')+'</strong></span>'+
       '<span style="font-size:.78rem;color:var(--text2);">하차위치: <strong style="color:var(--text);">'+esc(bus.alightLoc||'-')+'</strong></span>'+
@@ -11184,21 +11317,28 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
       '<div style="background:var(--border2);border-radius:4px;height:6px;margin-bottom:12px;overflow:hidden;"><div style="height:100%;border-radius:4px;width:'+pct+'%;background:'+(over?'#d94040':'linear-gradient(90deg,#4a7fc1,#2d8a5a)')+';transition:width .5s;"></div></div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:6px;">'+
 
-      (slots.length===0?'<span style="color:var(--muted);font-size:.82rem;">배정된 팀 없음</span>':
-        slots.map(function(slot){
-          var team=curTeams.find(function(t){ return t.id===slot.teamId; }); if(!team) return '';
-          var isMine = visibleTeamIds && visibleTeamIds.indexOf(slot.teamId)>=0;
-          var isSplit=showSplitStat && curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }).length>=2;
+      (pillSlots.length===0?'<span style="color:var(--muted);font-size:.82rem;">배정된 팀 없음</span>':
+        pillSlots.map(function(slot){
+          var team=slot._jhTeamOverride || curTeams.find(function(t){ return t.id===slot.teamId; }); if(!team) return '';
+          var isMine = visibleTeamIds && !slot._jhTeamOverride && visibleTeamIds.indexOf(slot.teamId)>=0;
+          var isSplit=!slot._jhTeamOverride && showSplitStat && curBuses.filter(function(b){ return b.slots.some(function(s){ return s.teamId===team.id; }); }).length>=2;
           var slotBg    = isMine ? '#edf7f2' : isSplit ? '#fdf6e3' : '#f7f8fc';
           var slotBd    = isMine ? '#2d8a5a' : isSplit ? '#f0dea0' : 'var(--border2)';
           var slotColor = isMine ? '#2d8a5a' : isSplit ? '#c89b30' : team.color;
-          return '<div onclick="busRosterOpen(\''+team.id+'\',\''+esc(team.name)+'\',\''+esc(bus.name)+'\',\''+bvwType+'\')" style="background:'+slotBg+';border:1px solid '+slotBd+';border-radius:8px;padding:5px 12px;display:flex;align-items:center;gap:5px;cursor:pointer;transition:opacity .15s;" onmouseover="this.style.opacity=.82" onmouseout="this.style.opacity=1">'+
+          var isSynthetic = String(team.id||'').indexOf('__jhMerge__')===0;
+          var hasDiag = isSynthetic && team.diagIdx!=null;
+          var clickAttr = hasDiag
+            ? ('onclick="busJHDiagOpen('+team.diagIdx+')" ')
+            : (isSynthetic ? '' : ('onclick="busRosterOpen(\''+team.id+'\',\''+esc(team.name)+'\',\''+esc(bus.name)+'\',\''+bvwType+'\')" '));
+          var clickable = hasDiag || !isSynthetic;
+          return '<div '+clickAttr+'style="background:'+slotBg+';border:1px solid '+slotBd+';border-radius:8px;padding:5px 12px;display:flex;align-items:center;gap:5px;'+(clickable?'cursor:pointer;transition:opacity .15s;':'')+'" '+(clickable?'onmouseover="this.style.opacity=.82" onmouseout="this.style.opacity=1"':'')+'>'+
             '<div style="width:7px;height:7px;border-radius:50%;background:'+(isMine?'#2d8a5a':isSplit?'#c89b30':team.color)+';flex-shrink:0;"></div>'+
             (isMine?'<span style="font-size:.65rem;background:#2d8a5a;color:#fff;border-radius:3px;padding:1px 5px;font-weight:700;">내구역</span>':'')+
             '<span style="font-size:.83rem;font-weight:600;color:var(--text);">'+esc(team.name)+'</span>'+
             '<span style="font-size:.76rem;color:'+slotColor+';font-weight:700;">'+(isSplit?(slot.count+'명/전체'+busTeamSlotTotal(team,curBuses)+'명'):slot.count+'명')+'</span>'+
             (isSplit?'<span style="font-size:.65rem;color:#c89b30;">✂️</span>':'')+
-            '<span style="font-size:.65rem;color:var(--muted);margin-left:2px;">▶</span>'+
+            (hasDiag?'<span style="font-size:.65rem;color:#c89b30;" title="클릭하면 진단정보를 볼 수 있습니다">🔍</span>':'')+
+            (clickable?'<span style="font-size:.65rem;color:var(--muted);margin-left:2px;">▶</span>':'')+
             '</div>';
         }).join(''))+
       '</div></div>';
@@ -20081,7 +20221,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'busTab','busAddTeam','busDeleteTeamConfirm','busDeleteTeamExecute','busTeamDeleteModalClose',
     'busEditTeam','busEditSave','busHandleCSV','busAutoAssign','busLoadRegisteredCount','busRemoveSlot','busReuniteGuardianPairs','getBusPaxByTeam',
     'busAssignBus1Bulk','busJHMergeToggle',
-    'busDeleteBus','busResetAll','busResetConfirm','busResetByAssignTypeConfirm','vwClearAllConfirm','_busTeamTabReset','_busTeamTabResetByAssignType','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busFindBaseRegIds','_busClearLeaderIds','_busRowMatchesAssignType','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew','_busCalcReassignGroups','calcBusUnassignedCounts',
+    'busDeleteBus','busResetAll','busResetConfirm','busResetByAssignTypeConfirm','vwClearAllConfirm','_busTeamTabReset','_busTeamTabResetByAssignType','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busFindBaseRegIds','_busClearLeaderIds','_busRowMatchesAssignType','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew','_busCalcReassignGroups','calcBusUnassignedCounts','_busMergeJHIntoDistrictPills','busJHDiagOpen','busJHDiagClose',
     'busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh','busCheckBusCountWarning','busUpdateCapSummary','_busJHIncludeMainSync',
     'busBulk1ImportOpen','busBulk1SaveAll',
     'busSaveToSheet','busExportCSV','busRestore',
@@ -20163,7 +20303,7 @@ document.addEventListener('DOMContentLoaded', function() {
     busAssignBus1Bulk:busAssignBus1Bulk, busJHMergeToggle:busJHMergeToggle,
     busRemoveSlot:busRemoveSlot, busDeleteBus:busDeleteBus,
     busResetAll:busResetAll, busResetConfirm:busResetConfirm, busResetByAssignTypeConfirm:busResetByAssignTypeConfirm, vwClearAllConfirm:vwClearAllConfirm, _busTeamTabReset:_busTeamTabReset, _busTeamTabResetByAssignType:_busTeamTabResetByAssignType, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear, _busFindBaseRegIds:_busFindBaseRegIds, _busClearLeaderIds:_busClearLeaderIds, _busRowMatchesAssignType:_busRowMatchesAssignType,
-    busDrop:busDrop, busMoveSlot:busMoveSlot, busDragOverEnter:busDragOverEnter, busDragOverLeave:busDragOverLeave, busRenderView:busRenderView, busSetDrag:busSetDrag, busSetDragNew:busSetDragNew, _busCalcReassignGroups:_busCalcReassignGroups, calcBusUnassignedCounts:calcBusUnassignedCounts,
+    busDrop:busDrop, busMoveSlot:busMoveSlot, busDragOverEnter:busDragOverEnter, busDragOverLeave:busDragOverLeave, busRenderView:busRenderView, busSetDrag:busSetDrag, busSetDragNew:busSetDragNew, _busCalcReassignGroups:_busCalcReassignGroups, calcBusUnassignedCounts:calcBusUnassignedCounts, _busMergeJHIntoDistrictPills:_busMergeJHIntoDistrictPills, busJHDiagOpen:busJHDiagOpen, busJHDiagClose:busJHDiagClose,
     busImportFromRetreat:busImportFromRetreat, busLoadTeamsFromSheet:busLoadTeamsFromSheet, _busLoadOneTeamSheet:_busLoadOneTeamSheet, busSaveTeamsToSheet:busSaveTeamsToSheet, _busUpdateTeamStatus:_busUpdateTeamStatus, _busUpdateTeamStatusAndRefresh:_busUpdateTeamStatusAndRefresh, busCheckBusCountWarning:busCheckBusCountWarning, busUpdateCapSummary:busUpdateCapSummary, _busJHIncludeMainSync:_busJHIncludeMainSync,
     busBulk1ImportOpen:busBulk1ImportOpen, busBulk1SaveAll:busBulk1SaveAll,
     busSaveToSheet:busSaveToSheet, busExportCSV:busExportCSV,
