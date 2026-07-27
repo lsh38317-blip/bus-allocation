@@ -14859,15 +14859,22 @@ function busUploadParseCsvWide(text){
 }
 
 // 파싱된 블록들을 retreat[]와 구역+이름 키로 매칭
+// [v447] 구역 값 정규화 — CSV의 "12"와 참석인원명단의 "12구역"처럼 표기가 달라도
+// 같은 구역으로 인식하도록 숫자만 추출해 비교. 숫자가 전혀 없으면(예: 선탑자 행의 "교사","고1" 등
+// 구역이 아닌 값) 원문 그대로 비교해 오매칭을 방지한다.
+function _busUploadNormalizeDistrict(v){
+  var digits = String(v||'').replace(/[^0-9]/g,'');
+  return digits ? digits : String(v||'').trim();
+}
 function busUploadMatchRoster(blocks){
   var matched=[], unmatched=[], ambiguous=[];
   blocks.forEach(function(b){
     b.entries.forEach(function(e){
-      var district = String(e.district||'').trim();
+      var district = _busUploadNormalizeDistrict(e.district);
       var name = String(e.name||'').trim();
       if(!name) return;
       var candidates = retreat.filter(function(x){
-        return (x.district||'').trim()===district && (x.name||'').trim()===name;
+        return _busUploadNormalizeDistrict(x.district)===district && (x.name||'').trim()===name;
       });
       if(candidates.length===0){ unmatched.push({block:b, entry:e}); return; }
       if(candidates.length>1){ ambiguous.push({block:b, entry:e, candidates:candidates}); return; }
