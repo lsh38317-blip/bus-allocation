@@ -19526,15 +19526,21 @@ var _rvRosterRows = [];  // 현재 드로어에 표시 중인 행 캐시
 // [v382] "숙소" 컬럼(구 "배정호") 헤더 클릭 정렬 상태 — 팝업을 새로 열 때마다 오름차순으로 초기화된다.
 var _rvRoomSortDir = 'asc';
 // [v426] 숙소 오름차순 1차 정렬 + 동일 숙소 내 이름 오름차순 2차 정렬
+// [v445] 동일 숙소 내에서 교구/구역이 뒤섞여 보이는 문제 개선 — 숙소→교구→구역→이름 4단계 정렬로 확장
 function _rvSortRoomsAsc(arr){
   return arr.slice().sort(function(a,b){
     var c = (a.room||'').localeCompare(b.room||'','ko');
     if(c!==0) return c;
+    var cp = (a.parish||'').localeCompare(b.parish||'','ko');
+    if(cp!==0) return cp;
+    var cd = (a.district||'').localeCompare(b.district||'','ko');
+    if(cd!==0) return cd;
     return (a.name||'').localeCompare(b.name||'','ko');
   });
 }
 // [v382] "숙소" 헤더 클릭 시 오름차순/내림차순 토글 정렬 (검색 필터가 적용돼 있으면 그 결과 기준으로 정렬)
 // [v426] 숙소값이 같은 경우(동일 숙소)에는 토글 방향과 무관하게 이름은 항상 오름차순으로 고정
+// [v445] 동일 숙소 내 정렬에 교구→구역 tier 추가(토글 방향과 무관하게 항상 오름차순 고정), 이름은 최종 4단계
 function rvSortByRoom(){
   _rvRoomSortDir = (_rvRoomSortDir==='asc') ? 'desc' : 'asc';
   var inp=$id('rvdr-search');
@@ -19546,6 +19552,10 @@ function rvSortByRoom(){
   var sorted = base.slice().sort(function(a,b){
     var c = (a.room||'').localeCompare(b.room||'','ko');
     if(c!==0) return _rvRoomSortDir==='asc' ? c : -c;
+    var cp = (a.parish||'').localeCompare(b.parish||'','ko');
+    if(cp!==0) return cp;
+    var cd = (a.district||'').localeCompare(b.district||'','ko');
+    if(cd!==0) return cd;
     return (a.name||'').localeCompare(b.name||'','ko');
   });
   rvRosterRender(sorted);
@@ -20067,7 +20077,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'roomInputReset','roomSheetResetConfirm','roomResetAll','roomSaveToSheet','roomExportCSV','roomRestore','_getRoomFilter',
     'roomAddBuilding','roomAddGroup','roomAutoAssign','roomRenderBuildings','roomRenderView',
     'roomviewSearch',
-    'rvOpenRoster','rvOpenBuildingRoster','rvRosterRender','rvRosterFilter','rvRosterClose','rvSortByRoom',
+    'rvOpenRoster','rvOpenBuildingRoster','rvRosterRender','rvRosterFilter','rvRosterClose','rvSortByRoom','_rvSortRoomsAsc',
     'roomRosterOpen','roomRosterClose','roomRosterFilter',
     'busRosterOpen','busRosterOpenForBus','busRosterClose','busRosterFilter',
     '_bvwCalcSheetStats','_bvwFetchSheetStats','_bvwRenderStatsOnly',
@@ -20153,7 +20163,7 @@ document.addEventListener('DOMContentLoaded', function() {
     roomAddBuilding:roomAddBuilding, roomAddGroup:roomAddGroup,
     roomAutoAssign:roomAutoAssign, roomRenderBuildings:roomRenderBuildings, roomRenderView:roomRenderView,
     roomviewSearch:roomviewSearch,
-    rvOpenRoster:rvOpenRoster, rvOpenBuildingRoster:rvOpenBuildingRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose, rvSortByRoom:rvSortByRoom,
+    rvOpenRoster:rvOpenRoster, rvOpenBuildingRoster:rvOpenBuildingRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose, rvSortByRoom:rvSortByRoom, _rvSortRoomsAsc:_rvSortRoomsAsc,
     roomRosterOpen:roomRosterOpen, roomRosterClose:roomRosterClose, roomRosterFilter:roomRosterFilter,
     busRosterOpen:busRosterOpen, busRosterOpenForBus:busRosterOpenForBus, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
     _bvwCalcSheetStats:_bvwCalcSheetStats, _bvwFetchSheetStats:_bvwFetchSheetStats, _bvwRenderStatsOnly:_bvwRenderStatsOnly,
