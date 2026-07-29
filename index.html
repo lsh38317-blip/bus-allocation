@@ -4947,6 +4947,10 @@ var _busRegisteredCountCache = {};
 // [v323] 버스정원 캐시 — _busRegisteredCountCache와 짝. busLoadRegisteredCount()가 명시적 클릭 시에만 채움.
 // 키: '배정유형|참석또는귀가' → 등록 버스정원(number). busGetCap()이 이 캐시를 우선 참조한다.
 var _busRegisteredCapCache = {};
+// [v467] 버스배정_운전자정보에 등록된 배차 슬롯별 버스명 캐시 — busLoadRegisteredCount()가
+// 명시적 클릭 시에만 채움. 키: '배정유형|참석또는귀가' → ['버스 2호', ...] (슬롯 순서 배열).
+// 자동배정/1대일괄배정이 순번 기반 "버스 N호" 대신 이 등록값을 우선 사용한다.
+var _busRegisteredBaeNamesCache = {};
 var busAssignSub   = 'arrive'; // 배정 서브탭
 var busSummarySub  = 'arrive'; // 현황 서브탭
 var busTeamsSub    = 'arrive'; // 팀관리 서브탭
@@ -5668,6 +5672,20 @@ function busLoadRegisteredCount(){
     } else {
       delete _busRegisteredCountCache[key];
       delete _busRegisteredCapCache[key];
+    }
+    // [v467] 등록된 배차 슬롯별 버스명도 함께 조회 — 자동배정/1대일괄배정이 순번 대신 이 값을 사용
+    if(matchBase && matchBase['등록ID']){
+      var regId = matchBase['등록ID'];
+      return apiCall({action:'getAll', sheetName:'버스배정_운전자정보'}).then(function(drvRes){
+        var drvRows = (drvRes&&drvRes.success) ? (drvRes.data||drvRes.rows||[]) : [];
+        var myRows = drvRows.filter(function(r){ return String(r['등록ID']||'')===String(regId); });
+        _busRegisteredBaeNamesCache[key] = myRows.map(function(r){
+          var label = bbNormalizeBaeLabel(r['배차']);
+          return label ? ('버스 '+label) : '';
+        });
+      }).catch(function(){ delete _busRegisteredBaeNamesCache[key]; });
+    } else {
+      delete _busRegisteredBaeNamesCache[key];
     }
     // [v311] 배정유형별 팀 목록도 함께 재조회 — 이 시점의 bus-sel-assigntype 값을 기준으로
     // _busLoadOneTeamSheet가 필터링하므로, 최소대수 계산이 해당 배정유형 인원수만 반영하게 됨
@@ -7016,7 +7034,10 @@ function _busBulk1AggregateForType(rows, type, assignType){
   rows.filter(function(r){
     if((r[transportKey]||'').trim()!=='버스') return false;
     if(isBusExcluded(r)) return false;
-    if(isJuniorHighBus(r,assignType)) return assignType==='중고등부';
+    // [v466] 버그수정 — 이전 줄 `if(isJuniorHighBus(r,assignType)) return assignType==='중고등부';`은
+    // isJuniorHighBus가 컨텍스트 기준으로 바뀐 뒤(v460) assignType==='중고등부'일 때 항상 true를
+    // 반환해(단락회로) 아래 필드 매칭 없이 버스 탑승자 전원이 중고등부로 잡히는 심각한 버그였음.
+    // 이제 모든 배정유형(중고등부 포함)이 동일하게 본인 필드 매칭만으로 판정된다.
     var val = isLeave ? r.leaveAssignType : r.arriveAssignType;
     return (val||'').trim() === assignType;
   }).forEach(function(r){
@@ -7707,10 +7728,13 @@ function busAutoAssign(type){
   var metaAlight = type==='leave'
     ? ($id('bus-leave-alight') ||{value:''}).value
     : ($id('bus-arrive-alight')||{value:''}).value;
+  // [v467] 버스배정_운전자정보에 등록된 배차 슬롯별 버스명(예: "버스 2호") — 없으면 순번 기반 폴백
+  var _baeNames = _busRegisteredBaeNamesCache[_v352AssignType+'|'+_lcDirection] || [];
   for(var i=0; i<actual; i++){
     var buses0   = type==='leave' ? busLeaveBuses : busArriveBuses;
     var existing = buses0[i]||{};
-    nb.push({id:busUid(), name:'버스 '+(i+1)+'호', slots:[], isExtra:i>=calculated,
+    var _baeName = _baeNames[i] || ('버스 '+(i+1)+'호');
+    nb.push({id:busUid(), name:_baeName, slots:[], isExtra:i>=calculated,
              boardLoc: existing.boardLoc || metaBoard  || '',
              alightLoc:existing.alightLoc|| metaAlight || ''});
   }
@@ -8332,8 +8356,20 @@ function _busAssignSingleTypeToOneBus(type, assignType, baseRow, sharedTeamRows)
   if(!people.length) return Promise.resolve(0);
   var cap = parseInt(baseRow['버스정원'],10) || busGetCap(type);
   var busName = '버스 1호';
+  var regId = baseRow['등록ID'];
 
-  return apiCall({action:'getAll', sheetName:rosterSheet}).then(function(rosterRes){
+  // [v467] 버스배정_운전자정보에 등록된 배차값이 있으면 우선 사용(예: "버스 2호"), 없으면 기존 폴백
+  return (regId ? apiCall({action:'getAll', sheetName:'버스배정_운전자정보'}) : Promise.resolve(null)).then(function(drvRes){
+    if(regId && drvRes && drvRes.success){
+      var drvRows = (drvRes.data||drvRes.rows||[]);
+      var myRow = drvRows.find(function(r){ return String(r['등록ID']||'')===String(regId); });
+      if(myRow){
+        var label = bbNormalizeBaeLabel(myRow['배차']);
+        if(label) busName = '버스 '+label;
+      }
+    }
+    return apiCall({action:'getAll', sheetName:rosterSheet});
+  }).then(function(rosterRes){
     var rosterRows = (rosterRes&&rosterRes.success) ? (rosterRes.data||rosterRes.rows||[]) : [];
     var rosterHdr = ['NO','년도','수양회종류','행사명','배정유형','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
     var preserved = rosterRows.filter(function(r){
@@ -12015,7 +12051,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v465_bus_assign_screen_reset_btn';
+var CACHE_VERSION = 'v467_bus_name_from_registered_bae';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
