@@ -5647,6 +5647,20 @@ function busSyncCountInputToState(type){
   busUpdateCapSummary();
   busCheckBusCountWarning();
 }
+// [v468] 버스배정_운전자정보에서 등록ID 기준 "배차" 슬롯별 버스명을 항상 새로 API조회해 반환하는
+// 공용 헬퍼. busLoadRegisteredCount()(버스운행설정 불러오기)와 busAssignQuery()(🔍 조회)가 공유해서
+// 사용 — 조회 시점마다 최신 배차 등록값을 반영하기 위해 캐시에만 의존하지 않고 매번 API를 호출한다.
+function _busFetchBaeNamesFresh(regId){
+  if(!regId) return Promise.resolve([]);
+  return apiCall({action:'getAll', sheetName:'버스배정_운전자정보'}).then(function(drvRes){
+    var drvRows = (drvRes&&drvRes.success) ? (drvRes.data||drvRes.rows||[]) : [];
+    var myRows = drvRows.filter(function(r){ return String(r['등록ID']||'')===String(regId); });
+    return myRows.map(function(r){
+      var label = bbNormalizeBaeLabel(r['배차']);
+      return label ? ('버스 '+label) : '';
+    });
+  });
+}
 // [v323] "버스운행설정 불러오기" 버튼 — 버스운행설정의 등록 배정대수·버스정원을 조회해
 // _busRegisteredCountCache/_busRegisteredCapCache에 그대로 반영(스피너가 없으므로 "최소값 보정"이 아닌
 // "그대로 대체"). 패널 진입/배정유형 변경만으로는 절대 호출되지 않음(명시적 클릭 전용, v286 원칙 유지).
@@ -5673,16 +5687,11 @@ function busLoadRegisteredCount(){
       delete _busRegisteredCountCache[key];
       delete _busRegisteredCapCache[key];
     }
-    // [v467] 등록된 배차 슬롯별 버스명도 함께 조회 — 자동배정/1대일괄배정이 순번 대신 이 값을 사용
+    // [v467→v468] 등록된 배차 슬롯별 버스명도 함께 조회 — 자동배정/1대일괄배정이 순번 대신 이 값을 사용
+    // (공용 헬퍼 _busFetchBaeNamesFresh로 통일 — busAssignQuery()와 동일 로직)
     if(matchBase && matchBase['등록ID']){
-      var regId = matchBase['등록ID'];
-      return apiCall({action:'getAll', sheetName:'버스배정_운전자정보'}).then(function(drvRes){
-        var drvRows = (drvRes&&drvRes.success) ? (drvRes.data||drvRes.rows||[]) : [];
-        var myRows = drvRows.filter(function(r){ return String(r['등록ID']||'')===String(regId); });
-        _busRegisteredBaeNamesCache[key] = myRows.map(function(r){
-          var label = bbNormalizeBaeLabel(r['배차']);
-          return label ? ('버스 '+label) : '';
-        });
+      return _busFetchBaeNamesFresh(matchBase['등록ID']).then(function(names){
+        _busRegisteredBaeNamesCache[key] = names;
       }).catch(function(){ delete _busRegisteredBaeNamesCache[key]; });
     } else {
       delete _busRegisteredBaeNamesCache[key];
@@ -5741,7 +5750,14 @@ function busAssignQuery(){
       _busRegisteredCountCache[key] = parseInt(matchBase['배정대수'],10)||0;
       _busRegisteredCapCache[key]   = parseInt(matchBase['버스정원'],10)||0;
     }
-    return new Promise(function(resolve){ _busLoadOneTeamSheet(type, resolve); });
+    // [v468] 조회할 때마다 버스배정_운전자정보의 "배차" 값을 새로 API조회해 카드 제목에 반영
+    // (캐시 재사용 아님 — 정확성 우선. 등록ID가 없으면 빈 배열 → 아래에서 순번 폴백)
+    var _baeQueryPromise = (matchBase && matchBase['등록ID'])
+      ? _busFetchBaeNamesFresh(matchBase['등록ID']).then(function(names){ _busRegisteredBaeNamesCache[key]=names; })
+      : Promise.resolve().then(function(){ delete _busRegisteredBaeNamesCache[key]; });
+    return _baeQueryPromise.then(function(){
+      return new Promise(function(resolve){ _busLoadOneTeamSheet(type, resolve); });
+    });
   }).then(function(){
     var teams = type==='leave' ? busLeaveTeams : busArriveTeams;
     var assignedTeams = teams.filter(function(t){ return t.sheetStatus==='배정' && t.sheetBus; });
@@ -5769,9 +5785,14 @@ function busAssignQuery(){
 
     var metaBoard  = type==='leave' ? ($id('bus-leave-board') ||{value:''}).value : ($id('bus-arrive-board')||{value:''}).value;
     var metaAlight = type==='leave' ? ($id('bus-leave-alight')||{value:''}).value : ($id('bus-arrive-alight')||{value:''}).value;
+    // [v468] 버스운행설정(운전자정보)에 등록된 배차 라벨을 카드 제목으로 우선 사용 — 자동배정과 동일 규칙.
+    // 미등록 슬롯(배차값 없음)은 기존처럼 순번 기반 "버스 N호"로 폴백. rawName은 팀내역 시트의 원본
+    // "버스" 문자열과 매칭해 슬롯을 복원하는 키이므로 표시용 name과 분리해 그대로 유지한다.
+    var baeNames = _busRegisteredBaeNamesCache[key] || [];
     var nb=[];
     for(var i=0;i<busCount;i++){
-      nb.push({id:busUid(), name:'버스 '+(i+1)+'호', rawName: rawNameOrder[i] || ('버스 '+(i+1)+'호'),
+      var _dispName = baeNames[i] || ('버스 '+(i+1)+'호');
+      nb.push({id:busUid(), name:_dispName, rawName: rawNameOrder[i] || ('버스 '+(i+1)+'호'),
                 slots:[], isExtra:i>=registeredCount,
                 boardLoc:metaBoard||'', alightLoc:metaAlight||''});
     }
@@ -12051,7 +12072,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v467_bus_name_from_registered_bae';
+var CACHE_VERSION = 'v468_bus_query_bae_name';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
