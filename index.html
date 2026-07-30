@@ -314,6 +314,18 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 .detail-row:last-child{border:none;}
 .detail-label{font-size:.76rem;color:var(--muted);min-width:110px;flex-shrink:0;font-weight:500;}
 .detail-value{font-size:.86rem;font-weight:600;color:var(--text);flex:1;word-break:break-all;}
+/* [v470] 참석자 상세 모달 그리드 배치용 — 기존 .detail-row(세로 1항목/줄)는 다른 모달에서 계속 사용하므로
+   유지하고, 줄당 여러 항목을 가로로 배치하는 용도로 별도 클래스를 추가한다. */
+.detail-grid-row{display:flex;gap:16px;padding:10px 0;border-bottom:1px solid var(--border2);flex-wrap:wrap;}
+.detail-grid-row:last-child{border:none;}
+.detail-grid-cell{flex:1;min-width:100px;display:flex;flex-direction:column;gap:3px;}
+.detail-grid-cell .detail-label{font-size:.72rem;min-width:0;}
+.detail-grid-cell .detail-value{font-size:.85rem;}
+/* [v472] 참석자 상세 모달 수정 모드 — 상세 조회 모달(.detail-grid-row)과 동일한 줄 구성으로
+   맞추기 위한 레이아웃. 기존 .form-group 클래스(다른 화면에서도 공용 사용)는 건드리지 않고,
+   이 행 안에서만 margin-bottom을 0으로 덮어써 이중 여백을 방지한다. */
+.edit-grid-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;}
+.edit-grid-row .form-group{flex:1;min-width:140px;margin-bottom:0;}
 .modal-footer{margin-top:18px;display:flex;gap:8px;justify-content:flex-end;}
 
 /* TOAST */
@@ -1970,9 +1982,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <button class="btn btn-sm" style="background:#f4f4f4;border:1px solid #cfcfcf;color:#444;font-weight:700;" onclick="bpDownloadTemplate()" title="일괄업로드용 CSV 양식을 다운로드합니다">📄 양식 다운로드</button>
                 <button class="btn btn-sm" style="background:#e8f0fe;border:1px solid #90b4f0;color:#1a4d8f;font-weight:700;" onclick="spBulkUploadOpen()" title="버스 탑승자 명단(CSV)을 업로드해 참석/귀가 교통수단·배정유형을 일괄 반영">📥 일괄업로드</button>
                 <button class="btn btn-sm" id="sp-btn-bulk" style="background:#fff3e0;border:1px solid #f0c080;color:#8a5a00;font-weight:700;" onclick="spBulkToggleTransport()">🔁 일괄변경</button>
-                <div id="btn-export-wrap" style="display:none;">
+                <!--
+                <div id="btn-export-wrap">
                   <button class="btn btn-green btn-sm" onclick="exportSearchExcel()">⬇️ CSV 다운로드</button>
                 </div>
+                -->
               </div>
             </div>
             <div class="table-wrap">
@@ -2857,7 +2871,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
 <!-- 상세/편집 모달 -->
 <div class="modal-overlay" id="detail-modal">
-  <div class="modal" style="max-width:580px;">
+  <div class="modal" style="max-width:720px;">
     <div class="modal-header">
       <div class="modal-title" id="modal-title">참석자 상세 정보</div>
       <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
@@ -2875,7 +2889,9 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
 
     <!-- 편집 모드 -->
     <div id="modal-edit" style="display:none;">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+      <!-- [v472] 상세 조회 모달(.detail-grid-row, 3/3/3/4/4/2칸)과 동일한 줄 구성으로 재배치.
+           항목 내용·id·onchange 등은 변경 없이 감싸는 행(row) 컨테이너만 6개로 분리했다. -->
+      <div class="edit-grid-row">
         <div class="form-group">
           <label>연도</label>
           <input type="number" id="e-year" min="2000" max="2099" placeholder="2025">
@@ -2902,6 +2918,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="7차">7차</option>
           </select>
         </div>
+      </div>
+      <div class="edit-grid-row">
         <div class="form-group">
           <label>교구</label>
           <select id="e-parish" onchange="populateDistrictSelect('e-district', this.value, '선택', document.getElementById('e-district').value)">
@@ -2920,6 +2938,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <label>성명</label>
           <input type="text" id="e-name" placeholder="홍길동">
         </div>
+      </div>
+      <div class="edit-grid-row">
         <div class="form-group">
           <label>회별</label>
           <select id="e-group">
@@ -2943,6 +2963,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="F">여</option>
           </select>
         </div>
+      </div>
+      <div class="edit-grid-row">
         <div class="form-group">
           <label>참석 일자</label>
           <input type="date" id="e-arrive-date">
@@ -2953,7 +2975,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="">선택</option>
             <option value="버스">버스</option>
             <option value="자가용">자가용</option>
-            <option value="기타">기타</option>
           </select>
         </div>
         <div class="form-group">
@@ -2968,6 +2989,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           </select>
         </div>
         <div class="form-group">
+          <!-- [v471] 참석배정(버스 호차) — 접수ID 99로 시작하는 건이 아니어도 항상 편집 가능한
+               6개 필드 중 하나. busAssignOptionsHtml('search' context)로 옵션을 채운다. -->
+          <label>참석배정</label>
+          <select id="e-arrive-bus"></select>
+        </div>
+      </div>
+      <div class="edit-grid-row">
+        <div class="form-group">
           <label>귀가 일자</label>
           <input type="date" id="e-leave-date">
         </div>
@@ -2977,7 +3006,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="">선택</option>
             <option value="버스">버스</option>
             <option value="자가용">자가용</option>
-            <option value="기타">기타</option>
           </select>
         </div>
         <div class="form-group">
@@ -2991,6 +3019,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="중고등부">중고등부</option>
           </select>
         </div>
+        <div class="form-group">
+          <label>귀가배정</label>
+          <select id="e-leave-bus"></select>
+        </div>
+      </div>
+      <div class="edit-grid-row">
         <div class="form-group">
           <label>보호자</label>
           <input type="text" id="e-guardian" placeholder="보호자 성명">
@@ -12072,7 +12106,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v469_csv_download_hidden';
+var CACHE_VERSION = 'v474_detail_edit_code_assigntype';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -15592,28 +15626,29 @@ function openDetail(id) {
   $id('modal-title').textContent='참석자 상세 정보';
   // [v235] 접수인원등록 화면과 항목/순서 동기화 — 참석·귀가버스배정/전참여부 제거,
   // 구원여부/성별/참석·귀가배정유형 추가.
-  var fields=[
-    ['연도',      r.year||'-'],
-    ['수양회 종류', r.retreatType||'-'],
-    ['회차',      r.event||'-'],
-    ['교구',      r.parish||'-'],
-    ['구역',      r.district||'-'],
-    ['성명',      maskName(r.name)||'-'],
-    ['회별',      r.group||'-'],
-    ['구원여부',   _salvLabel(r.salvCode)],
-    ['성별',      _enrollGenderLabel(r.gender)],
-    ['참석 일자',  fmtDate(r.arriveDate)||'-'],
-    ['참석 교통수단', r.arriveTransport||'-'],
-    ['참석배정유형', r.arriveAssignType||'-'],
-    ['귀가 일자',  fmtDate(r.leaveDate)||'-'],
-    ['귀가 교통수단', r.leaveTransport||'-'],
-    ['귀가배정유형', r.leaveAssignType||'-'],
-    ['보호자',    r.guardian||'-'],
-    ['연락처',    r.contact||'-'],
+  // [v470] 항목을 세로 나열(1줄1항목) 대신 6줄 그리드(줄당 2~4항목)로 재배치.
+  // 참석배정/귀가배정(버스배정 결과)을 조회전용으로 신규 추가 — bpOpenDetail()과 동일하게
+  // _rosterFullArr/_rosterFullLv 조회맵을 그대로 재사용(별도 API 호출 없음).
+  var _busAssignVal = function(kind){
+    var rid = r.receiptId||'';
+    var transport = kind==='arrive' ? r.arriveTransport : r.leaveTransport;
+    if(transport!=='버스') return '-';
+    var v = kind==='arrive' ? (rid && _rosterFullArr[rid]) : (rid && _rosterFullLv[rid]);
+    return v || '미배정';
+  };
+  var rows=[
+    [['연도', r.year||'-'], ['수양회 종류', r.retreatType||'-'], ['회차', r.event||'-']],
+    [['교구', r.parish||'-'], ['구역', r.district||'-'], ['성명', maskName(r.name)||'-']],
+    [['회별', r.group||'-'], ['구원여부', _salvLabel(r.salvCode)], ['성별', _enrollGenderLabel(r.gender)]],
+    [['참석 일자', fmtDate(r.arriveDate)||'-'], ['참석 교통수단', r.arriveTransport||'-'], ['참석배정유형', r.arriveAssignType||'-'], ['참석배정', _busAssignVal('arrive')]],
+    [['귀가 일자', fmtDate(r.leaveDate)||'-'], ['귀가 교통수단', r.leaveTransport||'-'], ['귀가배정유형', r.leaveAssignType||'-'], ['귀가배정', _busAssignVal('leave')]],
+    [['보호자', r.guardian||'-'], ['연락처', r.contact||'-']],
   ];
   var mb=$id('modal-body');
-  if(mb) mb.innerHTML=fields.map(function(f){
-    return '<div class="detail-row"><span class="detail-label">'+f[0]+'</span><span class="detail-value">'+esc(String(f[1]))+'</span></div>';
+  if(mb) mb.innerHTML=rows.map(function(row){
+    return '<div class="detail-grid-row">'+row.map(function(f){
+      return '<div class="detail-grid-cell"><span class="detail-label">'+f[0]+'</span><span class="detail-value">'+esc(String(f[1]))+'</span></div>';
+    }).join('')+'</div>';
   }).join('');
   // [v396] 삭제 버튼 복원 — 수정 버튼과 동일 범위(관리자+구역장)로 노출 (교구장은 조회 전용이라 계속 숨김)
   var delBtn=$id('btn-delete');
@@ -15626,12 +15661,32 @@ function openDetail(id) {
   }
   var modal=$id('detail-modal'); if(modal) modal.classList.add('show');
 }
+// [v474] 참석자 상세 모달 수정폼(e-arrive-assign-type/e-leave-assign-type)의 배정유형 옵션 —
+// 공통코드(CODE_MAJOR/CODE_MINOR: 공주행배정유형/하행배정유형) 캐시(_bbTypeOptionsCache, 버스운행설정·
+// 접수인원등록과 공유)가 있으면 그 목록으로, 없으면(캐시 미로딩/조회실패) 기존 HTML 하드코딩 옵션을
+// 그대로 유지한다(자동 폴백). enrollAssignTypeOptionsRefresh()와 동일 패턴 — 완전 동기 함수(캐시만
+// 읽음, API 호출 없음)이므로 토글 시 지연 없이 즉시 반영된다.
+function _detailAssignTypeOptionsRefresh(kind){
+  var typeSel = $id(kind==='leave' ? 'e-leave-assign-type' : 'e-arrive-assign-type');
+  if(!typeSel) return;
+  var cached = kind==='leave' ? _bbTypeOptionsCache.leave : _bbTypeOptionsCache.arrive;
+  if(!cached || !cached.length) return; // 캐시 없음 → 기존 HTML 옵션(폴백) 그대로 유지
+  var prev = typeSel.value;
+  var _esc = (typeof esc === 'function') ? esc : function(s){ return String(s); };
+  typeSel.innerHTML = '<option value="">선택</option>' + cached.map(function(o){
+    return '<option value="'+_esc(o)+'">'+_esc(o)+'</option>';
+  }).join('');
+  typeSel.value = (cached.indexOf(prev)>=0) ? prev : '';
+}
 function openEditMode(id) {
   var r=retreat.find(function(x){ return String(x.id)===String(id); }); if(!r) return;
-  var isAdmin=currentUser&&currentUser.role==='admin';
+  // [v471] 필드 잠금 기준을 로그인 역할(관리자/구역장)에서 접수ID 패턴으로 교체.
+  // 접수ID가 '99'로 시작하면(v404 _deleteIsRealDelete()와 동일 규칙 — 임시/수동 등록 건) 전체 항목
+  // 수정 가능, 그 외에는 참석/귀가 교통수단·배정유형·배정(버스)만 수정 가능하도록 잠금.
+  var isFullEdit = _deleteIsRealDelete(r);
   $id('modal-view').style.display='none';
   $id('modal-edit').style.display='';
-  $id('modal-title').textContent= isAdmin ? '참석자 정보 수정' : '일정 / 교통수단 / 배정유형 수정 (구역장)';
+  $id('modal-title').textContent='참석자 정보 수정';
   $id('e-year').value=r.year||''; $id('e-retreat-type').value=r.retreatType||''; $id('e-event').value=r.event||'';
   $id('e-parish').value=r.parish||'';
   populateDistrictSelect('e-district', r.parish, '선택', r.district); // 구역 select: 현재 교구 기준으로 옵션 채운 뒤 현재 구역값 선택
@@ -15643,37 +15698,54 @@ function openEditMode(id) {
   $id('e-leave-assign-type').value=r.leaveAssignType||'';
   $id('e-contact').value=r.contact||''; $id('e-guardian').value=r.guardian||'';
 
+  // [v471] 참석배정/귀가배정(버스 호차) select 채우기 — 자료검색 전용 전체 인덱스(_rosterFullArr·Lv)
+  // 기준(rosterArriveIndex는 버스배정 패널 콤보 필터 적용본이라 이 화면 맥락과 불일치 가능해 폴백으로만 사용).
+  var rid = r.receiptId||'';
+  var curArriveBus = rid ? (_rosterFullArr[rid]||rosterArriveIndex[rid]||'') : '';
+  var curLeaveBus  = rid ? (_rosterFullLv[rid] ||rosterLeaveIndex[rid] ||'') : '';
+  var eArrBus=$id('e-arrive-bus'); if(eArrBus) eArrBus.innerHTML = busAssignOptionsHtml('arrive', curArriveBus, r, 'search');
+  var eLvBus =$id('e-leave-bus');  if(eLvBus)  eLvBus.innerHTML  = busAssignOptionsHtml('leave',  curLeaveBus,  r, 'search');
+  var modal=$id('detail-modal');
+  if(modal){ modal._prevArriveBus = curArriveBus; modal._prevLeaveBus = curLeaveBus; }
+
   // [v235] 참석/귀가배정유형: 교통수단=버스일 때만 활성화 (접수인원등록과 동일 규칙, 역할 무관)
+  // [v471] 참석배정/귀가배정(버스 호차) select도 동일하게 교통수단=버스일 때만 활성화
+  // [v474] 배정유형 select를 활성화할 때마다 코드관리 캐시(_bbTypeOptionsCache) 기준으로 옵션을
+  // 동기 재적용(API 재조회 없음, 캐시만 읽음) — enrollToggleAssignType()과 동일 패턴.
   function _toggleAssign(kind){
     var t=$id(kind==='leave' ? 'e-leave-transport' : 'e-arrive-transport');
     var s=$id(kind==='leave' ? 'e-leave-assign-type' : 'e-arrive-assign-type');
-    if(!t||!s) return;
+    var b=$id(kind==='leave' ? 'e-leave-bus' : 'e-arrive-bus');
+    if(!t) return;
+    _detailAssignTypeOptionsRefresh(kind);
     var isBus = t.value==='버스';
-    s.disabled = !isBus;
-    s.style.opacity = isBus ? '' : '.5';
-    if(!isBus) s.value='';
+    if(s){ s.disabled = !isBus; s.style.opacity = isBus ? '' : '.5'; if(!isBus) s.value=''; }
+    if(b){ b.disabled = !isBus; b.style.opacity = isBus ? '' : '.5'; if(!isBus) b.value=''; }
   }
   _toggleAssign('arrive'); _toggleAssign('leave');
   var eArrT=$id('e-arrive-transport'); if(eArrT) eArrT.onchange=function(){ _toggleAssign('arrive'); };
   var eLvT=$id('e-leave-transport');   if(eLvT) eLvT.onchange=function(){ _toggleAssign('leave'); };
 
-  // ── 그리드 인라인수정에 없는 필드: role 무관 항상 잠금(읽기 전용 표시) ──
-  var alwaysLockFields = ['e-event','e-group'];
-  alwaysLockFields.forEach(function(fid){
-    var el=$id(fid); if(!el) return;
-    el.disabled = true;
-    el.style.opacity = '.5';
-    el.style.cursor  = 'not-allowed';
+  // [v474] 참석/귀가배정유형 공통코드 캐시 — 버스운행설정·접수인원등록과 동일한 캐시
+  // (_bbTypeOptionsCache)를 공유한다. 이 화면에 먼저 들어와도 캐시를 확보하도록 로딩을
+  // 트리거하고, 완료되면 이미 그려진 select에 즉시 반영한다.
+  _bbLoadTypeOptionsCache(function(){
+    _detailAssignTypeOptionsRefresh('arrive');
+    _detailAssignTypeOptionsRefresh('leave');
   });
 
-  // ── 그리드 인라인수정에 있는 필드: 구역장은 일정·교통·배정유형만 편집 허용,
-  //    나머지(년도/종류/교구/구역/이름/구원여부/성별/연락처/보호자)는 관리자만 ──
-  var roleLockFields = ['e-year','e-retreat-type','e-parish','e-district','e-name','e-salv-code','e-gender','e-contact','e-guardian'];
+
+  // ── 접수ID가 '99'로 시작하지 않으면 참석/귀가 교통수단·배정유형·배정(버스) 6개만 편집 허용,
+  //    나머지(년도/종류/회차/교구/구역/이름/회별/구원여부/성별/연락처/보호자)는 잠금.
+  //    ('99'로 시작하면 전체 편집 가능 — isFullEdit) ──
+  // [v473] e-event(회차)/e-group(회별) — 종전엔 접수ID 조건 무관 항상 잠금이었으나,
+  // isFullEdit(접수ID 99 시작) 건은 이 두 필드도 함께 편집 가능하도록 이 목록으로 편입.
+  var roleLockFields = ['e-year','e-retreat-type','e-parish','e-district','e-name','e-salv-code','e-gender','e-contact','e-guardian','e-event','e-group'];
   roleLockFields.forEach(function(fid) {
     var el=$id(fid); if(!el) return;
-    el.disabled = !isAdmin;
-    el.style.opacity = isAdmin ? '' : '.5';
-    el.style.cursor  = isAdmin ? '' : 'not-allowed';
+    el.disabled = !isFullEdit;
+    el.style.opacity = isFullEdit ? '' : '.5';
+    el.style.cursor  = isFullEdit ? '' : 'not-allowed';
   });
   // 편집 가능 필드 힌트 표시
   var hint=$id('edit-role-hint');
@@ -15685,9 +15757,9 @@ function openEditMode(id) {
     if(editArea) editArea.insertBefore(hintEl, editArea.firstChild);
     hint=hintEl;
   }
-  if(!isAdmin){
+  if(!isFullEdit){
     hint.style.display='';
-    hint.textContent='ℹ️ 구역장 권한: 참석/귀가 일자·교통수단·배정유형만 수정 가능합니다.';
+    hint.textContent='ℹ️ 참석/귀가 교통수단·배정유형·배정(버스)만 수정 가능합니다. (접수ID가 99로 시작하는 건만 전체 항목 수정 가능)';
   } else {
     hint.style.display='none';
   }
@@ -15696,32 +15768,43 @@ function cancelEdit() { var id=$id('detail-modal')._editId; if(id) openDetail(id
 function saveEdit() {
   var id=$id('detail-modal')._editId;
   var r=retreat.find(function(x){ return String(x.id)===String(id); }); if(!r) return;
-  var isAdmin=currentUser&&currentUser.role==='admin';
+  // [v471] isAdmin(역할) → isFullEdit(접수ID '99' 시작 여부, _deleteIsRealDelete 재사용)로 게이팅 기준 교체
+  var isFullEdit = _deleteIsRealDelete(r);
 
-  // ── 관리자 전용 필드: 구역장은 화면상 disabled라 DOM값이 비어있을 수 있으므로 원본(r) 값 유지 ──
+  // ── 잠금 필드: 잠긴 상태(비-isFullEdit)면 화면상 disabled라 DOM값이 비어있을 수 있으므로 원본(r) 값 유지 ──
   var changes = {
-    year:        isAdmin ? $id('e-year').value.trim()        : r.year,
-    retreatType: isAdmin ? $id('e-retreat-type').value       : r.retreatType,
-    event:       r.event,   // 항상 잠금(요청1에 따라 읽기전용)
-    parish:      isAdmin ? $id('e-parish').value.trim()      : r.parish,
-    district:    isAdmin ? $id('e-district').value.trim()    : r.district,
-    group:       r.group,   // 항상 잠금(요청1에 따라 읽기전용)
-    name:        isAdmin ? $id('e-name').value.trim()        : r.name,
+    year:        isFullEdit ? $id('e-year').value.trim()        : r.year,
+    retreatType: isFullEdit ? $id('e-retreat-type').value       : r.retreatType,
+    event:       isFullEdit ? $id('e-event').value           : r.event,   // [v473] isFullEdit 건은 회차도 편집 가능
+    parish:      isFullEdit ? $id('e-parish').value.trim()      : r.parish,
+    district:    isFullEdit ? $id('e-district').value.trim()    : r.district,
+    group:       isFullEdit ? $id('e-group').value           : r.group,   // [v473] isFullEdit 건은 회별도 편집 가능
+    name:        isFullEdit ? $id('e-name').value.trim()        : r.name,
     room1:       r.room1, room2: r.room2, // 항상 잠금(요청1에 따라 모두 읽기전용)
-    salvCode:    isAdmin ? $id('e-salv-code').value           : r.salvCode,
-    gender:      isAdmin ? $id('e-gender').value              : r.gender,
+    salvCode:    isFullEdit ? $id('e-salv-code').value           : r.salvCode,
+    gender:      isFullEdit ? $id('e-gender').value              : r.gender,
     arriveDate:  $id('e-arrive-date').value, arriveTransport: $id('e-arrive-transport').value,
     arriveAssignType: $id('e-arrive-assign-type').value,
     leaveDate:   $id('e-leave-date').value,  leaveTransport:  $id('e-leave-transport').value,
     leaveAssignType: $id('e-leave-assign-type').value,
     prevAttend:  r.prevAttend, // [v235] 수정폼에서 필드 제거(접수인원등록 항목과 동기화) — 원본값 항상 보존
-    contact:     isAdmin ? $id('e-contact').value.trim()      : r.contact,
-    guardian:    isAdmin ? $id('e-guardian').value.trim()     : r.guardian,
+    contact:     isFullEdit ? $id('e-contact').value.trim()      : r.contact,
+    guardian:    isFullEdit ? $id('e-guardian').value.trim()     : r.guardian,
   };
   var updated=Object.assign({},r,changes);
-  // 검증도 관리자가 실제로 수정 가능한 경우에만 적용 (구역장은 항상 원본값이라 검증 불필요)
-  if(isAdmin && !updated.name)  { showToast('이름을 입력해 주세요.','error'); return; }
-  if(isAdmin && !updated.parish){ showToast('교구를 선택해 주세요.','error'); return; }
+  // 검증도 실제로 수정 가능한 경우에만 적용 (잠긴 필드는 항상 원본값이라 검증 불필요)
+  if(isFullEdit && !updated.name)  { showToast('이름을 입력해 주세요.','error'); return; }
+  if(isFullEdit && !updated.parish){ showToast('교구를 선택해 주세요.','error'); return; }
+
+  // [v471] 참석배정/귀가배정(버스 호차) 변경 감지 — saveInlineEdit()과 동일 패턴
+  var rid = r.receiptId||'';
+  var newArriveBus = changes.arriveTransport==='버스' ? ($id('e-arrive-bus') ? ($id('e-arrive-bus').value||'').trim() : '') : '';
+  var newLeaveBus  = changes.leaveTransport==='버스'  ? ($id('e-leave-bus')  ? ($id('e-leave-bus').value ||'').trim() : '') : '';
+  var modalEl = $id('detail-modal');
+  var prevArriveBus = (modalEl && modalEl._prevArriveBus) || '';
+  var prevLeaveBus  = (modalEl && modalEl._prevLeaveBus)  || '';
+  var needUpdateArriveBus = rid && changes.arriveTransport==='버스' && newArriveBus!==prevArriveBus;
+  var needUpdateLeaveBus  = rid && changes.leaveTransport==='버스'  && newLeaveBus !==prevLeaveBus;
 
   // ── 교통수단 변경 감지 → 로컬 팀카운트 조정 + 시트 반영 대상 표시 (saveInlineEdit과 동일 로직) ──
   var prevArrive = (r.arriveTransport||'').trim();
@@ -15782,9 +15865,30 @@ function saveEdit() {
       var delJobs = [];
       if (needDeleteArrive && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_참석', id:r.receiptId}));
       if (needDeleteLeave  && r.receiptId) delJobs.push(apiCall({action:'delete', sheetName:'탑승자_귀가', id:r.receiptId}));
-      // [v235] 이 모달의 참석/귀가 버스배정(호차) select는 제거됨(접수인원등록과 항목 동기화) —
-      // 특정 버스·호차 재배정은 이제 '버스 배정' 화면에서만 처리한다.
-      return Promise.allSettled(delJobs).then(function(){
+
+      // ── [v471][단계 3] 참석배정/귀가배정(호차) 변경분: 탑승자_참석/귀가 시트 반영 ──
+      // saveInlineEdit()과 동일 패턴 재사용 — 개인 단건 update(신규 append 아님)이라
+      // Promise.allSettled 병렬 처리로도 행 인덱스 경쟁이 발생하지 않는다(기존 검증된 패턴).
+      var arriveJob = needUpdateArriveBus
+        ? _updateRosterBusAssign(rid, newArriveBus, '탑승자_참석')
+            .then(function(){ rosterArriveIndex[rid]=newArriveBus||''; _rosterFullArr[rid]=newArriveBus||''; })
+            .catch(function(e){ console.warn('[탑승자_참석 버스 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+      var leaveJob = needUpdateLeaveBus
+        ? _updateRosterBusAssign(rid, newLeaveBus, '탑승자_귀가')
+            .then(function(){ rosterLeaveIndex[rid]=newLeaveBus||''; _rosterFullLv[rid]=newLeaveBus||''; })
+            .catch(function(e){ console.warn('[탑승자_귀가 버스 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+      // ── [단계 4] 버스배정 요약/팀내역 시트 인원수·팀목록 갱신 ──
+      var arrSummaryJob = needUpdateArriveBus
+        ? _updateBusSummarySheet('arrive', teamKeyArr, prevArriveBus, newArriveBus).catch(function(e){ console.warn('[참석 요약/팀내역 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+      var lvSummaryJob  = needUpdateLeaveBus
+        ? _updateBusSummarySheet('leave', teamKeyLv, prevLeaveBus, newLeaveBus).catch(function(e){ console.warn('[귀가 요약/팀내역 업데이트 실패]', e&&e.message||e); })
+        : Promise.resolve();
+
+      var allJobs = delJobs.concat([arriveJob, leaveJob, arrSummaryJob, lvSummaryJob]);
+      return Promise.allSettled(allJobs).then(function(){
         openDetail(id);
         showToast('✅ 수정 완료 (Sheets 반영)','success');
       });
@@ -20426,7 +20530,7 @@ function codeDeleteMinor(minorId){
 
   var direction = null, teamSheet = null;
   if(majorName==='공주행배정유형'){ direction='arrive'; teamSheet='버스배정_참석팀내역'; }
-  else if(majorName==='하행배정유형'){ direction='leave'; teamSheet='버스배정_귀가팀내역'; }
+  else if(majorName==='서울행배정유형'){ direction='leave'; teamSheet='버스배정_귀가팀내역'; }
 
   function doDeleteCodeOnly(){
     if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
@@ -20940,7 +21044,7 @@ function _bbLoadTypeOptionsCache(cb){
     .then(function(res){
       var majors = (res&&res.success) ? (res.data||res.rows||[]) : [];
       var majorArrive = majors.find(function(m){ return String(m['대분류명']||'').trim()==='공주행배정유형'; });
-      var majorLeave  = majors.find(function(m){ return String(m['대분류명']||'').trim()==='하행배정유형'; });
+      var majorLeave  = majors.find(function(m){ return String(m['대분류명']||'').trim()==='서울행배정유형'; });
       if(!majorArrive && !majorLeave) return null;
       return apiCall({action:'getAll', sheetName:'CODE_MINOR'}).then(function(r2){
         var minors = (r2&&r2.success) ? (r2.data||r2.rows||[]) : [];
