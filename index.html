@@ -12153,7 +12153,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v479_fix_jh_team_popup_assigntype_basis';
+var CACHE_VERSION = 'v480_bp_assigntype_uses_code_mgmt_cache';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -12962,6 +12962,15 @@ function switchPanel(name, skipRender) {
       initYearSelect();
       // [v242] 로그인 계정 기준 교구/구역 기본값 재적용 (s-parish·s-district 공용 함수)
       applySearchDefaultScope();
+      // [v480] 참석/귀가배정유형 공통코드 캐시 — 개별신청(enrollInit)/버스운행설정(bbInit)과 동일한
+      // 캐시(_bbTypeOptionsCache)를 공유한다. "개별신청" 탭을 거치지 않고 이 화면(일괄 신청 및 배정)에
+      // 바로 들어와도 캐시를 확보하도록 여기서도 로딩을 트리거하고, 완료 시점에 아직 이 패널에 있다면
+      // (다른 화면으로 이동하지 않았다면) doSearch()를 다시 실행해 그리드의 배정유형 옵션을 최신
+      // 코드관리 목록으로 재적용한다(캐시 로딩 전에는 폴백 목록으로 우선 렌더되어 화면 공백 없음).
+      _bbLoadTypeOptionsCache(function(){
+        var p=$id('panel-search');
+        if(p && p.classList.contains('active')) doSearch();
+      });
       // ── 참석/귀가 버스배정 드롭다운 옵션을 위해 운행버스 목록 확보 (없으면 보강 로드) ──
       if(USE_SHEET() && !busArriveBuses.length && !busLeaveBuses.length){
         // busRestore(); // [v455] busRestore() 함수 정의를 주석처리함에 따라 호출부도 비활성화
@@ -16136,8 +16145,16 @@ var ASSIGN_TYPES_ARRIVE = ['선발대','본대(봉사)','본대','직장조','�
 var ASSIGN_TYPES_LEAVE  = ['본대','후발대','중고등부'];
 
 var BP_ASSIGN_TYPES = ['','선발대','본대','직장조','시각선교부','중고등부']; // (구버전 호환용, 더 이상 미사용)
+// [v480] 참석/귀가배정유형 옵션 — 개별신청(enrollAssignTypeOptionsRefresh)·상세보기 수정모달
+// (_detailAssignTypeOptionsRefresh)과 동일하게, 코드관리 공통코드 캐시(_bbTypeOptionsCache:
+// 공주행배정유형→arrive, 서울행배정유형→leave)를 우선 사용하고 캐시가 없을 때만(코드관리 미설정/
+// 조회실패) 기존 하드코딩 상수(ASSIGN_TYPES_ARRIVE/LEAVE)로 폴백한다. 완전 동기 함수(캐시만 읽음,
+// API 호출 없음)라 그리드 렌더링(doSearch/bpRenderTable 등)에 지연을 주지 않는다.
 function _bpAssignOptionsHtml(selected, kind){
-  var list = ['' ].concat(kind==='leave' ? ASSIGN_TYPES_LEAVE : ASSIGN_TYPES_ARRIVE);
+  var isLeave = (kind==='leave');
+  var fallback = isLeave ? ASSIGN_TYPES_LEAVE : ASSIGN_TYPES_ARRIVE;
+  var cached = isLeave ? _bbTypeOptionsCache.leave : _bbTypeOptionsCache.arrive;
+  var list = ['' ].concat((cached && cached.length) ? cached : fallback);
   // [v305] 일괄업로드 등으로 저장된 원문 라벨(예: "직장조 1대")이 표준 목록에 없어도
   // select가 빈칸(미선택)으로 보이지 않도록, 목록에 없는 현재값은 맨 뒤에 옵션으로 추가
   if(selected && list.indexOf(selected)===-1) list.push(selected);
