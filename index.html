@@ -12153,7 +12153,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v488_upload_commit_retry_and_report_failures';
+var CACHE_VERSION = 'v489_roster_bus_assign_append_row_fallback';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -14747,6 +14747,7 @@ function spBulkToggleTransport(){
   function _spBulkToggleTransportProceed(){
   showLoading(true);
   var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, arriveBusCount=0, leaveBusCount=0, failCount=0, blockedCount=0;
+  var busFailNames = []; // [v489] 배정버스 저장(재시도 포함)까지 실패한 사람 — 완료 시 명확히 알림
   var chain = idList.reduce(function(p, idStr){
     return p.then(function(){
       var r = retreat.find(function(x){ return String(x.id)===idStr; });
@@ -14788,7 +14789,10 @@ function spBulkToggleTransport(){
                 _updateRosterBusAssign(rid, newArrBus, '탑승자_참석')
                   .then(function(){ _rosterFullArr[rid]=newArrBus; arriveBusCount++; })
                   .then(function(){ return _updateBusSummarySheet('arrive', teamKeyArr, prevArrBus||'(미배정)', newArrBus||'(미배정)'); })
-                  .catch(function(e){ console.warn('[참석배정버스 변경 실패]', r.name, e&&e.message||e); })
+                  .catch(function(e){
+                    console.warn('[참석배정버스 변경 실패]', r.name, e&&e.message||e);
+                    busFailNames.push(maskName(r.name||'')+'(참석)'); failCount++;
+                  })
               );
             }
           }
@@ -14800,7 +14804,10 @@ function spBulkToggleTransport(){
                 _updateRosterBusAssign(rid, newLvBus, '탑승자_귀가')
                   .then(function(){ _rosterFullLv[rid]=newLvBus; leaveBusCount++; })
                   .then(function(){ return _updateBusSummarySheet('leave', teamKeyLv, prevLvBus||'(미배정)', newLvBus||'(미배정)'); })
-                  .catch(function(e){ console.warn('[귀가배정버스 변경 실패]', r.name, e&&e.message||e); })
+                  .catch(function(e){
+                    console.warn('[귀가배정버스 변경 실패]', r.name, e&&e.message||e);
+                    busFailNames.push(maskName(r.name||'')+'(귀가)'); failCount++;
+                  })
               );
             }
           }
@@ -14820,6 +14827,10 @@ function spBulkToggleTransport(){
     var msg = '✅ 일괄변경 완료 (참석일자 '+arriveDateCount+'건 / 귀가일자 '+leaveDateCount+'건 / 참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건 / 참석배정버스 '+arriveBusCount+'건 / 귀가배정버스 '+leaveBusCount+'건)'
       +(blockedCount?(' · 범위밖 제외 '+blockedCount+'건'):'')+(failCount?(' · 실패 '+failCount+'건'):'');
     showToast(msg, failCount ? 'error' : 'success');
+    // [v489] 배정버스 저장이 (재시도까지) 실패한 사람이 있으면 조용히 넘어가지 않고 명확히 알림
+    if(busFailNames.length){
+      alert('⚠️ 배정버스 저장에 실패한 인원이 있습니다(재시도 후에도 실패). 다시 시도해 주세요.\n\n'+busFailNames.join(', '));
+    }
   }).finally(function(){
     showLoading(false);
   });
@@ -15229,11 +15240,49 @@ function _updateBusSummarySheet(type, teamKey, fromBus, toBus){
 // receiptId: 접수ID (행 탐색 키)
 // busName  : 새 배정호차 (빈값이면 미배정)
 // sheetName: '탑승자_참석' | '탑승자_귀가'
+// [v489] 신규로 처음 버스에 배정되는 사람은 탑승자_참석/귀가 시트에 아직 그 사람 행이 없어
+// "행 없음" 오류가 나면서 조용히 실패하던 문제 — 참석인원명단에서 정보를 찾아 새 행을 추가하는
+// 폴백을 넣는다. 그 외 오류는 1회 자동 재시도 후에도 실패하면 명확히 알린다(조용히 넘어가지 않음).
 function _updateRosterBusAssign(receiptId, busName, sheetName){
   if(!USE_SHEET() || !receiptId) return Promise.resolve();
+  return _updateRosterBusAssignCore(receiptId, busName, sheetName, 0);
+}
+function _appendRosterRowForBus(receiptId, busName, sheetName){
+  var isLeave = (sheetName==='탑승자_귀가');
+  var person = retreat.find(function(x){ return String(x.receiptId)===String(receiptId); });
+  if(!person){
+    return Promise.reject(new Error('참석인원명단에서 접수ID '+receiptId+'를 찾을 수 없어 신규 행을 추가할 수 없습니다.'));
+  }
+  var rosterHdr = ['NO','년도','수양회종류','행사명','배정유형','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
+  var at = isLeave ? (person.leaveAssignType||'') : (person.arriveAssignType||'');
+  var newRowObj = {
+    '년도': person.year||'', '수양회종류': person.retreatType||'', '행사명': person.event||'',
+    '배정유형': at, '접수ID': String(receiptId), '버스명': busName||'',
+    '상차위치':'', '하차위치':'', '교구': person.parish||'', '구역': person.district||'',
+    '이름': maskName(person.name||''), '회별': person.group||'',
+    '일자': isLeave ? (person.leaveDate||'') : (person.arriveDate||''),
+    '배정호차': busName||'', '성별': person.gender||''
+  };
+  return apiCall({action:'getAll', sheetName:sheetName}).then(function(res){
+    var existing = (res&&res.success) ? (res.data||res.rows||[]) : [];
+    // 혹시 이미 그 접수ID 행이 있는데 다른 이유로 update가 실패했을 수 있으니, 있으면 제외하고
+    // 새로 만든 행으로 교체(중복 방지).
+    var filtered = existing.filter(function(r){ return String(r['접수ID']||'').trim() !== String(receiptId).trim(); });
+    var combined = filtered.concat([newRowObj]);
+    var outRows = combined.map(function(r,i){
+      return rosterHdr.map(function(h){ return h==='NO' ? i+1 : (r[h]!=null ? r[h] : ''); });
+    });
+    return _busOverwriteSheetRaw(sheetName, rosterHdr, outRows);
+  }).then(function(r2){
+    if(!r2||!r2.success) throw new Error(r2&&r2.error||'신규 행 추가 실패');
+    return r2;
+  });
+}
+function _updateRosterBusAssignCore(receiptId, busName, sheetName, retryCount){
+  retryCount = retryCount || 0;
   console.log('[_updateRosterBusAssign]', sheetName,
     '접수ID:', receiptId, '(type:', typeof receiptId+')',
-    '배정호차:', busName);
+    '배정호차:', busName, retryCount ? '(재시도'+retryCount+')' : '');
   // [v131] apiCall(action:'update') 경유 시 GAS actionUpdate의 SHEET_HEADERS 의존 문제로
   // "접수ID N 행 없음" 오류 반복 발생 → GAS 전용 action 'updateRosterBus'로 직접 fetch
   var body = {
@@ -15255,13 +15304,21 @@ function _updateRosterBusAssign(receiptId, busName, sheetName){
     console.log('[_updateRosterBusAssign] GAS 응답:', JSON.stringify(res));
     if(res && res.success === false){
       var msg = res.error||'알 수 없는 오류';
-      showToast('⚠️ '+sheetName+' 배정호차 반영 실패: '+msg,'error');
+      // [v489] 신규 배정자(이 시트에 아직 행이 없는 사람) — 새 행 추가로 폴백
+      if(/행\s*없음/.test(msg)){
+        console.warn('[_updateRosterBusAssign] 행 없음 → 신규 행 추가로 폴백', sheetName, receiptId);
+        return _appendRosterRowForBus(receiptId, busName, sheetName);
+      }
       return Promise.reject(new Error(msg));
     }
     return res;
   })
   .catch(function(e){
-    showToast('⚠️ '+sheetName+' 배정호차 오류: '+(e&&e.message||e),'error');
+    if(retryCount < 1){
+      console.warn('[_updateRosterBusAssign] 실패, 재시도', sheetName, receiptId, e&&e.message||e);
+      return _updateRosterBusAssignCore(receiptId, busName, sheetName, retryCount+1);
+    }
+    showToast('⚠️ '+sheetName+' 배정호차 반영 실패(재시도 후에도 실패): '+(e&&e.message||e),'error', true);
     return Promise.reject(e);
   });
 }
@@ -17347,6 +17404,7 @@ function bpBulkToggleTransport(){
   function _bpBulkToggleTransportProceed(){
   showLoading(true);
   var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, arriveBusCount=0, leaveBusCount=0, failCount=0;
+  var busFailNames = []; // [v489] 배정버스 저장(재시도 포함)까지 실패한 사람 — 완료 시 명확히 알림
 
   // [v308] 접수ID(행) 기준 건by건 순차 처리 — 사람당 저장 API 1회
   var chain = idList.reduce(function(p, idStr){
@@ -17388,7 +17446,10 @@ function bpBulkToggleTransport(){
                 _updateRosterBusAssign(rid, newArrBus, '탑승자_참석')
                   .then(function(){ _rosterFullArr[rid]=newArrBus; arriveBusCount++; })
                   .then(function(){ return _updateBusSummarySheet('arrive', teamKeyArr, prevArrBus||'(미배정)', newArrBus||'(미배정)'); })
-                  .catch(function(e){ console.warn('[참석배정버스 변경 실패]', r.name, e&&e.message||e); })
+                  .catch(function(e){
+                    console.warn('[참석배정버스 변경 실패]', r.name, e&&e.message||e);
+                    busFailNames.push(maskName(r.name||'')+'(참석)'); failCount++;
+                  })
               );
             }
           }
@@ -17400,7 +17461,10 @@ function bpBulkToggleTransport(){
                 _updateRosterBusAssign(rid, newLvBus, '탑승자_귀가')
                   .then(function(){ _rosterFullLv[rid]=newLvBus; leaveBusCount++; })
                   .then(function(){ return _updateBusSummarySheet('leave', teamKeyLv, prevLvBus||'(미배정)', newLvBus||'(미배정)'); })
-                  .catch(function(e){ console.warn('[귀가배정버스 변경 실패]', r.name, e&&e.message||e); })
+                  .catch(function(e){
+                    console.warn('[귀가배정버스 변경 실패]', r.name, e&&e.message||e);
+                    busFailNames.push(maskName(r.name||'')+'(귀가)'); failCount++;
+                  })
               );
             }
           }
@@ -17420,6 +17484,10 @@ function bpBulkToggleTransport(){
     bpDoSearch();
     var msg = '✅ 일괄변경 완료 (참석일자 '+arriveDateCount+'건 / 귀가일자 '+leaveDateCount+'건 / 참석교통 '+arriveCount+'건 / 귀가교통 '+leaveCount+'건 / 참석배정유형 '+arriveAssignCount+'건 / 귀가배정유형 '+leaveAssignCount+'건 / 참석배정버스 '+arriveBusCount+'건 / 귀가배정버스 '+leaveBusCount+'건)'+(failCount?(' · 실패 '+failCount+'건'):'');
     showToast(msg, failCount ? 'error' : 'success');
+    // [v489] 배정버스 저장이 (재시도까지) 실패한 사람이 있으면 조용히 넘어가지 않고 명확히 알림
+    if(busFailNames.length){
+      alert('⚠️ 배정버스 저장에 실패한 인원이 있습니다(재시도 후에도 실패). 다시 시도해 주세요.\n\n'+busFailNames.join(', '));
+    }
   }).finally(function(){
     showLoading(false);
   });
@@ -21184,7 +21252,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'busTab','busAddTeam','busDeleteTeamConfirm','busDeleteTeamExecute','busTeamDeleteModalClose',
     'busEditTeam','busEditSave','busHandleCSV','busAutoAssign','busLoadRegisteredCount','busRemoveSlot','busReuniteGuardianPairs','getBusPaxByTeam',
     'busAssignBus1Bulk','busJHMergeToggle',
-    'busDeleteBus','busResetAll','busResetConfirm','busResetByAssignTypeConfirm','vwClearAllConfirm','_busTeamTabReset','_busTeamTabResetByAssignType','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busFindBaseRegIds','_busClearLeaderIds','_busRowMatchesAssignType','_busAssignConsistencyCheck','_busListByAssignType','_busApplyAssignTypeFilteredOptions','_spLoadBusTypeCache','_spBusOptionsFromCache','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew','_busCalcReassignGroups','calcBusUnassignedCounts','_busMergeJHIntoDistrictPills','busJHDiagOpen','busJHDiagClose','busAssignQuery','_busParseSheetBusField','busScreenReset','busAssignScreenReset',
+    'busDeleteBus','busResetAll','busResetConfirm','busResetByAssignTypeConfirm','vwClearAllConfirm','_busTeamTabReset','_busTeamTabResetByAssignType','busTabResetConfirm','_busTabResetExec','_busResetTeamStatus','_busOnEventChange','_busFilteredClear','_busFindBaseRegIds','_busClearLeaderIds','_busRowMatchesAssignType','_busAssignConsistencyCheck','_busListByAssignType','_busApplyAssignTypeFilteredOptions','_spLoadBusTypeCache','_spBusOptionsFromCache','_updateRosterBusAssign','_appendRosterRowForBus','_busUpdateTeamSheetFromBuses','busDrop','busMoveSlot','busDragOverEnter','busDragOverLeave','busRenderView','busSetDrag','busSetDragNew','_busCalcReassignGroups','calcBusUnassignedCounts','_busMergeJHIntoDistrictPills','busJHDiagOpen','busJHDiagClose','busAssignQuery','_busParseSheetBusField','busScreenReset','busAssignScreenReset',
     'busImportFromRetreat','busLoadTeamsFromSheet','_busLoadOneTeamSheet','busSaveTeamsToSheet','_busUpdateTeamStatus','_busUpdateTeamStatusAndRefresh','busCheckBusCountWarning','busUpdateCapSummary','_busJHIncludeMainSync',
     'busBulk1ImportOpen','busBulk1SaveAll',
     'busSaveToSheet','busExportCSV',
@@ -21265,7 +21333,7 @@ document.addEventListener('DOMContentLoaded', function() {
     busEditSave:busEditSave, busHandleCSV:busHandleCSV, busAutoAssign:busAutoAssign, busLoadRegisteredCount:busLoadRegisteredCount, busReuniteGuardianPairs:busReuniteGuardianPairs, getBusPaxByTeam:getBusPaxByTeam,
     busAssignBus1Bulk:busAssignBus1Bulk, busJHMergeToggle:busJHMergeToggle,
     busRemoveSlot:busRemoveSlot, busDeleteBus:busDeleteBus,
-    busResetAll:busResetAll, busResetConfirm:busResetConfirm, busResetByAssignTypeConfirm:busResetByAssignTypeConfirm, vwClearAllConfirm:vwClearAllConfirm, _busTeamTabReset:_busTeamTabReset, _busTeamTabResetByAssignType:_busTeamTabResetByAssignType, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear, _busFindBaseRegIds:_busFindBaseRegIds, _busClearLeaderIds:_busClearLeaderIds, _busRowMatchesAssignType:_busRowMatchesAssignType, _busAssignConsistencyCheck:_busAssignConsistencyCheck, _busListByAssignType:_busListByAssignType, _busApplyAssignTypeFilteredOptions:_busApplyAssignTypeFilteredOptions, _spLoadBusTypeCache:_spLoadBusTypeCache, _spBusOptionsFromCache:_spBusOptionsFromCache,
+    busResetAll:busResetAll, busResetConfirm:busResetConfirm, busResetByAssignTypeConfirm:busResetByAssignTypeConfirm, vwClearAllConfirm:vwClearAllConfirm, _busTeamTabReset:_busTeamTabReset, _busTeamTabResetByAssignType:_busTeamTabResetByAssignType, busTabResetConfirm:busTabResetConfirm, _busTabResetExec:_busTabResetExec, _busResetTeamStatus:_busResetTeamStatus, _busUpdateTeamSheetFromBuses:_busUpdateTeamSheetFromBuses, _busOnEventChange:_busOnEventChange, _busFilteredClear:_busFilteredClear, _busFindBaseRegIds:_busFindBaseRegIds, _busClearLeaderIds:_busClearLeaderIds, _busRowMatchesAssignType:_busRowMatchesAssignType, _busAssignConsistencyCheck:_busAssignConsistencyCheck, _busListByAssignType:_busListByAssignType, _busApplyAssignTypeFilteredOptions:_busApplyAssignTypeFilteredOptions, _spLoadBusTypeCache:_spLoadBusTypeCache, _spBusOptionsFromCache:_spBusOptionsFromCache, _updateRosterBusAssign:_updateRosterBusAssign, _appendRosterRowForBus:_appendRosterRowForBus,
     busDrop:busDrop, busMoveSlot:busMoveSlot, busDragOverEnter:busDragOverEnter, busDragOverLeave:busDragOverLeave, busRenderView:busRenderView, busSetDrag:busSetDrag, busSetDragNew:busSetDragNew, _busCalcReassignGroups:_busCalcReassignGroups, calcBusUnassignedCounts:calcBusUnassignedCounts, _busMergeJHIntoDistrictPills:_busMergeJHIntoDistrictPills, busJHDiagOpen:busJHDiagOpen, busJHDiagClose:busJHDiagClose, busAssignQuery:busAssignQuery, _busParseSheetBusField:_busParseSheetBusField, busScreenReset:busScreenReset, busAssignScreenReset:busAssignScreenReset,
     busImportFromRetreat:busImportFromRetreat, busLoadTeamsFromSheet:busLoadTeamsFromSheet, _busLoadOneTeamSheet:_busLoadOneTeamSheet, busSaveTeamsToSheet:busSaveTeamsToSheet, _busUpdateTeamStatus:_busUpdateTeamStatus, _busUpdateTeamStatusAndRefresh:_busUpdateTeamStatusAndRefresh, busCheckBusCountWarning:busCheckBusCountWarning, busUpdateCapSummary:busUpdateCapSummary, _busJHIncludeMainSync:_busJHIncludeMainSync,
     busBulk1ImportOpen:busBulk1ImportOpen, busBulk1SaveAll:busBulk1SaveAll,
