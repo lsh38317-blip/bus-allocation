@@ -2881,7 +2881,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <div class="modal-footer">
         <button class="btn btn-danger btn-sm" id="btn-delete" style="display:none;">🗑 삭제</button>
         <button class="btn btn-navy btn-sm"   id="btn-edit"   style="display:none;">✏️ 수정</button>
-        <button class="btn btn-primary btn-sm" onclick="closeModal('detail-modal'); reloadFromSheet();">닫기</button>
+        <button class="btn btn-primary btn-sm" onclick="_detailCloseAndReload()">닫기</button>
       </div>
     </div>
 
@@ -12153,7 +12153,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v486_sp_grid_bus_filtered_by_type';
+var CACHE_VERSION = 'v488_upload_commit_retry_and_report_failures';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -15562,12 +15562,19 @@ function busUploadCommit(){
   var rosterHdr  = ['NO','년도','수양회종류','행사명','배정유형','접수ID','버스명','상차위치','하차위치','교구','구역','이름','회별','일자','배정호차','성별'];
 
   var totalChanged = 0, totalNew = 0, totalUnchanged = 0;
+  var saveFailures = []; // [v488] 재시도까지 실패한 시트 저장을 기록 — 완료 시 명확히 알림(조용히 넘어가지 않음)
 
   function processAssignType(idx){
     if(idx>=assignTypes.length){
       showLoading(false);
       showToast('✅ 배정정보 업로드 확정 완료 · 변경 '+totalChanged+'명 · 신규 '+totalNew+'명 · 동일 유지 '+totalUnchanged+'명'
         + (skippedNoType ? (' · 배정유형 미인식 '+skippedNoType+'건 제외') : ''), 'success', true);
+      // [v488] 재시도까지 실패한 시트가 있으면 조용히 넘어가지 않고 명확히 알림 — 어떤 배정유형의
+      // 어떤 시트가 반영 안 됐는지 알아야 사용자가 재업로드 등으로 복구할 수 있다.
+      if(saveFailures.length){
+        alert('⚠️ 일부 시트 저장에 실패했습니다(재시도 후에도 실패). 아래 항목은 반영되지 않았을 수 있으니 다시 업로드해 주세요.\n\n'
+          + saveFailures.map(function(f){ return '· '+f.assignType+' — '+f.sheetName; }).join('\n'));
+      }
       busUploadReset();
       return;
     }
@@ -15575,7 +15582,22 @@ function busUploadCommit(){
     var items = byAssignType[at];
 
     // ── ① 탑승자 시트 원본을 먼저 조회해 CSV와 비교(순차 API 호출 원칙 유지) ──
-    apiCall({action:'getAll', sheetName:rosterSheet}).then(function(res){
+    // [v488] 이 조회에 실패하면 이 배정유형 전체(팀내역·요약·탑승자)가 통째로 스킵되므로,
+    // 1회 재시도 후에도 실패하면 saveFailures에 기록해 완료 시 명확히 알린다.
+    function loadRosterAndProceed(retryCount){
+      retryCount = retryCount || 0;
+      apiCall({action:'getAll', sheetName:rosterSheet}).then(onRosterLoaded).catch(function(e){
+        if(retryCount < 1){
+          console.warn('[배정정보 업로드] 탑승자 시트 조회 실패, 재시도', e&&e.message||e);
+          loadRosterAndProceed(retryCount+1);
+          return;
+        }
+        console.warn('[배정정보 업로드] 탑승자 시트 조회 실패(재시도 후에도 실패)', e&&e.message||e);
+        saveFailures.push({assignType:at, sheetName:teamSheet+' / '+summarySheet+' / '+rosterSheet+' (전체)'});
+        processAssignType(idx+1);
+      });
+    }
+    function onRosterLoaded(res){
       var existingRoster = (res&&res.success) ? (res.data||res.rows||[]) : [];
       // 다른 배정유형/다른 수양회 행(기존과 동일하게 무조건 보존)
       var preservedOtherTypeRoster = _busMergeOtherAssignTypeRows(existingRoster, pageBf, at);
@@ -15680,7 +15702,8 @@ function busUploadCommit(){
         if(jobIdx>=jobs.length){ processAssignType(idx+1); return; }
         var job = jobs[jobIdx];
 
-        function writeWithPreserved(preserved){
+        function writeWithPreserved(preserved, retryCount){
+          retryCount = retryCount || 0;
           var noIdx = job.headers.indexOf('NO');
           var preservedArr = preserved.map(function(r2){
             return job.headers.map(function(h){ return h==='NO' ? 0 : (r2[h]!=null ? r2[h] : ''); });
@@ -15694,7 +15717,15 @@ function busUploadCommit(){
             .then(function(r){ return r.text(); })
             .then(function(){ processJob(jobIdx+1); })
             .catch(function(e){
-              console.warn('[배정정보 업로드] 저장 실패', job.sheetName, e&&e.message||e);
+              // [v488] 1회 자동 재시도 — 일시적 오류(네트워크/응답 지연 등)로 조용히 데이터가
+              // 누락되는 걸 막는다. 재시도까지 실패하면 saveFailures에 기록하고 넘어간다(완료 시 알림).
+              if(retryCount < 1){
+                console.warn('[배정정보 업로드] 저장 실패, 재시도', job.sheetName, e&&e.message||e);
+                writeWithPreserved(preserved, retryCount+1);
+                return;
+              }
+              console.warn('[배정정보 업로드] 저장 실패(재시도 후에도 실패)', job.sheetName, e&&e.message||e);
+              saveFailures.push({assignType:at, sheetName:job.sheetName});
               processJob(jobIdx+1);
             });
         }
@@ -15703,20 +15734,28 @@ function busUploadCommit(){
           writeWithPreserved(job._preloadedPreservedOther);
           return;
         }
-        apiCall({action:'getAll', sheetName:job.sheetName}).then(function(res2){
-          var existing2 = (res2&&res2.success) ? (res2.data||res2.rows||[]) : [];
-          var preserved2 = _busMergeOtherAssignTypeRows(existing2, pageBf, at);
-          writeWithPreserved(preserved2);
-        }).catch(function(e){
-          console.warn('[배정정보 업로드] 조회 실패', job.sheetName, e&&e.message||e);
-          processJob(jobIdx+1);
-        });
+        function loadAndWrite(retryCount){
+          retryCount = retryCount || 0;
+          apiCall({action:'getAll', sheetName:job.sheetName}).then(function(res2){
+            var existing2 = (res2&&res2.success) ? (res2.data||res2.rows||[]) : [];
+            var preserved2 = _busMergeOtherAssignTypeRows(existing2, pageBf, at);
+            writeWithPreserved(preserved2);
+          }).catch(function(e){
+            if(retryCount < 1){
+              console.warn('[배정정보 업로드] 조회 실패, 재시도', job.sheetName, e&&e.message||e);
+              loadAndWrite(retryCount+1);
+              return;
+            }
+            console.warn('[배정정보 업로드] 조회 실패(재시도 후에도 실패)', job.sheetName, e&&e.message||e);
+            saveFailures.push({assignType:at, sheetName:job.sheetName});
+            processJob(jobIdx+1);
+          });
+        }
+        loadAndWrite();
       }
       processJob(0);
-    }).catch(function(e){
-      console.warn('[배정정보 업로드] 탑승자 시트 조회 실패', e&&e.message||e);
-      processAssignType(idx+1);
-    });
+    }
+    loadRosterAndProceed();
   }
   processAssignType(0);
 }
@@ -15857,6 +15896,24 @@ function loadRosterIndex(useFilter, overrideFilter){
   });
 }
 
+// [v487] 상세모달 "닫기" 전용 — 방금 보고 있던 사람의 "일괄 신청 및 배정" 그리드 예약(스테이징)
+// 값이 남아있으면, renderTable()이 항상 예약값을 우선 표시하는 탓에 방금 저장한 최신 값이 가려지는
+// 문제가 있었다(재조회 자체는 정상이었지만 화면엔 낡은 예약값이 덮어써서 보임). 그 사람의 예약값만
+// 정리하고(다른 사람의 아직 저장 안 한 예약은 보존) 재조회한다.
+function _detailCloseAndReload(){
+  var modal = $id('detail-modal');
+  var id = modal ? modal._editId : '';
+  if(id){
+    [spStagedArrive, spStagedLeave, spStagedArriveAssign, spStagedLeaveAssign,
+     spStagedArriveBus, spStagedLeaveBus, spStagedArriveDate, spStagedLeaveDate].forEach(function(dict){
+      if(dict && dict.hasOwnProperty(id)) delete dict[id];
+    });
+    if(typeof spSelectedIds!=='undefined' && spSelectedIds.has(id)) spSelectedIds.delete(id);
+    if(typeof spUpdateBulkBtnLabel==='function') spUpdateBulkBtnLabel();
+  }
+  closeModal('detail-modal');
+  reloadFromSheet();
+}
 function openDetail(id) {
   var r=retreat.find(function(x){ return String(x.id)===String(id); }); if(!r) return;
   var isAdmin=currentUser&&currentUser.role==='admin';
@@ -21107,7 +21164,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'initYearSelect',
     'saveForm','resetForm','doSearch','clearSearch','goPage',
     'searchParishChange','populateDistrictSelect',
-    'openDetail','deleteRow','cancelEdit','saveEdit',
+    'openDetail','_detailCloseAndReload','deleteRow','cancelEdit','saveEdit',
     'openInlineEdit','saveInlineEdit','renderTable','goPage','loadRosterIndex',
     'reloadFromSheet',
     'openAddAccount','addAccount','deleteAccount',
@@ -21180,7 +21237,7 @@ document.addEventListener('DOMContentLoaded', function() {
     saveForm:saveForm, resetForm:resetForm,
     doSearch:doSearch, clearSearch:clearSearch, goPage:goPage,
     searchParishChange:searchParishChange, populateDistrictSelect:populateDistrictSelect,
-    openDetail:openDetail, deleteRow:deleteRow,
+    openDetail:openDetail, _detailCloseAndReload:_detailCloseAndReload, deleteRow:deleteRow,
     cancelEdit:cancelEdit, saveEdit:saveEdit,
     openInlineEdit:openInlineEdit, saveInlineEdit:saveInlineEdit, renderTable:renderTable, goPage:goPage, loadRosterIndex:loadRosterIndex,
     reloadFromSheet:reloadFromSheet,
