@@ -2531,7 +2531,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div id="code-subtab-main">
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;">
             <button class="btn btn-sm" style="background:#eef2f7;color:var(--navy);border:1px solid var(--border2);" onclick="codeLoadAll()">🔄 새로고침</button>
-            <button class="btn btn-navy btn-sm" onclick="codeSaveUseYn()" id="code-btn-save">☁️ 구글시트 저장</button>
+            <button class="btn btn-navy btn-sm" onclick="codeSaveUseYn()" id="code-btn-save">💾 변경사항 저장</button>
           </div>
           <div style="display:grid;grid-template-columns:30% 70%;gap:14px;align-items:start;">
             <!-- ① 대분류 영역 -->
@@ -12194,7 +12194,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v497_legacy_gas_url_auto_purge';
+var CACHE_VERSION = 'v498_code_save_btn_relabel_load_error_toast';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -20969,19 +20969,37 @@ function codeLoadAll(){
     return;
   }
   showLoading(true);
+  // [v498] 조회 실패(success:false) 시 사유를 화면에 노출하기 위한 수집용 배열
+  //        (기존에는 실패해도 빈 배열로 조용히 넘어가 "데이터 없음"과 구분이 안 됐음)
+  var loadErrors = [];
   Promise.resolve()
     .then(function(){ return apiCall({action:'getAll', sheetName:'CODE_MAJOR'}); })
     .then(function(res){
-      codeMajorList = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      if(res && res.success){
+        codeMajorList = res.data || res.rows || [];
+      } else {
+        codeMajorList = [];
+        var reason = (res && (res.error || res.message)) || '알 수 없는 오류';
+        loadErrors.push('대분류: ' + reason);
+        console.error('[codeLoadAll] CODE_MAJOR 조회 실패', res);
+      }
       codeMajorList.sort(function(a,b){ return (Number(a['정렬순서'])||9999)-(Number(b['정렬순서'])||9999); });
       return apiCall({action:'getAll', sheetName:'CODE_MINOR'});
     })
     .then(function(res){
-      codeMinorList = (res&&res.success) ? (res.data||res.rows||[]) : [];
+      if(res && res.success){
+        codeMinorList = res.data || res.rows || [];
+      } else {
+        codeMinorList = [];
+        var reason2 = (res && (res.error || res.message)) || '알 수 없는 오류';
+        loadErrors.push('중분류: ' + reason2);
+        console.error('[codeLoadAll] CODE_MINOR 조회 실패', res);
+      }
       codeStagedUseYn = {};
       if(!codeSelectedMajorId && codeMajorList.length) codeSelectedMajorId = codeMajorList[0]['대분류ID'];
       codeRenderMajorList();
       codeRenderMinorList();
+      if(loadErrors.length) showToast('⚠️ 코드 조회 실패\n' + loadErrors.join('\n'), 'error');
     })
     .catch(function(e){ showToast('⚠️ 코드 조회 실패: '+(e&&e.message||e), 'error'); })
     .finally(function(){ showLoading(false); });
@@ -21115,7 +21133,7 @@ function codeRenderMinorList(){
 function codeUpdateSaveBtnLabel(){
   var btn = $id('code-btn-save'); if(!btn) return;
   var n = Object.keys(codeStagedUseYn).length;
-  btn.textContent = n ? ('☁️ 구글시트 저장 ('+n+')') : '☁️ 구글시트 저장';
+  btn.textContent = n ? ('💾 변경사항 저장 ('+n+')') : '💾 변경사항 저장';
 }
 function codeToggleUseYn(minorId){
   var m = codeMinorList.find(function(x){ return String(x['중분류ID'])===minorId; }); if(!m) return;
