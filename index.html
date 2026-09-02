@@ -2199,6 +2199,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <!-- ── 업로드 미리보기 배너 (접수ID 중복체크 후 표시) ── -->
             <div id="upload-preview-banner" style="display:none;background:#fff8e1;border-bottom:1.5px solid #f0d060;padding:10px 16px;align-items:center;gap:10px;flex-wrap:wrap;">
               <span style="font-size:.82rem;font-weight:700;color:#7a5800;">📄 <span id="upld-file-name"></span></span>
+              <!-- [v503] 비교 기준(연도+종류) 안내 -->
+              <span style="font-size:.82rem;color:#5a6a8a;">🎯 비교기준: <strong id="upld-scope-label"></strong></span>
               <span style="font-size:.82rem;color:var(--muted);">총 <strong id="upld-total" style="color:var(--navy);">0</strong>명</span>
               <span style="font-size:.82rem;color:#1a6b45;">✅ 신규 <strong id="upld-new">0</strong>명</span>
               <span style="font-size:.82rem;color:#b8860b;">🛠 수정 <strong id="upld-upd">0</strong>명</span>
@@ -3627,8 +3629,42 @@ function vwParseCSVLine(line){
   return res;
 }
 
+// [v505] 업로드 파일의 연도/행사명이 화면 선택값(수양회연도/수양회종류)과 다르면 처리 중단하기 위한 검증
+// CSV에 해당 컬럼이 없으면 비교 자체를 생략(값이 다른 것과 컬럼이 없는 것은 다름)
+function _vwCheckYearEventMismatch(hdrs, rows){
+  var norm=function(s){ return s.trim().toLowerCase().replace(/\s+/g,'').replace(/[\/\-_\(\)]/g,'').replace(/코드$/,'code'); };
+  function findCol(aliases){
+    return hdrs.find(function(h){ return aliases.some(function(a){ return norm(h)===norm(a); }); }) || null;
+  }
+  var yearCol  = findCol(['연도','year','년도','연 도']);
+  var eventCol = findCol(['행사명','행사','event','행 사명']);
+  if(!yearCol && !eventCol) return false;
+
+  var selYear   = String(($id('inpYear')   && $id('inpYear').value)  ||'').trim();
+  var selSeason = String(($id('inpSeason') && $id('inpSeason').value)||'').trim();
+
+  // 값이 있는 첫 행 기준으로 비교 (업로드 파일은 통상 단일 연도·단일 행사 배치)
+  var sample = rows.find(function(r){
+    return (yearCol && String(r[yearCol]||'').trim()) || (eventCol && String(r[eventCol]||'').trim());
+  });
+  if(!sample) return false;
+
+  var fileYear  = yearCol  ? String(sample[yearCol]||'').trim()  : '';
+  var fileEvent = eventCol ? String(sample[eventCol]||'').trim() : '';
+
+  var yearMismatch  = fileYear  && fileYear  !== selYear;
+  var eventMismatch = fileEvent && fileEvent !== selSeason;
+  return yearMismatch || eventMismatch;
+}
+
 // ── 공통 데이터 처리 ─────────────────────────────────
 function vwProcessData(hdrs, rows, filename){
+  // [v505] 화면 선택값과 파일의 연도/행사명이 다르면 처리 자체를 중단
+  if(_vwCheckYearEventMismatch(hdrs, rows)){
+    alert('화면 선택한 수양회 연도와 수양회 종류가 상이한 파일을 업로드 하셨습니다. 파일을 확인해주세요');
+    return;   // vwHeaders/vwAllRows 갱신 없이 종료 → 기존 로드 상태 그대로 유지, 미리보기 테이블도 갱신 안 됨
+  }
+
   vwHeaders=hdrs; vwAllRows=rows;
   var norm=function(s){ return s.trim().toLowerCase().replace(/\s+/g,'').replace(/[\/\-_\(\)]/g,'').replace(/코드$/,'code'); };
   vwColMap={};
@@ -4359,17 +4395,33 @@ function vwCheckDuplicatesAndPreview(){
   apiCall({action:'getAll', sheetName:'참석인원명단'})
     .then(function(res){
       if(!(res && res.success)) throw new Error((res&&res.error)||'기존 데이터 조회 실패');
+
+      // [v503] 신규/수정/삭제 판정을 현재 선택된 수양회연도+수양회종류로 스코핑
+      //        (기존엔 시트 전체를 비교 대상으로 삼아, 다른 연도/종류 CSV 업로드 시
+      //         이번 CSV에 없는 기존 전체 인원이 전부 "삭제대상"으로 오판되는 위험이 있었음)
+      var selYear   = String(($id('inpYear')   && $id('inpYear').value)  ||'').trim();
+      var selSeason = String(($id('inpSeason') && $id('inpSeason').value)||'').trim();
+
+      var allRows = res.data||res.rows||[];
       var existingRows = {}, existingByComposite = {};
       var maxNo = 0;
-      (res.data||res.rows||[]).forEach(function(r){
+      allRows.forEach(function(r){
+        var noVal = parseInt(r['NO'])||0;
+        if(noVal > maxNo) maxNo = noVal;   // [v503] NO는 시트 전체 일련번호이므로 스코핑 없이 전체 기준 유지
+      });
+      _vwMaxExistingNo = maxNo;  // [v198] 신규 등록 채번 기준값 저장(추가 API 호출 없이 이 조회 결과 재사용)
+
+      // [v503] 비교/매칭 대상은 선택된 연도+종류와 일치하는 행만
+      var scopedRows = allRows.filter(function(r){
+        return String(r['연도']||'').trim()===selYear
+            && String(r['수양회종류']||'').trim()===selSeason;
+      });
+      scopedRows.forEach(function(r){
         var rid = String(r['접수ID']||'').trim();
         var fb = (String(r['성명']||'')+String(r['교구']||'')+String(r['구역']||'')).replace(/\s/g,'');
         if(rid){ existingRows[rid] = r; }  // [v206] boolean → 행 전체 객체(필드 비교용)
         if(fb){ existingByComposite[fb] = rid; }  // rid가 빈 문자열이어도 그대로 기록(ID 없음 상태 보존)
-        var noVal = parseInt(r['NO'])||0;
-        if(noVal > maxNo) maxNo = noVal;
       });
-      _vwMaxExistingNo = maxNo;  // [v198] 신규 등록 채번 기준값 저장(추가 API 호출 없이 이 조회 결과 재사용)
 
       var compareCols = _vwCompareCols();
       var srcRows = (vwFilteredRows.length?vwFilteredRows:vwAllRows);
@@ -4437,7 +4489,7 @@ function vwCheckDuplicatesAndPreview(){
       _vwUploadPending.forEach(function(item){
         if(item._status==='del') alreadyFlagged[item.deleteTargetId]=true;
       });
-      (res.data||res.rows||[]).forEach(function(r){
+      (scopedRows).forEach(function(r){   // [v503] 연도+종류 일치 행만 삭제 후보로 검토 (기존: 시트 전체)
         var rid = String(r['접수ID']||'').trim();
         if(!rid) return;                 // 시트에 ID 없는 행은 대상 아님
         if(csvIdSet[rid]) return;         // CSV 어딘가에 존재 → 삭제대상 아님
@@ -4490,6 +4542,9 @@ function _vwRenderUploadPreview(){
   function s2(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; }
   var pillName = document.getElementById('vwPillName');
   s2('upld-file-name', pillName ? pillName.textContent : '');
+  // [v503] 비교기준(연도+종류) 표시
+  var _yEl=$id('inpYear'), _sEl=$id('inpSeason');
+  s2('upld-scope-label', (_yEl?_yEl.value:'')+'년 '+(_sEl?_sEl.value:''));
   // [v237] 총 건수 표시는 실제 처리대상(신규/수정/중복/삭제)만 카운트 — 수동등록 제외 건은 별도 표기
   s2('upld-total', newRows.length+updRows.length+dupRows.length+delRows.length);
   s2('upld-new', newRows.length);
@@ -4523,7 +4578,14 @@ function _vwRenderUploadPreview(){
     tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:.85rem;padding:24px;">'+esc(emptyMsg)+'</td></tr>';
     return;
   }
-  var preview=newRows.concat(updRows).concat(delRows).concat(dupRows).slice(0,200);  // 신규 → 수정 → 삭제대상 → 중복 순 노출
+  // [v504] 목록 표시 기준이 수정/삭제뿐이므로, 신규(+중복)만 있는 경우도 "목록엔 없음" 상태로 별도 안내
+  if(updRows.length===0 && delRows.length===0){
+    var emptyMsg2 = '표시할 변경/삭제 내역이 없습니다.'+(newRows.length?(' (신규 '+newRows.length+'명은 목록에서 생략됨 — 상단 요약 참고)'):'');
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:.85rem;padding:24px;">'+esc(emptyMsg2)+'</td></tr>';
+    return;
+  }
+  // [v504] 목록에는 실제 변경사항(수정/삭제)만 표시. 신규/중복(변경없음)은 상단 요약 배지로만 안내.
+  var preview=updRows.concat(delRows).slice(0,200);
   tbody.innerHTML=preview.map(function(r){
     var badge = r._status==='new'
       ? '<span style="background:#e6f4ec;color:#1a6b45;border-radius:20px;padding:2px 8px;font-size:.74rem;font-weight:700;">신규</span>'
@@ -12211,7 +12273,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v502_goalstatus_retreat_type_filter';
+var CACHE_VERSION = 'v505_vw_upload_year_event_mismatch_guard';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
