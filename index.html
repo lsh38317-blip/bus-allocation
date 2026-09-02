@@ -12273,7 +12273,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v510_loaddata_silent_all_menu_entries';
+var CACHE_VERSION = 'v511_gasapikey_default_fallback';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -12287,7 +12287,15 @@ var CACHE_VERSION = 'v510_loaddata_silent_all_menu_entries';
 
 // ── GAS API Key (보안 강화) ─────────────────────────────────
 // 운영 시: GAS 스크립트 속성(PropertiesService)의 키와 동일 값으로 설정
-var GAS_API_KEY = (function(){ try{return localStorage.getItem('retreat_gas_api_key')||'';}catch(e){return '';} }());
+// [v511] DEFAULT_API_URL과 동일한 방식: localStorage가 브라우저 정책(Safari ITP,
+// 캐시삭제, 다른 오리진 접속 등)으로 비워져도 코드 내장 기본값으로 자동 복구되도록 함.
+var DEFAULT_GAS_API_KEY = 'ed4db0b0f6c71f48a4076f33d5c7a81117aa61c4dd2ab2560d65e31a86606014';
+var GAS_API_KEY = (function(){
+  try{
+    var saved = localStorage.getItem('retreat_gas_api_key');
+    return (saved && saved.length) ? saved : DEFAULT_GAS_API_KEY;
+  } catch(e){ return DEFAULT_GAS_API_KEY; }
+}());
 
 // ── T1: sessionStorage 세션 복원 (페이지 새로고침 자동 로그인) ──
 (function restoreSession(){
@@ -20189,7 +20197,7 @@ function apiUrlRefreshUI() {
   // T3: API Key 상태 표시
   var keyStatus = $id('gas-api-key-status');
   if(keyStatus){
-    var k = _ls.get('retreat_gas_api_key')||'';
+    var k = GAS_API_KEY || '';
     keyStatus.textContent = k ? '✅ API Key 설정됨 (저장된 키: '+k.slice(0,4)+'…'+k.slice(-4)+')' : '⚪ API Key 미설정 (설정 없이도 동작)';
     keyStatus.style.color = k ? '#2e7d32' : '#8896aa';
   }
