@@ -862,7 +862,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
             <select id="gs-year-select" onchange="goalStatusYearChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
             <!-- [v502] 수양회종류 콤보 신규 추가 (home-type-select와 동일) -->
-            <select id="gs-type-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;">
+            <select id="gs-type-select" onchange="goalStatusTypeChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;">
               <option value="" selected>전체</option>
               <option value="춘계">춘계</option>
               <option value="하계">하계</option>
@@ -870,7 +870,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <option value="동계">동계</option>
             </select>
             <select id="gs-parish-select" onchange="goalStatusParishChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
-            <select id="gs-district-select" onchange="goalStatusQuery()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
+            <select id="gs-district-select" onchange="goalStatusDistrictChange()" style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:.85rem;"></select>
             <button class="btn btn-primary btn-sm" onclick="goalStatusQuery()">🔍 조회</button>
             <button class="btn btn-sm" onclick="goalStatusExportCSV()" style="border:1px solid var(--border2);background:#fff;">📥 엑셀다운</button>
           </div>
@@ -12273,7 +12273,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v505_vw_upload_year_event_mismatch_guard';
+var CACHE_VERSION = 'v507_home_manual_query_only';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -13113,6 +13113,7 @@ function switchPanel(name, skipRender) {
       srInit();
     }
     if(name==='home'){
+      homeAggQueried = false;   // [v507] 다른 화면 갔다가 다시 들어와도 조회 버튼을 눌러야 표가 뜨도록
       // ── 홈 배지 필터 확정 ──────────────────────────────────────────────
       // 경로 B: 버스배정 패널 방문 후 홈 진입 → 버스배정 콤보값 그대로 사용
       // 경로 A: 그 외(로그인 직후·자료검색 등) → 교회목표 당해 최신값 사용
@@ -13345,6 +13346,7 @@ var GROUP_DISPLAY_SHORT = {
 
 // 홈 집계 화면 상태
 var homeAggYear = null;            // 선택된 연도 (문자열)
+var homeAggQueried = false;        // [v507] true가 되기 전까지는 renderHome()이 표를 그리지 않음
 var homeAggType = '';              // [v501] 선택된 수양회종류 ('' = 전체)
 var homeAggParish = null;          // 선택된 교구 ('전체'|'1교구'|'2교구'|'3교구'|'4교구'|'기타교구')
 var homeAggDistrict = null;        // 선택된 구역 ('전체' 또는 실제 구역명)
@@ -13622,6 +13624,12 @@ function renderHome(filter) {
   initHomeParishSelect();
   initHomeDistrictSelect();
 
+  // [v507] 조회 전에는 표를 계산·렌더링하지 않고 안내만 표시
+  if(!homeAggQueried){
+    _homeShowQueryPrompt();
+    return;
+  }
+
   var role    = currentUser ? currentUser.role : '';
   var isAdmin = role === 'admin';
 
@@ -13688,8 +13696,17 @@ function renderHome(filter) {
   }
 }
 
+// [v507] 조회 전 안내 상태
+function _homeShowQueryPrompt(){
+  var msg = '<div style="text-align:center;color:var(--muted);font-size:.85rem;padding:40px 20px;">🔍 조회 버튼을 눌러 결과를 확인하세요.</div>';
+  var t1=$id('home-table1'), t2=$id('home-table2');
+  if(t1) t1.innerHTML = msg;
+  if(t2) t2.innerHTML = msg;
+}
+
 // ── 조회 버튼: 선택 연도/교구/구역으로 구글시트 재조회 후 재집계 ──────
 function homeAggQuery(){
+  homeAggQueried = true;   // [v507]
   var ySel = $id('home-year-select');     if(ySel) homeAggYear     = ySel.value;
   var tSel = $id('home-type-select');     if(tSel) homeAggType     = tSel.value;   // [v501]
   var pSel = $id('home-parish-select');   if(pSel) homeAggParish   = pSel.value;
@@ -19721,14 +19738,20 @@ function goalStatusInit(){
   }
   goalStatusInitParishSelect();
   goalStatusInitDistrictSelect();
-  // 참석인원명단 + 구역목표기초값 모두 최신화 후 조회
+  // [v506] 화면 진입 시 자동조회 제거 — 데이터는 미리 받아두되(조회 버튼 클릭시 빠르게 뜨도록) 표는 그리지 않음
+  _gsShowQueryPrompt();
   if(USE_SHEET()){
-    loadData().finally(function(){
-      goalDistrictFetchFromSheet(function(){ goalStatusQuery(); });
-    });
+    loadData();
+    goalDistrictFetchFromSheet();
   } else {
-    goalDistrictFetchFromSheet(function(){ goalStatusQuery(); });
+    goalDistrictFetchFromSheet();
   }
+}
+
+// [v506] 초기 진입/조회 전 안내 상태
+function _gsShowQueryPrompt(){
+  var el = $id('gs-table'); if(!el) return;
+  el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.85rem;padding:40px 20px;">🔍 조회 버튼을 눌러 결과를 확인하세요.</div>';
 }
 
 function goalStatusInitParishSelect(){
@@ -19777,12 +19800,22 @@ function goalStatusParishChange(){
   var sel=$id('gs-parish-select'); if(sel) gsParish=sel.value;
   gsDistrict='전체';
   goalStatusInitDistrictSelect();
-  goalStatusQuery();
+  // [v506] goalStatusQuery() 호출 제거 — 구역 옵션만 갱신, 조회는 버튼 클릭시에만
 }
 
 function goalStatusYearChange(){
   var sel=$id('gs-year-select'); if(sel) gsYear=sel.value;
-  goalStatusQuery();
+  // [v506] goalStatusQuery() 호출 제거 — 조회는 버튼 클릭시에만
+}
+
+// [v506] 신규 — 수양회종류 콤보 변경 시 값만 반영
+function goalStatusTypeChange(){
+  var sel=$id('gs-type-select'); if(sel) gsType=sel.value;
+}
+
+// [v506] 신규 — 구역 콤보 변경 시 값만 반영
+function goalStatusDistrictChange(){
+  var sel=$id('gs-district-select'); if(sel) gsDistrict=sel.value;
 }
 
 function goalStatusQuery(){
