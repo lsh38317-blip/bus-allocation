@@ -12273,7 +12273,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v507_home_manual_query_only';
+var CACHE_VERSION = 'v510_loaddata_silent_all_menu_entries';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -12639,7 +12639,8 @@ function toSheetObj(r){
     '귀가배정유형': r.leaveAssignType  || '',
   };
 }
-function loadData() {
+function loadData(opts) {
+  opts = opts || {};   // [v508] {silent:true} → 성공 토스트 생략, {successMsg:'...'} → 성공 문구 교체
   if(!USE_SHEET()){
     try{ retreat=JSON.parse(_ls.get('retreat_data')||'[]'); }catch(e){ retreat=[]; }
     retreat=retreat.map(sheetRowToObj);
@@ -12663,7 +12664,10 @@ function loadData() {
         var rows = res.data || res.rows || [];
         retreat = rows.map(sheetRowToObj);
         try{ _ls.set('retreat_data', JSON.stringify(retreat)); }catch(e){}
-        showToast('✅ 구글 시트에서 '+retreat.length+'명 로드 완료','success');
+        // [v508] silent면 토스트 생략, successMsg 있으면 문구 교체
+        if(!opts.silent){
+          showToast(opts.successMsg || ('✅ 구글 시트에서 '+retreat.length+'명 로드 완료'), 'success');
+        }
       } else {
         showToast('로드 실패: '+(res.message||'알 수 없는 오류'),'error');
         try{ retreat=JSON.parse(_ls.get('retreat_data')||'[]'); }catch(e){ retreat=[]; }
@@ -12988,7 +12992,7 @@ function initApp() {
 
   switchPanel('home', true);
   // 참석자 데이터 로드 (시트 or 로컬)
-  loadData().finally(function(){
+  loadData({silent:true}).finally(function(){   // [v509] 로그인 직후 최초 로드도 토스트 미노출(화면 로드시 조용히)
     // 관리자: 홈 화면 버스 미배정 인원 뱃지를 위해 탑승자 인덱스도 사전 로드
     if(currentUser && currentUser.role==='admin' && USE_SHEET()){
       loadRosterIndex();
@@ -13062,7 +13066,7 @@ function switchPanel(name, skipRender) {
       vwLoadSeasonOptions(function(){ vwRenderTable(); }); // [v409] 기초정보관리 수양회종류 코드 반영 후 필터 갱신
       vwLoadLastProcTime();
       vwRenderSheetWarn(); // [v406] 연동 미설정 시 경고 배너 노출
-      if(USE_SHEET()){ loadData(); }  // 참석인원명단 재조회 — 로컬 캐시 유무와 무관하게 항상 최신화
+      if(USE_SHEET()){ loadData({silent:true}); }  // [v510] 메뉴 진입시 토스트 미노출 — 참석인원명단 재조회 — 로컬 캐시 유무와 무관하게 항상 최신화
     }
     if(name==='goal'){
       // 메뉴 진입 시마다 매번 재조회(최신값 보장) — 기존 모달 오픈 방식과 동일한 정책
@@ -13099,7 +13103,7 @@ function switchPanel(name, skipRender) {
       if(USE_SHEET()){
         // ── 로컬 캐시 화면 노출 방지: 시트 응답 전까지 그리드를 빈 상태로 초기화 ──
         retreat = []; filtered = []; renderTable();
-        loadData().finally(function(){
+        loadData({silent:true}).finally(function(){   // [v510] 메뉴 진입시 토스트 미노출
           searchParishChange(); // 구역 옵션 생성
           doSearch();           // 조회 버튼 클릭과 동일한 조회 실행
           loadRosterIndex();    // useFilter=false: 전체 탑승자 인덱스 로드 (_rosterFullArr·Lv — 자료검색 버스배정 컬럼 표시용)
@@ -13137,7 +13141,7 @@ function switchPanel(name, skipRender) {
       }
       // ── 참석인원명단 로드 + 탑승자 인덱스 재로드 ────────────────────────
       if(USE_SHEET()){
-        loadData().finally(function(){
+        loadData({silent:true}).finally(function(){   // [v508] 화면 진입시 토스트 미노출
           if(currentUser && currentUser.role === 'admin' && _homeBadgeFilter){
             loadRosterIndex(false, _homeBadgeFilter);
           }
@@ -13711,7 +13715,7 @@ function homeAggQuery(){
   var tSel = $id('home-type-select');     if(tSel) homeAggType     = tSel.value;   // [v501]
   var pSel = $id('home-parish-select');   if(pSel) homeAggParish   = pSel.value;
   var dSel = $id('home-district-select'); if(dSel) homeAggDistrict = dSel.value;
-  if(USE_SHEET()){ loadData(); } else { renderHome(); }
+  if(USE_SHEET()){ loadData({successMsg:'✅ 정상처리 하였습니다.'}); } else { renderHome(); }   // [v508]
 }
 
 // ── 엑셀다운: 현재 화면(표1·표2 좌우 한 줄 배치, 선택 연도·권한 스코프)을 CSV 한 파일로 ──
@@ -19740,8 +19744,9 @@ function goalStatusInit(){
   goalStatusInitDistrictSelect();
   // [v506] 화면 진입 시 자동조회 제거 — 데이터는 미리 받아두되(조회 버튼 클릭시 빠르게 뜨도록) 표는 그리지 않음
   _gsShowQueryPrompt();
+  _gsUpdateEmptyBanner();   // [v509] 조회 여부와 무관하게 데이터 없음 안내는 즉시 반영
   if(USE_SHEET()){
-    loadData();
+    loadData({silent:true}).finally(function(){ _gsUpdateEmptyBanner(); });   // [v510] 메뉴 진입시 토스트 미노출, 로드 완료 후 배너 상태 재확인
     goalDistrictFetchFromSheet();
   } else {
     goalDistrictFetchFromSheet();
@@ -19940,17 +19945,23 @@ function renderGoalStatusTableDOM(containerId, table, headerOnly){
   el.innerHTML = html;
 }
 
+// [v509] 참석인원 데이터 없음 안내배너 — renderGoalStatusPanel()과 goalStatusInit() 양쪽에서 호출
+//        (v506에서 조회 게이트를 걸면서 이 배너도 같이 안 뜨게 된 회귀를 수정: 홈 화면(renderHome)과
+//         동일하게 조회 여부와 무관하게 항상 최신 상태를 반영해야 함)
+function _gsUpdateEmptyBanner(){
+  var gsEmptyBanner = $id('gs-empty-banner'), gsEmptyMsg = $id('gs-empty-msg');
+  if(!gsEmptyBanner || !gsEmptyMsg) return;
+  if(!retreat.length){
+    gsEmptyMsg.textContent = _retreatEmptyMsg();
+    gsEmptyBanner.style.display = 'flex';
+  } else {
+    gsEmptyBanner.style.display = 'none';
+  }
+}
+
 function renderGoalStatusPanel(){
   // [v268] 참석인원 데이터가 없을 때 화면에 안내 배너 표시(관리자/비관리자 문구 분리)
-  var gsEmptyBanner = $id('gs-empty-banner'), gsEmptyMsg = $id('gs-empty-msg');
-  if(gsEmptyBanner && gsEmptyMsg){
-    if(!retreat.length){
-      gsEmptyMsg.textContent = _retreatEmptyMsg();
-      gsEmptyBanner.style.display = 'flex';
-    } else {
-      gsEmptyBanner.style.display = 'none';
-    }
-  }
+  _gsUpdateEmptyBanner();   // [v509]
   var year = gsYear || String(new Date().getFullYear());
   var isAdmin = !!(currentUser && currentUser.role==='admin');
   var selParish   = gsParish   || (isAdmin ? '전체' : ((currentUser&&currentUser.parish)||'1교구'));
@@ -22456,7 +22467,7 @@ function enrollInit(){
   enrollFormReset();
   if(USE_SHEET()){
     showLoading(true);
-    loadData().then(function(){ enrollRenderList(); }).finally(function(){ showLoading(false); });
+    loadData({silent:true}).then(function(){ enrollRenderList(); }).finally(function(){ showLoading(false); });   // [v510] 메뉴 진입시 토스트 미노출
   } else {
     enrollRenderList();
   }
