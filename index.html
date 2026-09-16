@@ -1810,12 +1810,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <!-- 중심 구분선 -->
             <hr style="margin:2px 0 16px;border:none;border-top:2px solid var(--border2);">
 
-            <!-- 하단: 참석일자/참석교통수단/참석배정유형 (3열) -->
+            <!-- 하단: 참석교통수단/참석배정유형/참석일자 (3열) [v519] 순서 변경 -->
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
-              <div class="form-group" style="margin:0;">
-                <label>참석일자</label>
-                <input type="date" id="enroll-arrive-date" onchange="enrollArriveDateChange()">
-              </div>
               <div class="form-group" style="margin:0;">
                 <label>참석교통수단</label>
                 <select id="enroll-arrive-transport" onchange="enrollArriveTransportChange()">
@@ -1826,7 +1822,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
               <div class="form-group" style="margin:0;">
                 <label>참석배정유형</label>
-                <select id="enroll-arrive-assign-type" disabled style="opacity:.5;">
+                <select id="enroll-arrive-assign-type" disabled style="opacity:.5;" onchange="enrollArriveAssignTypeChange()">
                   <option value="">선택</option>
                   <option value="선발대">선발대</option>
                   <option value="본대(봉사)">본대(봉사)</option>
@@ -1836,14 +1832,14 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                   <option value="시각선교부">시각선교부</option>
                 </select>
               </div>
+              <div class="form-group" style="margin:0;">
+                <label>참석일자</label>
+                <input type="date" id="enroll-arrive-date" onchange="enrollArriveDateChange()">
+              </div>
             </div>
 
-            <!-- 하단: 귀가일자/귀가교통수단/귀가배정유형 (3열) -->
+            <!-- 하단: 귀가교통수단/귀가배정유형/귀가일자 (3열) [v519] 순서 변경 -->
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
-              <div class="form-group" style="margin:0;">
-                <label>귀가일자</label>
-                <input type="date" id="enroll-leave-date">
-              </div>
               <div class="form-group" style="margin:0;">
                 <label>귀가교통수단</label>
                 <select id="enroll-leave-transport" onchange="enrollToggleAssignType('leave')">
@@ -1854,12 +1850,16 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
               <div class="form-group" style="margin:0;">
                 <label>귀가배정유형</label>
-                <select id="enroll-leave-assign-type" disabled style="opacity:.5;">
+                <select id="enroll-leave-assign-type" disabled style="opacity:.5;" onchange="enrollLeaveAssignTypeChange()">
                   <option value="">선택</option>
                   <option value="본대">본대</option>
                   <option value="후발대">후발대</option>
                   <option value="중고등부">중고등부</option>
                 </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>귀가일자</label>
+                <input type="date" id="enroll-leave-date">
               </div>
             </div>
 
@@ -2020,13 +2020,13 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th style="display:none;">성별</th>
                     <th onclick="sortByColumn('group',event.shiftKey)" style="cursor:pointer;user-select:none;display:none;">회별 <span id="sort-icon-group" style="font-size:.7rem;"></span></th>
                     <th onclick="sortByColumn('salvCode',event.shiftKey)" style="cursor:pointer;user-select:none;display:none;">구원여부 <span id="sort-icon-salvCode" style="font-size:.7rem;"></span></th>
-                    <th>참석일자</th>
                     <th>참석교통수단</th>
                     <th>참석배정유형</th>
+                    <th>참석일자</th>
                     <th>참석버스배정</th>
-                    <th>귀가일자</th>
                     <th>귀가교통수단</th>
                     <th>귀가배정유형</th>
+                    <th>귀가일자</th>
                     <th>귀가버스배정</th>
                     <th>관리</th>
                   </tr>
@@ -2570,7 +2570,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <div id="code-major-empty" class="empty-state" style="display:none;padding:20px;">
                 <div class="icon">🗂</div><p>등록된 대분류가 없습니다.</p>
               </div>
-              <div style="margin-top:12px;">
+              <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+                <button class="btn btn-sm" style="width:100%;background:#eef2f7;color:var(--navy);border:1px solid var(--border2);display:none;" onclick="codeRenameMajor()" id="code-btn-rename-major" disabled>✏️ 이름 변경</button>
                 <button class="btn btn-danger btn-sm" style="width:100%;" onclick="codeDeleteMajor()" id="code-btn-del-major" disabled>🗑 선택 대분류 삭제</button>
               </div>
             </div>
@@ -3001,10 +3002,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       </div>
       <div class="edit-grid-row">
         <div class="form-group">
-          <label>참석 일자</label>
-          <input type="date" id="e-arrive-date">
-        </div>
-        <div class="form-group">
           <label>참석 교통수단</label>
           <select id="e-arrive-transport">
             <option value="">선택</option>
@@ -3024,6 +3021,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
           </select>
         </div>
         <div class="form-group">
+          <label>참석 일자</label>
+          <input type="date" id="e-arrive-date">
+        </div>
+        <div class="form-group">
           <!-- [v471] 참석배정(버스 호차) — 접수ID 99로 시작하는 건이 아니어도 항상 편집 가능한
                6개 필드 중 하나. busAssignOptionsHtml('search' context)로 옵션을 채운다. -->
           <label>참석배정</label>
@@ -3031,10 +3032,6 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         </div>
       </div>
       <div class="edit-grid-row">
-        <div class="form-group">
-          <label>귀가 일자</label>
-          <input type="date" id="e-leave-date">
-        </div>
         <div class="form-group">
           <label>귀가 교통수단</label>
           <select id="e-leave-transport">
@@ -3053,6 +3050,10 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="시각선교부">시각선교부</option>
             <option value="중고등부">중고등부</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>귀가 일자</label>
+          <input type="date" id="e-leave-date">
         </div>
         <div class="form-group">
           <label>귀가배정</label>
@@ -3633,6 +3634,29 @@ function vwParseCSVLine(line){
   return res;
 }
 
+// [v517] 업로드 CSV에서 방문자='방문' 또는 환불='환불'인 행을 처리 대상에서 제외.
+// _vwCheckYearEventMismatch()와 동일한 컬럼탐색(정규화+별칭매칭) 패턴 재사용.
+// 두 컬럼 중 하나도 CSV에 없으면 필터를 건너뛰어 기존 동작을 그대로 유지한다(과거 파일 호환).
+function _vwFilterExcludedRows(hdrs, rows){
+  var norm=function(s){ return s.trim().toLowerCase().replace(/\s+/g,'').replace(/[\/\-_\(\)]/g,'').replace(/코드$/,'code'); };
+  function findCol(aliases){
+    return hdrs.find(function(h){ return aliases.some(function(a){ return norm(h)===norm(a); }); }) || null;
+  }
+  var visitorCol = findCol(['방문자']);
+  var refundCol  = findCol(['환불']);
+  if(!visitorCol && !refundCol){
+    return { rows: rows, visitorExcluded: 0, refundExcluded: 0 };
+  }
+  var visitorExcluded = 0, refundExcluded = 0;
+  var filtered = rows.filter(function(r){
+    var isVisitor = visitorCol && String(r[visitorCol]||'').trim()==='방문';
+    var isRefund  = refundCol  && String(r[refundCol] ||'').trim()==='환불';
+    if(isVisitor) visitorExcluded++;
+    if(isRefund) refundExcluded++;
+    return !(isVisitor || isRefund);
+  });
+  return { rows: filtered, visitorExcluded: visitorExcluded, refundExcluded: refundExcluded };
+}
 // [v505] 업로드 파일의 연도/행사명이 화면 선택값(수양회연도/수양회종류)과 다르면 처리 중단하기 위한 검증
 // CSV에 해당 컬럼이 없으면 비교 자체를 생략(값이 다른 것과 컬럼이 없는 것은 다름)
 function _vwCheckYearEventMismatch(hdrs, rows){
@@ -3668,6 +3692,10 @@ function vwProcessData(hdrs, rows, filename){
     alert('화면 선택한 수양회 연도와 수양회 종류가 상이한 파일을 업로드 하셨습니다. 파일을 확인해주세요');
     return;   // vwHeaders/vwAllRows 갱신 없이 종료 → 기존 로드 상태 그대로 유지, 미리보기 테이블도 갱신 안 됨
   }
+
+  // [v517] 방문자='방문' 또는 환불='환불'인 행은 미리보기/처리 대상에서 아예 제외
+  var _vwFiltered = _vwFilterExcludedRows(hdrs, rows);
+  rows = _vwFiltered.rows;
 
   vwHeaders=hdrs; vwAllRows=rows;
   var norm=function(s){ return s.trim().toLowerCase().replace(/\s+/g,'').replace(/[\/\-_\(\)]/g,'').replace(/코드$/,'code'); };
@@ -3719,7 +3747,14 @@ function vwProcessData(hdrs, rows, filename){
   }
 
   vwFilter();
-  vwToast('✅ '+rows.length.toLocaleString()+'행 로드됨','ok');
+  var _excludedMsg = '';
+  if(_vwFiltered.visitorExcluded || _vwFiltered.refundExcluded){
+    var _parts=[];
+    if(_vwFiltered.visitorExcluded) _parts.push('방문자 '+_vwFiltered.visitorExcluded+'건');
+    if(_vwFiltered.refundExcluded)  _parts.push('환불 '+_vwFiltered.refundExcluded+'건');
+    _excludedMsg = ' (제외 '+_parts.join(' / ')+')';
+  }
+  vwToast('✅ '+rows.length.toLocaleString()+'행 로드됨'+_excludedMsg,'ok');
 }
 
 // ── 값 추출 ───────────────────────────────────────────
@@ -4288,6 +4323,36 @@ function _procTimeToStr(raw){
   if(m) return m[1]+'-'+m[2]+'-'+m[3]+' '+m[4]+':'+m[5]+':'+m[6];
   return null;
 }
+// [v515] 대분류ID 기반 "예약 대분류" 매핑 헬퍼
+// 배경: 수양회종류/회차/공주행배정유형/서울행배정유형 4개 대분류는 여러 화면의 옵션 로딩 로직이
+// "대분류명==='정확한 문자열'"로 직접 찾고 있었다. 대분류명을 자유롭게 수정할 수 있게 하려면
+// 이 로직들이 이름이 아니라 "변하지 않는 값"으로 서로를 찾아야 한다.
+// 대분류ID는 한번 부여되면 이름이 바뀌어도 절대 바뀌지 않으므로 이 값으로 매핑하는 것이 맞지만,
+// 실제 운영 DB에 이미 등록된 각 대분류의 대분류ID 값을 서버 스키마 변경 없이 알아낼 방법이 없다.
+// 그래서 "최초 1회는 지금과 같은 이름으로 찾아서 그 대분류ID를 브라우저에 기억해두고, 그 다음부터는
+// 이름이 아니라 기억해둔 대분류ID로 찾는" 부트스트랩 방식을 쓴다. 이렇게 하면 서버 작업이나 실제
+// ID 값을 몰라도, 이름이 바뀌기 전에 한번이라도 이 코드가 실행된 브라우저에서는 그 이후 이름이
+// 여러 번 바뀌어도 계속 같은 대분류를 정확히 찾는다.
+// (주의: localStorage는 브라우저별로 저장되므로, 이 코드가 배포된 뒤 어떤 관리자가 아직 한번도
+//  접속하지 않은 브라우저에서 "이름이 이미 바뀐 상태"로 처음 접속하면 그 브라우저에서만 부트스트랩이
+//  실패할 수 있다 — 이 경우에도 기존 이름 매칭 폴백이 동작하므로 화면이 완전히 깨지지는 않는다.)
+function _reservedMajorId(key, expectedName, majors){
+  var lsKey = 'code_reserved_major_' + key;
+  var cached = null;
+  try { cached = localStorage.getItem(lsKey); } catch(e){}
+  // 캐시된 ID가 있고, 그 ID가 현재 대분류 목록에도 실제로 존재하면(삭제되지 않았으면) 그대로 사용
+  if(cached && majors.some(function(m){ return String(m['대분류ID'])===cached; })){
+    return cached;
+  }
+  // 캐시가 없거나 무효화됨 → 아직 이름이 바뀌지 않았다는 전제하에 이름으로 찾아 부트스트랩
+  var m = majors.find(function(x){ return (x['대분류명']||'').trim()===expectedName; });
+  if(m){
+    var id = String(m['대분류ID']);
+    try { localStorage.setItem(lsKey, id); } catch(e){}
+    return id;
+  }
+  return cached; // 이름으로도 못 찾으면(이미 개명된 상태에서 첫 접속) 옛 캐시라도 반환(대부분 null)
+}
 // [v409] 참석인원관리 수양회종류 콤보 — 기초정보관리(CODE_MAJOR/CODE_MINOR)에서 동적 로드.
 // 조회 실패/대상 없음 시 HTML에 이미 있는 고정 옵션(춘계/하계/추계/동계)을 그대로 유지(폴백).
 // 다른 화면의 수양회종류 콤보는 이번 변경 범위에 포함하지 않음(참석인원관리 한정).
@@ -4298,7 +4363,10 @@ function vwLoadSeasonOptions(cb){
   apiCall({action:'getAll', sheetName:'CODE_MAJOR'})
     .then(function(res){
       var majors = (res&&res.success) ? (res.data||res.rows||[]) : [];
-      var major = majors.find(function(m){ return String(m['대분류명']||'').trim()==='수양회종류'; });
+      // [v515] 이름 대신 대분류ID(부트스트랩+캐시)로 찾아 대분류명이 바뀌어도 안전하게 동작
+      var reservedId = _reservedMajorId('SEASON_TYPE', '수양회종류', majors);
+      var major = majors.find(function(m){ return String(m['대분류ID'])===reservedId; })
+                || majors.find(function(m){ return String(m['대분류명']||'').trim()==='수양회종류'; }); // 이중 폴백
       if(!major) return null;
       return apiCall({action:'getAll', sheetName:'CODE_MINOR'}).then(function(r2){
         var minors = (r2&&r2.success) ? (r2.data||r2.rows||[]) : [];
@@ -10829,8 +10897,8 @@ function srInit(){
       } else {
         srRosterReload();
       }
-    }, true);
-  });
+    }, true, 'EVENT_ROUND');
+  }, undefined, 'SEASON_TYPE');
 }
 function srSetType(type){
   srType = type;
@@ -12277,7 +12345,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v514_login_default_userid';
+var CACHE_VERSION = 'v522_bbsave_sequential_fk_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -13226,8 +13294,8 @@ function switchPanel(name, skipRender) {
             // [v463] 요청에 따라 주석처리
             // busTab('teams'); // [v390]
           }
-        });
-      });
+        }, undefined, 'EVENT_ROUND');
+      }, undefined, 'SEASON_TYPE');
     }
     if(name==='busview'){
       // [v242] 교구/구역 조회 콤보 기본값·잠금 적용
@@ -14372,13 +14440,13 @@ function renderTable() {
       '<td style="display:none;">'+esc(_enrollGenderLabel(r.gender))+'</td>'+
       '<td style="display:none;">'+esc(r.group||'-')+'</td>'+
       '<td style="display:none;">'+esc(_salvLabel(r.salvCode))+'</td>'+
-      '<td id="sp-arrive-date-cell-'+esc(idStr)+'">'+arriveDateCell+'</td>'+
       '<td>'+arriveTransCell+'</td>'+
       '<td>'+arriveAssignCell+'</td>'+
+      '<td id="sp-arrive-date-cell-'+esc(idStr)+'">'+arriveDateCell+'</td>'+
       '<td>'+arriveBusCell+'</td>'+
-      '<td id="sp-leave-date-cell-'+esc(idStr)+'">'+leaveDateCell+'</td>'+
       '<td>'+leaveTransCell+'</td>'+
       '<td>'+leaveAssignCell+'</td>'+
+      '<td id="sp-leave-date-cell-'+esc(idStr)+'">'+leaveDateCell+'</td>'+
       '<td>'+leaveBusCell+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
@@ -14621,6 +14689,19 @@ function spStageAssignType(id, kind, value){
     // [v486] 배정유형이 바뀌었으니 배정버스 옵션(그 유형에 배차된 버스만)도 즉시 재계산한다.
     // 테이블 전체를 다시 그려도 다른 스테이징 상태(spStaged*)는 모두 모듈 전역이라 그대로 유지된다.
     renderTable();
+    // [v521] 배정유형에 대응하는 출발일자를 버스운행설정에서 조회해 참석/귀가일자도 함께 스테이징.
+    // 매칭되는 기초정보가 없으면 조용히 무시(기존 날짜 유지).
+    var _spScope = {
+      year:   ($id('s-year')||{value:''}).value.trim(),
+      season: ($id('s-retreat-type')||{value:''}).value.trim(),
+      event:  ($id('s-event')||{value:''}).value.trim()
+    };
+    _lookupBusScheduleDate(value, kind==='arrive'?'참석':'귀가', _spScope).then(function(date){
+      if(!date) return;
+      var dateStaged = kind==='arrive' ? spStagedArriveDate : spStagedLeaveDate;
+      dateStaged[idStr] = date;
+      renderTable();
+    });
   }).catch(function(e){
     console.warn('[배정유형 스테이징 실패]', e&&e.message||e);
     if(sel){ sel.value = prevValue; sel.disabled = false; }
@@ -14728,6 +14809,36 @@ function spBulkUploadHandleFile(input){
   });
   input.value = '';
 }
+// [v521] 배정유형 → 버스운행설정(버스배정_기초정보)의 출발일자 조회 공통 함수.
+// 기존 spBulkUploadProcess()/bpBulkUploadProcess()의 CSV 업로드 처리에 중복 구현돼 있던
+// dateMap 구축 로직({배정유형|운행방향: 출발일자})을 이 함수로 추출해 공용화했다.
+// scope: {year, season, event} — 화면별 현재 선택된 연도/수양회종류/회차. 값이 없으면 해당 조건은 건너뜀.
+// Promise<dateMap>을 반환 — 호출부에서 .then()/.catch()로 기존 apiCall(...).then() 자리에 그대로 대체 가능.
+function _fetchBusScheduleDateMap(scope){
+  if(typeof USE_SHEET !== 'function' || !USE_SHEET() || typeof apiCall !== 'function'){ return Promise.resolve({}); }
+  return apiCall({action:'getAll', sheetName:'버스배정_기초정보'}).then(function(res){
+    var rows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+    var dateMap = {};
+    rows.forEach(function(r){
+      if(scope){
+        if(scope.year   && String(r['년도'])!==String(scope.year))   return;
+        if(scope.season && r['수양회종류']!==scope.season) return;
+        if(scope.event  && r['행사명']!==scope.event)     return;
+      }
+      var key = (r['배정유형']||'')+'|'+(r['운행방향']||'');
+      if(r['출발일자']) dateMap[key] = r['출발일자'];
+    });
+    return dateMap;
+  });
+}
+// [v521] 단일 배정유형+운행방향(direction: '참석'=공주행 / '귀가'=서울행) 출발일자 조회 편의 함수.
+// 개별신청/참석자 정보 수정/일괄 신청 및 배정 화면의 배정유형 select onchange에서 사용. Promise<출발일자|''>.
+function _lookupBusScheduleDate(assignType, direction, scope){
+  if(!assignType) return Promise.resolve('');
+  return _fetchBusScheduleDateMap(scope).then(function(dateMap){
+    return dateMap[assignType+'|'+direction] || '';
+  });
+}
 // [v344] CSV 파싱은 bpBulkUploadParseCSV() 재사용. 매칭 후 "본인 소속 범위 밖" 행은
 // 관리자가 아니면 자동 제외(스코프 가드)하고, 제외 건수를 별도로 안내한다.
 function spBulkUploadProcess(text){
@@ -14793,20 +14904,12 @@ function spBulkUploadProcess(text){
   }
 
   showLoading(true);
-  apiCall({action:'getAll', sheetName:'버스배정_기초정보'}).then(function(res){
-    var baseRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
-    var sYear   = ($id('s-year')||{value:''}).value.trim();
-    var sSeason = ($id('s-retreat-type')||{value:''}).value.trim();
-    var sEvent  = ($id('s-event')||{value:''}).value.trim();
-    var dateMap = {};
-    baseRows.forEach(function(r){
-      if(sYear   && String(r['년도'])!==String(sYear))   return;
-      if(sSeason && r['수양회종류']!==sSeason) return;
-      if(sEvent  && r['행사명']!==sEvent)     return;
-      var key = (r['배정유형']||'')+'|'+(r['운행방향']||'');
-      if(r['출발일자']) dateMap[key] = r['출발일자'];
-    });
-
+  var _spScope = {
+    year:   ($id('s-year')||{value:''}).value.trim(),
+    season: ($id('s-retreat-type')||{value:''}).value.trim(),
+    event:  ($id('s-event')||{value:''}).value.trim()
+  };
+  _fetchBusScheduleDateMap(_spScope).then(function(dateMap){
     var arriveCount=0, leaveCount=0, dateCount=0;
     toStage.forEach(function(item){
       var idStr = String(item.r.id);
@@ -16196,8 +16299,8 @@ function openDetail(id) {
     [['연도', r.year||'-'], ['수양회 종류', r.retreatType||'-'], ['회차', r.event||'-']],
     [['교구', r.parish||'-'], ['구역', r.district||'-'], ['성명', maskName(r.name)||'-']],
     [['회별', r.group||'-'], ['구원여부', _salvLabel(r.salvCode)], ['성별', _enrollGenderLabel(r.gender)]],
-    [['참석 일자', fmtDate(r.arriveDate)||'-'], ['참석 교통수단', r.arriveTransport||'-'], ['참석배정유형', r.arriveAssignType||'-'], ['참석배정', _busAssignVal('arrive')]],
-    [['귀가 일자', fmtDate(r.leaveDate)||'-'], ['귀가 교통수단', r.leaveTransport||'-'], ['귀가배정유형', r.leaveAssignType||'-'], ['귀가배정', _busAssignVal('leave')]],
+    [['참석 교통수단', r.arriveTransport||'-'], ['참석배정유형', r.arriveAssignType||'-'], ['참석 일자', fmtDate(r.arriveDate)||'-'], ['참석배정', _busAssignVal('arrive')]],
+    [['귀가 교통수단', r.leaveTransport||'-'], ['귀가배정유형', r.leaveAssignType||'-'], ['귀가 일자', fmtDate(r.leaveDate)||'-'], ['귀가배정', _busAssignVal('leave')]],
     [['보호자', r.guardian||'-'], ['연락처', r.contact||'-']],
   ];
   var mb=$id('modal-body');
@@ -16291,15 +16394,20 @@ function openEditMode(id) {
   var eLvT=$id('e-leave-transport');   if(eLvT) eLvT.onchange=function(){ _toggleAssign('leave'); };
 
   // [v482] 참석/귀가배정유형을 바꾸면 배정버스 목록도 그 배정유형 기준으로 즉시 재필터링한다.
+  // [v521] 동시에 버스운행설정의 해당 배정유형 출발일자를 참석/귀가일자에도 자동 반영한다.
   var eArrAssignType=$id('e-arrive-assign-type');
   if(eArrAssignType) eArrAssignType.onchange=function(){
     var v=this.value;
     _busApplyAssignTypeFilteredOptions($id('e-arrive-bus'), 'arrive', v, $id('e-arrive-bus')?$id('e-arrive-bus').value:'', function(){ _toggleAssign('arrive'); });
+    var _eScope = { year: $id('e-year').value, season: $id('e-retreat-type').value, event: $id('e-event').value };
+    _lookupBusScheduleDate(v, '참석', _eScope).then(function(date){ if(date) $set('e-arrive-date', date); });
   };
   var eLvAssignType=$id('e-leave-assign-type');
   if(eLvAssignType) eLvAssignType.onchange=function(){
     var v=this.value;
     _busApplyAssignTypeFilteredOptions($id('e-leave-bus'), 'leave', v, $id('e-leave-bus')?$id('e-leave-bus').value:'', function(){ _toggleAssign('leave'); });
+    var _eScope = { year: $id('e-year').value, season: $id('e-retreat-type').value, event: $id('e-event').value };
+    _lookupBusScheduleDate(v, '귀가', _eScope).then(function(date){ if(date) $set('e-leave-date', date); });
   };
 
   // [v474] 참석/귀가배정유형 공통코드 캐시 — 버스운행설정·접수인원등록과 동일한 캐시
@@ -17475,20 +17583,12 @@ function bpBulkUploadProcess(text){
   }
 
   showLoading(true);
-  apiCall({action:'getAll', sheetName:'버스배정_기초정보'}).then(function(res){
-    var baseRows = (res&&res.success) ? (res.data||res.rows||[]) : [];
-    var sYear   = ($id('bb-year-sel')  ||{value:''}).value.trim();
-    var sSeason = ($id('bb-season-sel')||{value:''}).value.trim();
-    var sEvent  = ($id('bb-event-sel') ||{value:''}).value.trim();
-    // {배정유형|운행방향: 출발일자}
-    var dateMap = {};
-    baseRows.forEach(function(r){
-      if(sYear   && String(r['년도'])!==String(sYear))   return;
-      if(sSeason && r['수양회종류']!==sSeason) return;
-      if(sEvent  && r['행사명']!==sEvent)     return;
-      var key = (r['배정유형']||'')+'|'+(r['운행방향']||'');
-      if(r['출발일자']) dateMap[key] = r['출발일자'];
-    });
+  var _bpScope = {
+    year:   ($id('bb-year-sel')  ||{value:''}).value.trim(),
+    season: ($id('bb-season-sel')||{value:''}).value.trim(),
+    event:  ($id('bb-event-sel') ||{value:''}).value.trim()
+  };
+  _fetchBusScheduleDateMap(_bpScope).then(function(dateMap){
 
     var arriveCount=0, leaveCount=0, dateCount=0;
     toStage.forEach(function(item){
@@ -19059,8 +19159,8 @@ function renderGoalPanel(){
   _codeLoadSelectOptions('goal-event-sel', '회차', '3차', function(){
     _codeLoadSelectOptions('goal-season-sel', '수양회종류', '하계', function(){
       _goalFetchFromSheet(function(){ goalRenderYearOptions(); }, {showSpinner:true, notify:true});
-    });
-  });
+    }, undefined, 'SEASON_TYPE');
+  }, undefined, 'EVENT_ROUND');
   goalDistrictFetchFromSheet(function(){ goalDistrictListRender(); goalManualTableRender(); }, {notify:true});
 }
 
@@ -19089,13 +19189,20 @@ function goalModalSwitchTab(tab){
 // [v421] 교회목표관리의 강서교회회차/수양회종류 콤보 — 기초정보관리(CODE_MAJOR/CODE_MINOR)에서
 // 동적 로드. 참석인원관리 vwLoadSeasonOptions()와 동일한 패턴(폴백 포함)을 범용화한 버전.
 // preferredDefault가 목록에 있으면 그 값을 기본 선택(요청: 회차=3차, 수양회종류=하계).
-function _codeLoadSelectOptions(selId, majorName, preferredDefault, cb, includeAllOption){
+// [v515] reservedKey — _reservedMajorId()에 넘길 예약키('SEASON_TYPE'/'EVENT_ROUND' 등).
+// majorName은 최초 부트스트랩용 이름으로만 쓰이고, 그 다음부터는 대분류ID로 찾아 이름이 바뀌어도 안전.
+function _codeLoadSelectOptions(selId, majorName, preferredDefault, cb, includeAllOption, reservedKey){
   var sel = $id(selId);
   if(!sel || !USE_SHEET()){ if(cb) cb(); return; }
   apiCall({action:'getAll', sheetName:'CODE_MAJOR'})
     .then(function(res){
       var majors = (res&&res.success) ? (res.data||res.rows||[]) : [];
-      var major = majors.find(function(m){ return String(m['대분류명']||'').trim()===majorName; });
+      var major = null;
+      if(reservedKey){
+        var reservedId = _reservedMajorId(reservedKey, majorName, majors);
+        major = majors.find(function(m){ return String(m['대분류ID'])===reservedId; });
+      }
+      if(!major) major = majors.find(function(m){ return String(m['대분류명']||'').trim()===majorName; }); // 이중 폴백
       if(!major) return null;
       return apiCall({action:'getAll', sheetName:'CODE_MINOR'}).then(function(r2){
         var minors = (r2&&r2.success) ? (r2.data||r2.rows||[]) : [];
@@ -21196,7 +21303,12 @@ function _codeNextMinorId(){
 }
 function codeRenderMajorList(){
   var box = $id('code-major-list'); var empty = $id('code-major-empty'); if(!box) return;
-  if(!codeMajorList.length){ box.innerHTML=''; if(empty) empty.style.display=''; $id('code-btn-del-major').disabled=true; return; }
+  if(!codeMajorList.length){
+    box.innerHTML=''; if(empty) empty.style.display='';
+    $id('code-btn-del-major').disabled=true;
+    if($id('code-btn-rename-major')) $id('code-btn-rename-major').disabled=true;
+    return;
+  }
   if(empty) empty.style.display='none';
   box.innerHTML = codeMajorList.map(function(m){
     var sel = String(m['대분류ID'])===String(codeSelectedMajorId);
@@ -21205,6 +21317,7 @@ function codeRenderMajorList(){
       +'<span>▸ '+esc(m['대분류명']||'')+'</span>'+(sel?'<span style="font-size:.72rem;">선택됨</span>':'')+'</div>';
   }).join('');
   $id('code-btn-del-major').disabled = !codeSelectedMajorId;
+  if($id('code-btn-rename-major')) $id('code-btn-rename-major').disabled = !codeSelectedMajorId;
 }
 function codeSelectMajor(id){
   codeSelectedMajorId = id;
@@ -21237,6 +21350,37 @@ function codeAddMajor(){
       codeSelectedMajorId = newId;
       codeRenderMajorList(); codeRenderMinorList();
       showToast('✅ 대분류가 추가되었습니다.','success');
+    })
+    .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
+    .finally(function(){ showLoading(false); });
+}
+// [v515] 대분류명 수정 — 대분류ID는 그대로 유지되므로 vwLoadSeasonOptions/_bbLoadTypeOptionsCache/
+// _codeLoadSelectOptions가 대분류ID(_reservedMajorId 부트스트랩+캐시) 기준으로 찾게 바뀐 뒤로는
+// "수양회종류"/"회차"/"공주행배정유형"/"서울행배정유형"을 포함해 어떤 대분류든 이름을 자유롭게
+// 바꿔도 안전하다.
+function codeRenameMajor(){
+  if(!codeSelectedMajorId) return;
+  var major = codeMajorList.find(function(m){ return String(m['대분류ID'])===String(codeSelectedMajorId); });
+  if(!major) return;
+  var oldName = major['대분류명']||'';
+  var name = prompt('새 대분류명을 입력하세요.', oldName);
+  if(name===null) return;
+  name = name.trim();
+  if(!name){ showToast('명칭을 입력해 주세요.','error'); return; }
+  if(name.length>30){ showToast('대분류명은 최대 30자입니다.','error'); return; }
+  if(name===oldName) return; // 변경 없음
+  if(codeMajorList.some(function(m){ return String(m['대분류ID'])!==String(codeSelectedMajorId) && (m['대분류명']||'').trim()===name; })){
+    showToast('이미 등록된 명칭입니다.','error'); return;
+  }
+  if(!USE_SHEET()){ showToast('⚠️ 구글 시트 연동 후 이용 가능합니다.','error'); return; }
+  showLoading(true);
+  var updated = Object.assign({}, major, {'대분류명': name});
+  apiCall(Object.assign({action:'update', sheetName:'CODE_MAJOR'}, updated))
+    .then(function(res){
+      if(!(res&&res.success)){ showToast('⚠️ 저장 실패: '+(res&&(res.error||res.message)||'알 수 없는 오류'),'error'); return; }
+      major['대분류명'] = name;
+      codeRenderMajorList(); codeRenderMinorList();
+      showToast('✅ 대분류명이 "'+oldName+'" → "'+name+'"(으)로 변경되었습니다.','success');
     })
     .catch(function(e){ showToast('⚠️ 저장 실패: '+(e&&e.message||e),'error'); })
     .finally(function(){ showLoading(false); });
@@ -21536,7 +21680,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'bpToggleTransport','bpToggleCheck','bpToggleAll','bpBulkToggleTransport','bpBulkUploadOpen','bpBulkUploadHandleFile','bpBulkUploadParseCSV','bpBulkUploadProcess','bpStageAssignType',
     'bpEditDate','bpStageDate','bpCancelDateEdit','bpDownloadTemplate','bpStageBus','_bpileToggleBusFields','_bpileAssignTypeChanged',
     // [v349] 코드관리
-    'codeLoadAll','codeSelectMajor','codeAddMajor','codeDeleteMajor','codeAddMinor','codeToggleUseYn','codeDeleteMinor','codeSaveUseYn','codeSwitchTab',
+    'codeLoadAll','codeSelectMajor','codeAddMajor','codeRenameMajor','codeDeleteMajor','codeAddMinor','codeToggleUseYn','codeDeleteMinor','codeSaveUseYn','codeSwitchTab',
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진 — onclick/onchange에서 직접 호출되는 함수만 등록
     'spToggleTransport','spToggleCheck','spToggleAll','spStageAssignType','spStageBus',
     'spEditDate','spStageDate','spCancelDateEdit',
@@ -21617,7 +21761,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bpOpenDetail:bpOpenDetail, bpOpenInlineEdit:bpOpenInlineEdit, bpSaveInlineEdit:bpSaveInlineEdit, bpDeleteRow:bpDeleteRow, bpCancelEdit:bpCancelEdit, bpSaveEdit:bpSaveEdit,
     bpToggleTransport:bpToggleTransport, bpToggleCheck:bpToggleCheck, bpToggleAll:bpToggleAll, bpBulkToggleTransport:bpBulkToggleTransport, bpBulkUploadOpen:bpBulkUploadOpen, bpBulkUploadHandleFile:bpBulkUploadHandleFile, bpBulkUploadParseCSV:bpBulkUploadParseCSV, bpBulkUploadProcess:bpBulkUploadProcess, bpStageAssignType:bpStageAssignType,
     bpEditDate:bpEditDate, bpStageDate:bpStageDate, bpCancelDateEdit:bpCancelDateEdit, bpDownloadTemplate:bpDownloadTemplate, bpStageBus:bpStageBus, _bpileToggleBusFields:_bpileToggleBusFields, _bpileAssignTypeChanged:_bpileAssignTypeChanged,
-    codeLoadAll:codeLoadAll, codeSelectMajor:codeSelectMajor, codeAddMajor:codeAddMajor, codeDeleteMajor:codeDeleteMajor, codeAddMinor:codeAddMinor, codeToggleUseYn:codeToggleUseYn, codeDeleteMinor:codeDeleteMinor, codeSaveUseYn:codeSaveUseYn, codeSwitchTab:codeSwitchTab,
+    codeLoadAll:codeLoadAll, codeSelectMajor:codeSelectMajor, codeAddMajor:codeAddMajor, codeRenameMajor:codeRenameMajor, codeDeleteMajor:codeDeleteMajor, codeAddMinor:codeAddMinor, codeToggleUseYn:codeToggleUseYn, codeDeleteMinor:codeDeleteMinor, codeSaveUseYn:codeSaveUseYn, codeSwitchTab:codeSwitchTab,
     // [v344] 배정인원현황(일괄신청 및 현황) 편집엔진
     spToggleTransport:spToggleTransport, spToggleCheck:spToggleCheck, spToggleAll:spToggleAll, spStageAssignType:spStageAssignType, spStageBus:spStageBus,
     spEditDate:spEditDate, spStageDate:spStageDate, spCancelDateEdit:spCancelDateEdit,
@@ -21908,8 +22052,13 @@ function _bbLoadTypeOptionsCache(cb){
   apiCall({action:'getAll', sheetName:'CODE_MAJOR'})
     .then(function(res){
       var majors = (res&&res.success) ? (res.data||res.rows||[]) : [];
-      var majorArrive = majors.find(function(m){ return String(m['대분류명']||'').trim()==='공주행배정유형'; });
-      var majorLeave  = majors.find(function(m){ return String(m['대분류명']||'').trim()==='서울행배정유형'; });
+      // [v515] 이름 대신 대분류ID(부트스트랩+캐시)로 찾아 대분류명이 바뀌어도 안전하게 동작(이중 폴백 유지)
+      var arriveId = _reservedMajorId('ARRIVE_ASSIGN_TYPE', '공주행배정유형', majors);
+      var leaveId  = _reservedMajorId('LEAVE_ASSIGN_TYPE', '서울행배정유형', majors);
+      var majorArrive = majors.find(function(m){ return String(m['대분류ID'])===arriveId; })
+                     || majors.find(function(m){ return String(m['대분류명']||'').trim()==='공주행배정유형'; });
+      var majorLeave  = majors.find(function(m){ return String(m['대분류ID'])===leaveId; })
+                     || majors.find(function(m){ return String(m['대분류명']||'').trim()==='서울행배정유형'; });
       if(!majorArrive && !majorLeave) return null;
       return apiCall({action:'getAll', sheetName:'CODE_MINOR'}).then(function(r2){
         var minors = (r2&&r2.success) ? (r2.data||r2.rows||[]) : [];
@@ -22173,12 +22322,16 @@ function bbSave(){
 
   var payloads = _bbBuildSheetPayloads();
   showLoading(true);
-  Promise.all([
-    apiCall({action:'overwrite', sheetName:'버스배정_기초정보',   headers:payloads.baseHdr, rows:payloads.baseRows}),
-    apiCall({action:'overwrite', sheetName:'버스배정_운전자정보', headers:payloads.drvHdr,  rows:payloads.drvRows})
-  ]).then(function(results){
-    if(!results[0]||!results[0].success) throw new Error(results[0]&&results[0].error||'기초정보 저장 실패');
-    if(!results[1]||!results[1].success) throw new Error(results[1]&&results[1].error||'운전자정보 저장 실패');
+  // [v522] 기존엔 Promise.all()로 기초정보/운전자정보를 동시에(병렬) 저장 요청했다.
+  // 운전자정보(bus_driver_info)는 기초정보(bus_base_info)의 reg_id를 외래키로 참조하므로,
+  // 부모(기초정보) 저장이 커밋되기 전에 자식(운전자정보) 저장 요청이 먼저 도달하면
+  // SQLSTATE[23000] 1452(외래키 제약 위반)로 롤백된다. 프로젝트 원칙(순차 API 호출)대로
+  // 기초정보 저장이 완전히 끝난 뒤에만 운전자정보 저장을 이어서 실행하도록 수정.
+  apiCall({action:'overwrite', sheetName:'버스배정_기초정보', headers:payloads.baseHdr, rows:payloads.baseRows}).then(function(baseResult){
+    if(!baseResult||!baseResult.success) throw new Error(baseResult&&baseResult.error||'기초정보 저장 실패');
+    return apiCall({action:'overwrite', sheetName:'버스배정_운전자정보', headers:payloads.drvHdr, rows:payloads.drvRows});
+  }).then(function(drvResult){
+    if(!drvResult||!drvResult.success) throw new Error(drvResult&&drvResult.error||'운전자정보 저장 실패');
     showToast('✅ 버스운행설정 '+(isNew?'등록':'수정')+' 완료','success');
     // [v385] "선탑자 저장(시트 반영)"과 동일한 로직으로, 이번 저장 폼에 입력된 선탑자
     // 교구/구역/이름이 채워진 배차만 이어서 매칭·저장한다(비어있는 배차는 위에서 이미
@@ -22539,6 +22692,29 @@ function enrollToggleAssignType(kind){
   typeSel.disabled = !isBus;
   typeSel.style.opacity = isBus ? '' : '.5';
   if(!isBus) typeSel.value = '';
+}
+// [v521] 개별신청 화면의 현재 연도/수양회종류/회차 — 배정유형→출발일자 조회 시 범위(scope)로 사용
+function _enrollScheduleScope(){
+  return {
+    year:   ($id('enroll-year')||{value:''}).value,
+    season: ($id('enroll-retreat-type')||{value:''}).value,
+    event:  ($id('enroll-event')||{value:''}).value
+  };
+}
+// [v521] 참석배정유형 선택 시 — 버스운행설정(공주행)의 해당 배정유형 출발일자를 참석일자에 자동 반영.
+// 매칭되는 기초정보가 없으면 조용히 무시(기존 값 유지). 참석일자가 바뀌면 귀가일자 +3일 자동계산도 이어서 동작.
+function enrollArriveAssignTypeChange(){
+  var v = ($id('enroll-arrive-assign-type')||{value:''}).value;
+  _lookupBusScheduleDate(v, '참석', _enrollScheduleScope()).then(function(date){
+    if(date){ $set('enroll-arrive-date', date); enrollArriveDateChange(); }
+  });
+}
+// [v521] 귀가배정유형 선택 시 — 버스운행설정(서울행)의 해당 배정유형 출발일자를 귀가일자에 자동 반영.
+function enrollLeaveAssignTypeChange(){
+  var v = ($id('enroll-leave-assign-type')||{value:''}).value;
+  _lookupBusScheduleDate(v, '귀가', _enrollScheduleScope()).then(function(date){
+    if(date){ $set('enroll-leave-date', date); }
+  });
 }
 
 // [v245] 'YYYY-MM-DD' 문자열에 일수를 더한 'YYYY-MM-DD'를 반환. 값이 없거나 형식이 아니면 ''.
