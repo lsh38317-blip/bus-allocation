@@ -672,11 +672,11 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
       <form id="login-form" onsubmit="doLogin(); return false;">
         <div class="form-group">
           <label>아이디</label>
-          <input type="text" id="inp-id" name="username" autocomplete="username" placeholder="아이디 입력" oninput="onLoginIdInput()">
+          <input type="text" id="inp-id" name="username" autocomplete="username" placeholder="아이디 입력" value="user" oninput="onLoginIdInput()">
         </div>
         <div class="form-group">
           <label>비밀번호</label>
-          <input type="password" id="inp-pw" name="password" autocomplete="current-password" placeholder="비밀번호 입력">
+          <input type="password" id="inp-pw" name="password" autocomplete="current-password" placeholder="비밀번호 입력" value="user">
         </div>
         <div class="form-group" id="login-parish-district-wrap" style="display:flex;gap:10px;">
           <div style="flex:1;">
@@ -12277,7 +12277,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v512_codemgmt_mobile_toast_fix';
+var CACHE_VERSION = 'v514_login_default_userid';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -12620,6 +12620,11 @@ function sheetRowToObj(r) {
 // ── JS 객체(영문키) → 구글시트 한글 컬럼명 객체 변환 ──────────────────────
 // GAS actionUpdate는 SHEET_HEADERS의 한글키로 data[h] 매칭하므로
 // apiCall update 호출 전 반드시 이 함수로 변환 후 전달해야 함
+// [v513] fmtDate()는 원본 날짜값이 비어있을 때 화면 표시용으로 '-'를 반환하는데(12348행),
+// 이 값이 그대로 저장 payload에 흘러들어가면 PHP 게이트웨이가 DATETIME 컬럼(예: registered_at)에
+// 문자열 '-'를 바인딩하려다 SQLSTATE[22007](1292) 오류로 저장 자체가 통째로 실패한다.
+// '-'는 순수 표시용 placeholder이며 실제 저장되어야 할 값이 아니므로, 저장 직전 빈 문자열로 되돌린다.
+function _sheetDateVal(v){ return (v==='-') ? '' : (v||''); }
 function toSheetObj(r){
   return {
     'NO':         r.id        || '',
@@ -12637,16 +12642,16 @@ function toSheetObj(r){
     '숙소코드':   r.roomCode  || '',
     '숙소1':      r.room1     || '',
     '숙소2':      r.room2     || '',
-    '참석일자':   r.arriveDate    || '',
+    '참석일자':   _sheetDateVal(r.arriveDate),
     '참석교통수단': r.arriveTransport || '',
-    '귀가일자':   r.leaveDate     || '',
+    '귀가일자':   _sheetDateVal(r.leaveDate),
     '귀가교통수단': r.leaveTransport  || '',
     '전참여부':   r.prevAttend || '',
     '구원여부':   r.salvCode   || '',
     '연락처':     r.contact    || '',
     '보호자':     r.guardian   || '',
     '성별':       r.gender     || '',
-    '등록일자':   r.regDate    || '',
+    '등록일자':   _sheetDateVal(r.regDate),
     '참석배정유형': r.arriveAssignType || '',
     '귀가배정유형': r.leaveAssignType  || '',
   };
@@ -14919,6 +14924,7 @@ function spBulkToggleTransport(){
   showLoading(true);
   var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, arriveBusCount=0, leaveBusCount=0, failCount=0, blockedCount=0;
   var busFailNames = []; // [v489] 배정버스 저장(재시도 포함)까지 실패한 사람 — 완료 시 명확히 알림
+  var fieldFailNames = []; // [v513] 일자/교통수단/배정유형 등 일반 필드 저장 실패 시 사유를 담아 완료 후 노출
   var chain = idList.reduce(function(p, idStr){
     return p.then(function(){
       var r = retreat.find(function(x){ return String(x.id)===idStr; });
@@ -14984,7 +14990,12 @@ function spBulkToggleTransport(){
           }
           return jobs.reduce(function(pp, job){ return pp.then(function(){ return job; }); }, Promise.resolve());
         })
-        .catch(function(e){ failCount++; console.warn('[일괄변경 실패]', r.name, e&&e.message||e); });
+        .catch(function(e){
+          failCount++;
+          var emsg = (e&&e.message)||String(e);
+          console.warn('[일괄변경 실패]', r.name, emsg);
+          fieldFailNames.push(maskName(r.name||'')+': '+emsg); // [v513] 화면에도 실제 실패 사유 노출
+        });
     });
   }, Promise.resolve());
 
@@ -15001,6 +15012,11 @@ function spBulkToggleTransport(){
     // [v489] 배정버스 저장이 (재시도까지) 실패한 사람이 있으면 조용히 넘어가지 않고 명확히 알림
     if(busFailNames.length){
       alert('⚠️ 배정버스 저장에 실패한 인원이 있습니다(재시도 후에도 실패). 다시 시도해 주세요.\n\n'+busFailNames.join(', '));
+    }
+    // [v513] 일자/교통수단/배정유형 등 일반 필드 저장 실패 시 실제 사유를 화면에 노출
+    // (이전에는 console.warn에만 남고 토스트엔 "실패 N건"만 표시되어 사유 파악이 불가능했음)
+    if(fieldFailNames.length){
+      alert('⚠️ 저장에 실패한 항목이 있습니다.\n\n'+fieldFailNames.join('\n'));
     }
   }).finally(function(){
     showLoading(false);
@@ -17596,6 +17612,7 @@ function bpBulkToggleTransport(){
   showLoading(true);
   var arriveDateCount=0, leaveDateCount=0, arriveCount=0, leaveCount=0, arriveAssignCount=0, leaveAssignCount=0, arriveBusCount=0, leaveBusCount=0, failCount=0;
   var busFailNames = []; // [v489] 배정버스 저장(재시도 포함)까지 실패한 사람 — 완료 시 명확히 알림
+  var fieldFailNames = []; // [v513] 일자/교통수단/배정유형 등 일반 필드 저장 실패 시 사유를 담아 완료 후 노출
 
   // [v308] 접수ID(행) 기준 건by건 순차 처리 — 사람당 저장 API 1회
   var chain = idList.reduce(function(p, idStr){
@@ -17662,7 +17679,12 @@ function bpBulkToggleTransport(){
           // 팀당 잡(job)들도 사람 단위로 순차 처리(동시 다발 호출 금지 원칙 준수)
           return jobs.reduce(function(pp, job){ return pp.then(function(){ return job; }); }, Promise.resolve());
         })
-        .catch(function(e){ failCount++; console.warn('[일괄변경 실패]', r.name, e&&e.message||e); });
+        .catch(function(e){
+          failCount++;
+          var emsg = (e&&e.message)||String(e);
+          console.warn('[일괄변경 실패]', r.name, emsg);
+          fieldFailNames.push(maskName(r.name||'')+': '+emsg); // [v513] 화면에도 실제 실패 사유 노출
+        });
     });
   }, Promise.resolve());
 
@@ -17678,6 +17700,10 @@ function bpBulkToggleTransport(){
     // [v489] 배정버스 저장이 (재시도까지) 실패한 사람이 있으면 조용히 넘어가지 않고 명확히 알림
     if(busFailNames.length){
       alert('⚠️ 배정버스 저장에 실패한 인원이 있습니다(재시도 후에도 실패). 다시 시도해 주세요.\n\n'+busFailNames.join(', '));
+    }
+    // [v513] 일자/교통수단/배정유형 등 일반 필드 저장 실패 시 실제 사유를 화면에 노출
+    if(fieldFailNames.length){
+      alert('⚠️ 저장에 실패한 항목이 있습니다.\n\n'+fieldFailNames.join('\n'));
     }
   }).finally(function(){
     showLoading(false);
