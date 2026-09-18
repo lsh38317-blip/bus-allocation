@@ -1810,8 +1810,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <!-- 중심 구분선 -->
             <hr style="margin:2px 0 16px;border:none;border-top:2px solid var(--border2);">
 
-            <!-- 하단: 참석교통수단/참석배정유형/참석일자 (3열) [v519] 순서 변경 -->
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
+            <!-- 하단: 참석교통수단/참석배정유형/출발시간/참석일자 (4열) [v534] 출발시간(읽기전용) 추가 -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
               <div class="form-group" style="margin:0;">
                 <label>참석교통수단</label>
                 <select id="enroll-arrive-transport" onchange="enrollArriveTransportChange()">
@@ -1836,10 +1836,16 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                 <label>참석일자</label>
                 <input type="date" id="enroll-arrive-date" onchange="enrollArriveDateChange()">
               </div>
+              <div class="form-group" style="margin:0;">
+                <!-- [v534] 참석배정유형 선택 시 버스운행설정(버스배정_기초정보)의 해당 유형 출발시간을
+                     자동 조회해 표시만 하는 읽기전용 항목. 저장 데이터 아님(배정유형 재선택 시 갱신). -->
+                <label>출발시간</label>
+                <input type="text" id="enroll-arrive-depart-time" readonly placeholder="-" style="background:#f5f5f7;">
+              </div>
             </div>
 
-            <!-- 하단: 귀가교통수단/귀가배정유형/귀가일자 (3열) [v519] 순서 변경 -->
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
+            <!-- 하단: 귀가교통수단/귀가배정유형/출발시간/귀가일자 (4열) [v534] 출발시간(읽기전용) 추가 -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
               <div class="form-group" style="margin:0;">
                 <label>귀가교통수단</label>
                 <select id="enroll-leave-transport" onchange="enrollToggleAssignType('leave')">
@@ -1860,6 +1866,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               <div class="form-group" style="margin:0;">
                 <label>귀가일자</label>
                 <input type="date" id="enroll-leave-date">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <!-- [v534] 귀가배정유형 선택 시 버스운행설정의 해당 유형 출발시간을 자동 조회해
+                     표시만 하는 읽기전용 항목. 저장 데이터 아님. -->
+                <label>출발시간</label>
+                <input type="text" id="enroll-leave-depart-time" readonly placeholder="-" style="background:#f5f5f7;">
               </div>
             </div>
 
@@ -2023,10 +2035,12 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                     <th>참석교통수단</th>
                     <th>참석배정유형</th>
                     <th>참석일자</th>
+                    <th>출발시간</th>
                     <th>참석버스배정</th>
                     <th>귀가교통수단</th>
                     <th>귀가배정유형</th>
                     <th>귀가일자</th>
+                    <th>출발시간</th>
                     <th>귀가버스배정</th>
                     <th>관리</th>
                   </tr>
@@ -3001,7 +3015,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         </div>
       </div>
       <div class="edit-grid-row">
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
           <label>참석 교통수단</label>
           <select id="e-arrive-transport">
             <option value="">선택</option>
@@ -3009,7 +3023,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="자가용">자가용</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
           <label>참석배정유형</label>
           <select id="e-arrive-assign-type" disabled style="opacity:.5;">
             <option value="">선택</option>
@@ -3020,11 +3034,17 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="중고등부">중고등부</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
           <label>참석 일자</label>
           <input type="date" id="e-arrive-date">
         </div>
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
+          <!-- [v536] 참석배정유형 선택 시 버스운행설정 기준 출발시간을 자동 조회해 표시만 하는
+               읽기전용 항목. 저장 데이터 아님(모달 오픈 시 빈칸, 배정유형 재선택 시 갱신). -->
+          <label>출발시간</label>
+          <input type="text" id="e-arrive-depart-time" readonly placeholder="-" style="background:#f5f5f7;">
+        </div>
+        <div class="form-group" style="min-width:120px;">
           <!-- [v471] 참석배정(버스 호차) — 접수ID 99로 시작하는 건이 아니어도 항상 편집 가능한
                6개 필드 중 하나. busAssignOptionsHtml('search' context)로 옵션을 채운다. -->
           <label>참석배정</label>
@@ -3032,7 +3052,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
         </div>
       </div>
       <div class="edit-grid-row">
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
           <label>귀가 교통수단</label>
           <select id="e-leave-transport">
             <option value="">선택</option>
@@ -3040,7 +3060,7 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="자가용">자가용</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
           <label>귀가배정유형</label>
           <select id="e-leave-assign-type" disabled style="opacity:.5;">
             <option value="">선택</option>
@@ -3051,11 +3071,17 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
             <option value="중고등부">중고등부</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
           <label>귀가 일자</label>
           <input type="date" id="e-leave-date">
         </div>
-        <div class="form-group">
+        <div class="form-group" style="min-width:120px;">
+          <!-- [v536] 귀가배정유형 선택 시 버스운행설정 기준 출발시간을 자동 조회해 표시만 하는
+               읽기전용 항목. 저장 데이터 아님. -->
+          <label>출발시간</label>
+          <input type="text" id="e-leave-depart-time" readonly placeholder="-" style="background:#f5f5f7;">
+        </div>
+        <div class="form-group" style="min-width:120px;">
           <label>귀가배정</label>
           <select id="e-leave-bus"></select>
         </div>
@@ -12384,7 +12410,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v532_enrollhistory_prefill_keyfield_unlock';
+var CACHE_VERSION = 'v538_enroll_form_time_after_date_order';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -14326,6 +14352,24 @@ function _spLoadBusTypeCache(cb){
     console.warn('[sp 배정유형별 버스목록 캐시 조회 실패]', e&&e.message||e);
   }).finally(function(){ if(cb) cb(); });
 }
+// [v535] "일괄 신청 및 배정" 그리드(sp) 출발시간 표시 전용 캐시 — _spBusTypeCache와 동일한 이유로
+// 행마다 개별 조회하지 않고 doSearch() 시점에 한 번만 받아와 모든 행이 공유(동기 조회).
+// v534에서 추가한 _fetchBusScheduleTimeMap()(버스배정_기초정보, 배정유형|운행방향 매칭)를 재사용한다.
+// null = 아직 못 받아옴 → renderTable()에서 빈칸(-) 처리.
+var _spScheduleTimeCache = null;
+function _spLoadScheduleTimeCache(cb){
+  var scope = {
+    year:   ($id('s-year')||{value:''}).value.trim(),
+    season: ($id('s-retreat-type')||{value:''}).value.trim(),
+    event:  ($id('s-event')||{value:''}).value.trim()
+  };
+  _fetchBusScheduleTimeMap(scope).then(function(map){
+    _spScheduleTimeCache = map;
+  }).catch(function(e){
+    console.warn('[sp 출발시간 캐시 조회 실패]', e&&e.message||e);
+    _spScheduleTimeCache = {};
+  }).finally(function(){ if(cb) cb(); });
+}
 // 캐시 기준으로 select 옵션 HTML을 동기적으로 생성. 반환: {html, disabled, value}
 // - 캐시 미로딩(null): 폴백 표시가 필요함을 알리기 위해 fallback=true 반환
 function _spBusOptionsFromCache(direction, assignType, curVal){
@@ -14369,7 +14413,12 @@ function doSearch() {
   // [v486] 배정유형별 버스목록 캐시를 매 조회마다 새로 받아온다. 첫 renderTable()은 캐시가 아직
   // 없으면 기존 방식(busAssignOptionsHtml 'all')으로 폴백해 화면 공백 없이 즉시 표시하고,
   // 캐시 도착 후 한 번 더 재렌더링해 배정유형 필터링 결과로 갱신한다.
-  _spLoadBusTypeCache(function(){ renderTable(); });
+  // [v535] 출발시간 캐시는 버스목록 캐시 로딩 뒤에 이어서(순차 체이닝) 받아온다(동일 시트 대상
+  // 동시요청 방지 컨벤션 준수). 완료 후 한 번 더 재렌더링해 출발시간 컬럼을 채운다.
+  _spLoadBusTypeCache(function(){
+    renderTable();
+    _spLoadScheduleTimeCache(function(){ renderTable(); });
+  });
 }
 function clearSearch() {
   var isAdmin   = currentUser&&currentUser.role==='admin';
@@ -14470,6 +14519,12 @@ function renderTable() {
     var leaveBusCell = canEdit
       ? '<select id="sp-leave-bus-'+esc(idStr)+'" '+(leaveBusDisabled?'disabled':'')+' style="font-size:.78rem;border:1.5px solid '+(leaveBusPending?'#8a5a00':'var(--border)')+';'+(leaveBusPending?'border-style:dashed;':'')+'border-radius:6px;padding:2px 4px;'+(leaveBusDisabled?'opacity:.5;':'')+'" onchange="spStageBus(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+leaveBusOptionsHtml+'</select>'
       : '<span style="'+leaveBusStyle+'">'+esc(leaveInfo.value)+'</span>';
+    // [v535] 출발시간 표시(읽기전용) — 현재 유효한 배정유형(스테이징 우선) 기준으로 캐시에서 동기 조회.
+    // 캐시 미로딩(null)이거나 매칭 없으면 빈칸('-').
+    var arriveTimeDisp = (_spScheduleTimeCache && arriveAssignDisp) ? (_spScheduleTimeCache[arriveAssignDisp+'|참석']||'') : '';
+    var leaveTimeDisp  = (_spScheduleTimeCache && leaveAssignDisp)  ? (_spScheduleTimeCache[leaveAssignDisp+'|귀가']||'')  : '';
+    var arriveTimeCell = '<span style="font-size:.78rem;color:var(--text2);">'+esc(arriveTimeDisp||'-')+'</span>';
+    var leaveTimeCell  = '<span style="font-size:.78rem;color:var(--text2);">'+esc(leaveTimeDisp||'-')+'</span>';
     return '<tr id="sptr-'+esc(idStr)+'">'+
       '<td>'+(canEdit?('<input type="checkbox" class="sp-chk-row" data-id="'+esc(idStr)+'" '+(isChecked?'checked':'')+' onchange="spToggleCheck(&quot;'+esc(idStr)+'&quot;,this.checked)">'):'')+'</td>'+
       '<td style="color:var(--text-dim);font-size:.74rem">'+((currentPage-1)*SEARCH_PAGE_SIZE+i+1)+'</td>'+
@@ -14483,10 +14538,12 @@ function renderTable() {
       '<td>'+arriveTransCell+'</td>'+
       '<td>'+arriveAssignCell+'</td>'+
       '<td id="sp-arrive-date-cell-'+esc(idStr)+'">'+arriveDateCell+'</td>'+
+      '<td>'+arriveTimeCell+'</td>'+
       '<td>'+arriveBusCell+'</td>'+
       '<td>'+leaveTransCell+'</td>'+
       '<td>'+leaveAssignCell+'</td>'+
       '<td id="sp-leave-date-cell-'+esc(idStr)+'">'+leaveDateCell+'</td>'+
+      '<td>'+leaveTimeCell+'</td>'+
       '<td>'+leaveBusCell+'</td>'+
       '<td style="white-space:nowrap;">'+actionBtns+'</td>'+
     '</tr>';
@@ -14877,6 +14934,34 @@ function _lookupBusScheduleDate(assignType, direction, scope){
   if(!assignType) return Promise.resolve('');
   return _fetchBusScheduleDateMap(scope).then(function(dateMap){
     return dateMap[assignType+'|'+direction] || '';
+  });
+}
+// [v534] 배정유형 → 버스운행설정(버스배정_기초정보)의 출발시간 조회 공용 함수.
+// _fetchBusScheduleDateMap()/_lookupBusScheduleDate()와 동일한 소스·매칭 기준(배정유형|운행방향)을
+// 그대로 병행 구현했다(기존 dateMap 호출부 다수를 건드리지 않기 위해 별도 함수로 분리 — 회귀 위험 최소화).
+// 개별신청 화면의 참석/귀가배정유형 선택 시 출발시간 표시(읽기전용) 전용으로 사용.
+function _fetchBusScheduleTimeMap(scope){
+  if(typeof USE_SHEET !== 'function' || !USE_SHEET() || typeof apiCall !== 'function'){ return Promise.resolve({}); }
+  return apiCall({action:'getAll', sheetName:'버스배정_기초정보'}).then(function(res){
+    var rows = (res&&res.success) ? (res.data||res.rows||[]) : [];
+    var timeMap = {};
+    rows.forEach(function(r){
+      if(scope){
+        if(scope.year   && String(r['년도'])!==String(scope.year))   return;
+        if(scope.season && r['수양회종류']!==scope.season) return;
+        if(scope.event  && r['행사명']!==scope.event)     return;
+      }
+      var key = (r['배정유형']||'')+'|'+(r['운행방향']||'');
+      if(r['출발시간']) timeMap[key] = bbNormalizeTimeFromSheet(r['출발시간']);
+    });
+    return timeMap;
+  });
+}
+// [v534] 단일 배정유형+운행방향의 출발시간 조회 편의 함수. Promise<출발시간|''>.
+function _lookupBusScheduleTime(assignType, direction, scope){
+  if(!assignType) return Promise.resolve('');
+  return _fetchBusScheduleTimeMap(scope).then(function(timeMap){
+    return timeMap[assignType+'|'+direction] || '';
   });
 }
 // [v344] CSV 파싱은 bpBulkUploadParseCSV() 재사용. 매칭 후 "본인 소속 범위 밖" 행은
@@ -16339,16 +16424,31 @@ function openDetail(id) {
     [['연도', r.year||'-'], ['수양회 종류', r.retreatType||'-'], ['회차', r.event||'-']],
     [['교구', r.parish||'-'], ['구역', r.district||'-'], ['성명', maskName(r.name)||'-']],
     [['회별', r.group||'-'], ['구원여부', _salvLabel(r.salvCode)], ['성별', _enrollGenderLabel(r.gender)]],
-    [['참석 교통수단', r.arriveTransport||'-'], ['참석배정유형', r.arriveAssignType||'-'], ['참석 일자', fmtDate(r.arriveDate)||'-'], ['참석배정', _busAssignVal('arrive')]],
-    [['귀가 교통수단', r.leaveTransport||'-'], ['귀가배정유형', r.leaveAssignType||'-'], ['귀가 일자', fmtDate(r.leaveDate)||'-'], ['귀가배정', _busAssignVal('leave')]],
+    [['참석 교통수단', r.arriveTransport||'-'], ['참석배정유형', r.arriveAssignType||'-'], ['참석 일자', fmtDate(r.arriveDate)||'-'], ['출발시간','-','detail-arrive-time-val'], ['참석배정', _busAssignVal('arrive')]],
+    [['귀가 교통수단', r.leaveTransport||'-'], ['귀가배정유형', r.leaveAssignType||'-'], ['귀가 일자', fmtDate(r.leaveDate)||'-'], ['출발시간','-','detail-leave-time-val'], ['귀가배정', _busAssignVal('leave')]],
     [['보호자', r.guardian||'-'], ['연락처', r.contact||'-']],
   ];
   var mb=$id('modal-body');
   if(mb) mb.innerHTML=rows.map(function(row){
     return '<div class="detail-grid-row">'+row.map(function(f){
-      return '<div class="detail-grid-cell"><span class="detail-label">'+f[0]+'</span><span class="detail-value">'+esc(String(f[1]))+'</span></div>';
+      var idAttr = f[2] ? ' id="'+f[2]+'"' : '';
+      return '<div class="detail-grid-cell"><span class="detail-label">'+f[0]+'</span><span class="detail-value"'+idAttr+'>'+esc(String(f[1]))+'</span></div>';
     }).join('')+'</div>';
   }).join('');
+  // [v536] 출발시간(조회 전용) — 이 화면은 선택 동작이 없는 순수 조회 화면이므로, 모달을 여는 시점에
+  // 저장된 참석/귀가배정유형 기준으로 자동 조회해 표시한다(v534 수정폼과 달리 자동조회가 자연스러움).
+  // 매칭되는 버스운행설정이 없으면 '-' 유지.
+  var _detailScope = { year: r.year, season: r.retreatType, event: r.event };
+  if(r.arriveAssignType){
+    _lookupBusScheduleTime(r.arriveAssignType, '참석', _detailScope).then(function(t){
+      var el=$id('detail-arrive-time-val'); if(el) el.textContent = t || '-';
+    });
+  }
+  if(r.leaveAssignType){
+    _lookupBusScheduleTime(r.leaveAssignType, '귀가', _detailScope).then(function(t){
+      var el=$id('detail-leave-time-val'); if(el) el.textContent = t || '-';
+    });
+  }
   // [v396] 삭제 버튼 복원 — 수정 버튼과 동일 범위(관리자+구역장)로 노출 (교구장은 조회 전용이라 계속 숨김)
   var delBtn=$id('btn-delete');
   if(delBtn){ delBtn.style.display = (isAdmin||isDistrict) ? '' : 'none'; delBtn.onclick=function(){ deleteRow(id,true); }; }
@@ -16395,6 +16495,10 @@ function openEditMode(id) {
   $id('e-arrive-assign-type').value=r.arriveAssignType||'';
   $id('e-leave-date').value=r.leaveDate||''; $id('e-leave-transport').value=r.leaveTransport||'';
   $id('e-leave-assign-type').value=r.leaveAssignType||'';
+  // [v536] 출발시간은 저장 데이터가 아닌 조회 전용 표시 항목 — v534 개별신청 화면과 동일하게
+  // 모달을 열 때는 자동 재조회하지 않고 빈칸으로 초기화한다(배정유형을 다시 선택해야 표시됨).
+  $set('e-arrive-depart-time', '');
+  $set('e-leave-depart-time', '');
   $id('e-contact').value=r.contact||''; $id('e-guardian').value=r.guardian||'';
 
   // [v471] 참석배정/귀가배정(버스 호차) select 채우기 — 자료검색 전용 전체 인덱스(_rosterFullArr·Lv)
@@ -16440,14 +16544,22 @@ function openEditMode(id) {
     var v=this.value;
     _busApplyAssignTypeFilteredOptions($id('e-arrive-bus'), 'arrive', v, $id('e-arrive-bus')?$id('e-arrive-bus').value:'', function(){ _toggleAssign('arrive'); });
     var _eScope = { year: $id('e-year').value, season: $id('e-retreat-type').value, event: $id('e-event').value };
-    _lookupBusScheduleDate(v, '참석', _eScope).then(function(date){ if(date) $set('e-arrive-date', date); });
+    // [v536] 출발일자 조회 뒤 이어서(순차 체이닝) 출발시간도 조회해 읽기전용 표시 필드에 반영.
+    _lookupBusScheduleDate(v, '참석', _eScope).then(function(date){
+      if(date) $set('e-arrive-date', date);
+      return _lookupBusScheduleTime(v, '참석', _eScope);
+    }).then(function(time){ $set('e-arrive-depart-time', time || ''); });
   };
   var eLvAssignType=$id('e-leave-assign-type');
   if(eLvAssignType) eLvAssignType.onchange=function(){
     var v=this.value;
     _busApplyAssignTypeFilteredOptions($id('e-leave-bus'), 'leave', v, $id('e-leave-bus')?$id('e-leave-bus').value:'', function(){ _toggleAssign('leave'); });
     var _eScope = { year: $id('e-year').value, season: $id('e-retreat-type').value, event: $id('e-event').value };
-    _lookupBusScheduleDate(v, '귀가', _eScope).then(function(date){ if(date) $set('e-leave-date', date); });
+    // [v536] 출발일자 조회 뒤 이어서(순차 체이닝) 출발시간도 조회해 읽기전용 표시 필드에 반영.
+    _lookupBusScheduleDate(v, '귀가', _eScope).then(function(date){
+      if(date) $set('e-leave-date', date);
+      return _lookupBusScheduleTime(v, '귀가', _eScope);
+    }).then(function(time){ $set('e-leave-depart-time', time || ''); });
   };
 
   // [v474] 참석/귀가배정유형 공통코드 캐시 — 버스운행설정·접수인원등록과 동일한 캐시
@@ -22755,15 +22867,26 @@ function _enrollScheduleScope(){
 // 매칭되는 기초정보가 없으면 조용히 무시(기존 값 유지). 참석일자가 바뀌면 귀가일자 +3일 자동계산도 이어서 동작.
 function enrollArriveAssignTypeChange(){
   var v = ($id('enroll-arrive-assign-type')||{value:''}).value;
-  _lookupBusScheduleDate(v, '참석', _enrollScheduleScope()).then(function(date){
+  var scope = _enrollScheduleScope();
+  // [v534] 출발일자 조회 뒤 이어서(순차 체이닝 — 동일 시트 동시요청 방지) 출발시간도 조회해
+  // 읽기전용 표시 필드에 반영. 매칭 없으면 빈칸.
+  _lookupBusScheduleDate(v, '참석', scope).then(function(date){
     if(date){ $set('enroll-arrive-date', date); enrollArriveDateChange(); }
+    return _lookupBusScheduleTime(v, '참석', scope);
+  }).then(function(time){
+    $set('enroll-arrive-depart-time', time || '');
   });
 }
 // [v521] 귀가배정유형 선택 시 — 버스운행설정(서울행)의 해당 배정유형 출발일자를 귀가일자에 자동 반영.
 function enrollLeaveAssignTypeChange(){
   var v = ($id('enroll-leave-assign-type')||{value:''}).value;
-  _lookupBusScheduleDate(v, '귀가', _enrollScheduleScope()).then(function(date){
+  var scope = _enrollScheduleScope();
+  // [v534] 출발일자 조회 뒤 이어서(순차 체이닝) 출발시간도 조회해 읽기전용 표시 필드에 반영.
+  _lookupBusScheduleDate(v, '귀가', scope).then(function(date){
     if(date){ $set('enroll-leave-date', date); }
+    return _lookupBusScheduleTime(v, '귀가', scope);
+  }).then(function(time){
+    $set('enroll-leave-depart-time', time || '');
   });
 }
 
@@ -22874,9 +22997,11 @@ function enrollFormReset(){
   $set('enroll-arrive-date','');
   $set('enroll-arrive-transport','');
   $set('enroll-arrive-assign-type','');
+  $set('enroll-arrive-depart-time',''); // [v534] 출발시간 표시 초기화
   $set('enroll-leave-date','');
   $set('enroll-leave-transport','');
   $set('enroll-leave-assign-type','');
+  $set('enroll-leave-depart-time',''); // [v534] 출발시간 표시 초기화
   $set('enroll-salv-code','');
   $set('enroll-gender','');
   $set('enroll-guardian','');
@@ -23073,9 +23198,13 @@ function enrollEditRow(id){
   $set('enroll-arrive-date', _enrollFmtDateOrBlank(row.arriveDate));
   $set('enroll-arrive-transport', row.arriveTransport);
   $set('enroll-arrive-assign-type', row.arriveAssignType);
+  // [v534] 출발시간은 저장 데이터가 아닌 조회 전용 표시 항목 — 기존 접수건 로드 시 자동 재조회하지
+  // 않고 빈칸으로 초기화한다(참석/귀가배정유형을 다시 선택해야 최신 출발시간이 표시됨).
+  $set('enroll-arrive-depart-time', '');
   $set('enroll-leave-date', _enrollFmtDateOrBlank(row.leaveDate));
   $set('enroll-leave-transport', row.leaveTransport);
   $set('enroll-leave-assign-type', row.leaveAssignType);
+  $set('enroll-leave-depart-time', '');
   $set('enroll-salv-code', row.salvCode);
   $set('enroll-gender', row.gender);
   $set('enroll-guardian', row.guardian);
@@ -23105,24 +23234,40 @@ function enrollHistoryOpen(){
   // 자동 조회는 하지 않고 값만 채운 채 대기(조회 버튼은 사용자가 직접 클릭).
   var mainRetreatType = ($id('enroll-retreat-type')||{value:''}).value;
   var mainEvent        = ($id('enroll-event')||{value:''}).value;
-  var rtSel=$id('eh-retreat-type'), evSel=$id('eh-event');
+  var yearSel=$id('eh-year'), rtSel=$id('eh-retreat-type'), evSel=$id('eh-event');
   if(rtSel) rtSel.value = mainRetreatType || '';
   if(evSel) evSel.value = mainEvent || '';
 
   var pSel=$id('eh-parish'), dSel=$id('eh-district');
+  // [v533] 연도/수양회종류/회차/교구 4개 항목의 입력가능(활성/잠금) 상태를 "구역" 필드와 동일하게 맞춘다
+  // (admin 제외 — district/parish 두 역할 모두 이 조회 팝업 안에서는 구역 필드의 잠금 여부를 기준으로 통일).
+  function _ehLockLikeDistrict(locked){
+    [yearSel, rtSel, evSel, pSel].forEach(function(el){
+      if(!el) return;
+      el.disabled = locked;
+      el.style.opacity = locked ? '.7' : '';
+    });
+  }
   if(isDistrict && currentUser.parish && currentUser.district){
-    // 구역장: 배정인원등록 폼과 동일하게 본인 소속으로 고정
-    if(pSel){ pSel.value = currentUser.parish; pSel.disabled = true; pSel.style.opacity='.7'; }
+    // 구역장: 배정인원등록 폼과 동일하게 본인 소속으로 고정 — 구역이 잠겨있으므로
+    // 연도/수양회종류/회차/교구도 함께 잠금(전 항목 조회 조건 변경 불가)
+    if(pSel) pSel.value = currentUser.parish;
     populateDistrictSelect('eh-district', currentUser.parish, '전체', currentUser.district);
     if(dSel){ dSel.disabled = true; dSel.style.opacity='.7'; }
+    _ehLockLikeDistrict(true);
   } else if(isParish && currentUser.parish){
-    // [v244] 교구장: 교구 고정, 구역은 자유 선택(로그인 시 선택했던 구역을 기본값으로만 채움)
-    if(pSel){ pSel.value = currentUser.parish; pSel.disabled = true; pSel.style.opacity='.7'; }
+    // [v533] 교구장: 구역이 자유 선택(활성) 상태이므로 교구를 포함한 연도/수양회종류/회차도 함께 활성화.
+    // 교구 기본값은 본인 소속으로 채우되, 다른 교구로 변경해 조회할 수 있다(요청 반영 — 이름은
+    // 마스킹되어 노출되지만 교구/구역 등은 노출되므로 향후 소속범위 제한이 필요하면 별도 논의).
+    if(pSel) pSel.value = currentUser.parish;
     populateDistrictSelect('eh-district', currentUser.parish, '전체', currentUser.loginDistrict||'');
     if(dSel){ dSel.disabled = false; dSel.style.opacity=''; }
+    _ehLockLikeDistrict(false);
   } else {
-    if(pSel){ pSel.disabled=false; pSel.style.opacity=''; pSel.value=''; }
-    if(dSel){ dSel.disabled=false; dSel.style.opacity=''; populateDistrictSelect('eh-district', '', '전체'); }
+    if(pSel) pSel.value = '';
+    populateDistrictSelect('eh-district', '', '전체');
+    if(dSel){ dSel.disabled=false; dSel.style.opacity=''; }
+    _ehLockLikeDistrict(false); // admin: 전 항목 자유 입력(기존 동작 유지)
   }
 
   _ehRows = [];
