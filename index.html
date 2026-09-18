@@ -5273,17 +5273,11 @@ function _navGuardSaveAndLeave(){
 }
 
 function _setDirtyBanner(){
+  // [v528] "배정 변경 — 구글 시트 저장 대기 중" 배너를 더 이상 표시하지 않는다(요청에 따라 비활성화).
+  // _busDirty/_roomDirty 플래그 자체와 디바운스 자동저장·이동 시 저장 확인 모달(_navGuardCheck)
+  // 로직은 이 배너 표시 여부와 무관하게 그대로 동작하므로 건드리지 않음 — 화면에 노출만 안 함.
   var banner = $id('assign-dirty-banner');
-  if(!banner) return;
-  var msg = [];
-  if(_busDirty)  msg.push('버스 배정');
-  if(_roomDirty) msg.push('숙소 배정');
-  if(msg.length && USE_SHEET()){
-    banner.style.display = 'flex';
-    banner.textContent   = '⚠️ '+msg.join(' · ')+' 변경 — 구글 시트 저장 대기 중';
-  } else {
-    banner.style.display = 'none';
-  }
+  if(banner) banner.style.display = 'none';
 }
 function _clearDirtyBanner(type){
   if(type==='bus')  _busDirty  = false;
@@ -5505,7 +5499,9 @@ function _busBuildDriverInfoMap(baseRows, driverRows, bf, direction){
   }).forEach(function(baseRow){
     var regId = baseRow['등록ID']||'';
     var atype = baseRow['배정유형']||'';
-    var departTime = String(baseRow['출발시간']||'').trim();
+    // [v531] 조회/수정 화면과 동일한 정규화 함수를 거치도록 통일 — MySQL TIME 값("09:00:00")의
+    // 초가 그대로 노출되던(또는 형식에 따라 빈 값이 되던) 표시 불일치를 해소.
+    var departTime = bbNormalizeTimeFromSheet(baseRow['출발시간']);
     (driverRows||[]).filter(function(d){ return String(d['등록ID']||'')===String(regId); })
       .forEach(function(d){
         var baeLabel = bbNormalizeBaeLabel(d['배차']);
@@ -5669,9 +5665,13 @@ function _busFilteredClear(sheetName, headers, bf, cb, matchAssignType){
       return false;  // 일치 → 제거
     });
     // 남길 rows 구성 (헤더 순서로 배열화)
+    // [v527] 남길 데이터가 0건일 때 예전에는 "완전히 빈 행 1개"를 보내 GAS(구글시트) 시절
+    // overwrite가 얼어붙는(frozen) 문제를 우회했으나, 지금은 MySQL 백엔드라 이 빈 문자열 행이
+    // 탑승자_참석/귀가.접수ID(FK, members 참조)나 수양회종류 등 컬럼 제약을 위반해 overwrite
+    // 자체가 실패하는 문제가 있었음(참석 배정유형별 초기화 등에서 재현). rows:[]로 완전 삭제.
     var rows = keep.length
       ? keep.map(function(r){ return headers.map(function(h){ return r[h]!=null?r[h]:''; }); })
-      : [headers.map(function(){ return ''; })];  // 빈 행 1개: GAS frozen rows 우회
+      : [];
     // ── overwrite: fetch 직접 호출 (apiCall 재포장 우회) ──
     // apiCall({action:'overwrite',...}) 사용 시 headers·rows가 data{}로 재포장되어
     // GAS 수신에 성공하더라도 success 체크 누락으로 오류를 감지하지 못하는 문제 방지
@@ -9199,7 +9199,18 @@ function busDeleteBus(busId,type){
   type=type||busAssignSub;
   if(type==='leave') busLeaveBuses=busLeaveBuses.filter(function(b){ return b.id!==busId; });
   else               busArriveBuses=busArriveBuses.filter(function(b){ return b.id!==busId; });
-  busSave(); busRenderBuses(type);
+  busSave();
+  // [v525] 버스 삭제는 되돌리기 어려운 조작이므로, busSave()의 3초 디바운스 저장을 기다리지 않고
+  // 즉시 시트/DB에 반영한다 — busAutoAssign() 완료 시 이미 쓰고 있는 것과 동일한 패턴(8266~8270행
+  // 참고). 디바운스에만 맡기면 저장 타이머가 돌기 전에 화면 전환/새로고침 등이 끼어들 경우 삭제가
+  // 서버에 반영되지 않고 유실되어, 화면(로컬 상태)과 DB가 어긋나는 문제가 있었음.
+  clearTimeout(_busAutoSaveTimer);
+  _busAutoSaveTimer = null;
+  if(USE_SHEET()){
+    busSaveToSheet(type);
+    _clearDirtyBanner('bus');
+  }
+  busRenderBuses(type);
 }
 // [v465] 버스 배정 탭 전용 화면초기화 — 현재 방향(참석/귀가)의 로컬 버스/팀 데이터만 비움.
 // 구글시트는 전혀 건드리지 않음('버스배정 초기화'와 명확히 구분).
@@ -9558,19 +9569,31 @@ function busResetAll(){
   var teamHdr    = ['NO','년도','수양회종류','행사명','배정유형','교구','구역/팀명','인원수','배정상태','버스','분산배정','비고'];
 
   // Step 3-A. 버스배정 요약 / 탑승자 4개 시트 → 헤더만 남기고 완전 삭제
-  var summaryEmpty = summaryHdr.map(function(){ return ''; });
-  var rosterEmpty  = rosterHdr.map(function(){ return ''; });
+  // [v527] 예전엔 완전히 빈 문자열 행(summaryEmpty/rosterEmpty) 1개를 보내 GAS(구글시트) 시절
+  // overwrite가 얼어붙는 문제를 우회했으나, MySQL 백엔드에서는 탑승자_참석/귀가.접수ID(FK) 등
+  // 컬럼 제약을 위반해 저장 자체가 실패할 수 있어 rows:[]로 완전 삭제하도록 변경.
   var clearPayloads = [
-    {sheetName:'버스배정_참석요약', mode:'overwrite', headers:summaryHdr, rows:[summaryEmpty]},
-    {sheetName:'버스배정_귀가요약', mode:'overwrite', headers:summaryHdr, rows:[summaryEmpty]},
-    {sheetName:'탑승자_참석',       mode:'overwrite', headers:rosterHdr,  rows:[rosterEmpty]},
-    {sheetName:'탑승자_귀가',       mode:'overwrite', headers:rosterHdr,  rows:[rosterEmpty]},
+    {sheetName:'버스배정_참석요약', mode:'overwrite', headers:summaryHdr, rows:[]},
+    {sheetName:'버스배정_귀가요약', mode:'overwrite', headers:summaryHdr, rows:[]},
+    {sheetName:'탑승자_참석',       mode:'overwrite', headers:rosterHdr,  rows:[]},
+    {sheetName:'탑승자_귀가',       mode:'overwrite', headers:rosterHdr,  rows:[]},
   ];
   var c1=0, errSheets=[];
   clearPayloads.forEach(function(p){
     fetch(API_URL,{method:'POST',headers:_gasHeaders({'Content-Type':'text/plain'}),
       body:JSON.stringify(p), redirect:'follow'})
-      .catch(function(){ errSheets.push(p.sheetName); })
+      .then(function(r){ return r.text(); })
+      .then(function(txt){
+        // [v527] 기존엔 fetch 자체가 throw(네트워크 오류)할 때만 실패로 잡고, 서버가 정상 응답
+        // 하면서 {success:false}를 반환한 경우(예: 제약 위반으로 저장 거부)는 응답 바디를 전혀
+        // 검사하지 않아 실패가 "성공"으로 표시되는 미탐지 버그가 있었음 — 다른 저장 함수들과
+        // 동일한 기준(j.success===false)으로 판정하도록 통일.
+        try{
+          var j = JSON.parse(txt);
+          if(j && j.success===false) errSheets.push(p.sheetName+'('+(j.error||'저장 실패')+')');
+        } catch(e){}
+      })
+      .catch(function(){ errSheets.push(p.sheetName+'(네트워크 오류)'); })
       .finally(function(){
         c1++;
         if(c1 < clearPayloads.length) return;
@@ -11075,7 +11098,9 @@ function _bvwBuildBusMetaMapFromBase(baseRows, driverRows, bf, direction){
     var count = parseInt(baseRow['배정대수'],10) || 0;
     var cap   = parseInt(baseRow['버스정원'],10) || busGetCap();
     var departDate = String(baseRow['출발일자']||'').trim();
-    var departTime = String(baseRow['출발시간']||'').trim();
+    // [v531] 조회/수정 화면과 동일한 정규화 함수를 거치도록 통일 — MySQL TIME 값("09:00:00")의
+    // 초가 그대로 노출되던(또는 형식에 따라 빈 값이 되던) 표시 불일치를 해소.
+    var departTime = bbNormalizeTimeFromSheet(baseRow['출발시간']);
     for(var i=1; i<=count; i++){
       var busLabel = i+'호';
       var busName  = '버스 '+busLabel;
@@ -11985,7 +12010,16 @@ function busSaveToSheet(typeOnly, onComplete){
   var metaLvAlight  = ($id('bus-leave-alight') ||{value:''}).value;
 
   function makeSummaryRows(buses, rosterByBus){
-    return buses.map(function(bus){
+    // [v526] 승객 0명 버스는 요약 시트(버스배정_참석/귀가요약)에도 행을 만들지 않고 제외한다.
+    // v524에서 탑승자_참석/귀가(roster)의 "(명단 미연동)" 빈 행 저장은 막았지만, 이 요약 집계는
+    // buses 전체를 그대로 순회해 0명 버스도 여전히 저장되고 있었음(등록 배정대수(base) >
+    // 최소 필요대수(calculated)로 "여유배정"된 빈 버스에서 재현). _busRowsToBuses()가 새로고침 시
+    // 이 시트를 원본으로 버스 카드를 복원하므로, 여기서 제외하면 빈 버스 카드도 자동으로 사라져
+    // 화면과 DB가 항상 일치하게 되는 효과도 있다.
+    return buses.filter(function(bus){
+      var p = (rosterByBus[bus.id] && rosterByBus[bus.id].passengers) || [];
+      return p.length > 0;
+    }).map(function(bus){
       // [v338] "팀 목록"/탑승인원/배정팀수를 bus.slots(자동배정 시점 스냅샷 카운트)가 아니라
       // 이 저장에서 실제로 탑승자_참석/귀가에 쓰여지는 buildBusRoster() 결과(passengers)를
       // 팀명 기준으로 다시 집계해 만든다. 두 시트가 항상 같은 소스에서 계산되므로, 저장 이후
@@ -12018,8 +12052,13 @@ function busSaveToSheet(typeOnly, onComplete){
     roster.forEach(function(item){
       var boardLoc  = item.bus.boardLoc  || defBoard  || '';
       var alightLoc = item.bus.alightLoc || defAlight || '';
+      // [v524] 승객 0명 버스는 접수ID=''인 "(명단 미연동)" 자리표시 행을 만들지 않고 그대로 건너뛴다.
+      // 이 자리표시 행이 그대로 저장되면 bus_passenger_arrive/leave.receipt_id(FK, members 참조)에
+      // 빈 문자열이 INSERT되어 SQLSTATE[23000] 1452 위반으로 overwrite 전체가 롤백되는 문제가 있었음
+      // (버스운행설정 등록 배정대수(base) > 최소 필요대수(calculated)로 "여유배정"된 빈 버스에서 재현).
+      // rosterRowsToIndex()(11147행 부근)가 이미 이 이름값을 만나면 걸러내도록 되어 있어,
+      // 애초에 행을 만들지 않아도 미배정 뱃지 등 기존 기능에는 영향이 없다.
       if(!item.passengers.length){
-        rows.push([no++, bf.year, bf.season, bf.event, bf.assignType||'', '', item.bus.name, boardLoc, alightLoc,'','','(명단 미연동)','','',item.bus.name,'']);
         return;
       }
       item.passengers.forEach(function(p){
@@ -12345,7 +12384,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v523_enroll_assigntype_window_export_fix';
+var CACHE_VERSION = 'v531_bb_time_normalize_fix';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -12973,7 +13012,8 @@ function doLogout() {
   var _pbl=$id('bus-reassign-leave-badge');  if(_pbl) _pbl.style.display='none';
   $id('app-page').style.display='none';
   $id('login-page').style.display='flex';
-  $set('inp-id',''); $set('inp-pw','');
+  // [v530] 로그아웃 후 로그인화면 복귀 시 아이디/비밀번호를 기본값(user/user)으로 채워둠(요청에 따름)
+  $set('inp-id','user'); $set('inp-pw','user');
   var _lpw=$id('login-parish-district-wrap'); if(_lpw) _lpw.style.display='flex';
   $set('login-parish-sel','전체'); onLoginParishChange();
 }
@@ -21872,6 +21912,12 @@ function bbNormalizeTimeFromSheet(v){
   if(!s) return '';
   var mSimple = s.match(/^(\d{1,2}):(\d{2})$/);
   if(mSimple) return mSimple[1].padStart(2,'0')+':'+mSimple[2];
+  // [v531] MySQL TIME 컬럼값("HH:MM:SS", 초 포함) 형식 매칭 케이스 추가.
+  // (원인) 이 함수는 구글시트 시절 "TIME 셀이 ISO 문자열로 깨져 나오는 경우"만 방어하도록 작성돼
+  // 있어, MySQL 백엔드가 내려주는 "09:00:00" 같은 초 포함 형식은 두 정규식 중 어디에도 매칭되지
+  // 않고 그대로 빈 값('') 처리되어 저장된 출발시간이 조회/수정 화면에 표시되지 않는 문제가 있었음.
+  var mSec = s.match(/^(\d{1,2}):(\d{2}):\d{2}$/);
+  if(mSec) return mSec[1].padStart(2,'0')+':'+mSec[2];
   var mIso = s.match(/T(\d{2}):(\d{2}):\d{2}/);
   if(mIso) return mIso[1]+':'+mIso[2];
   return '';
@@ -22566,6 +22612,10 @@ window.bbDriverLeaderParishChange = bbDriverLeaderParishChange; // [v385]
 // [v257] 신규 추가 함수(배정유형/회차 옵션 동적 갱신)도 전역 등록
 window.bbTypeOptionsRefresh  = bbTypeOptionsRefresh;
 window.bbEventOptionsRefresh = bbEventOptionsRefresh;
+// [v529] 출발시간/연락처 인라인 마스킹 함수(oninput="...")도 전역 등록 누락으로
+// "ReferenceError: Can't find variable: bbFormatTime/bbFormatPhone" 발생하던 문제 수정.
+window.bbFormatTime  = bbFormatTime;
+window.bbFormatPhone = bbFormatPhone;
 
 // ════════════════════════════════════════════════════════════
 // 접수인원등록 (관리자 + 구역장) — 참석인원명단 시트에 대한
