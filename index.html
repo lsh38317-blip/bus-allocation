@@ -12384,7 +12384,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v531_bb_time_normalize_fix';
+var CACHE_VERSION = 'v532_enrollhistory_prefill_keyfield_unlock';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -22843,14 +22843,23 @@ var ENROLL_LOCK_FIELD_IDS = [
   'enroll-name','enroll-group','enroll-salv-code','enroll-gender',
   'enroll-guardian','enroll-contact'
 ];
+// [v532] 연도/수양회종류/회차/교구/구역 5개 항목 — admin 이외 역할(district=구역장, parish=교구장)은
+// 기존 접수건(실제 접수ID)을 불러온 경우에도 항상 수정 가능해야 하므로 잠금 대상에서 제외한다.
+// (enrollSave()→_enrollSaveProceed()는 receiptId 기준 update이므로 이 5개 값을 바꿔 저장해도
+//  동일 접수ID가 그대로 갱신되며, 소속 범위 검증(_enrollCheckDistrictScope)은 기존대로 유지된다.)
+var ENROLL_KEY_FIELD_IDS = ['enroll-year','enroll-retreat-type','enroll-event','enroll-parish','enroll-district'];
 function enrollApplyEditLock(){
   var id = _enrollEditingId;
   var isNew = !id || String(id).trim()==='' || /^99/.test(String(id).trim());
+  var role = currentUser ? currentUser.role : '';
+  var isAdmin = role === 'admin';
   ENROLL_LOCK_FIELD_IDS.forEach(function(fid){
     var el = $id(fid);
     if(!el) return;
-    el.disabled = !isNew;
-    el.style.opacity = isNew ? '' : '.5';
+    var isKeyField = ENROLL_KEY_FIELD_IDS.indexOf(fid) >= 0;
+    var lock = !isNew && (isAdmin || !isKeyField);
+    el.disabled = lock;
+    el.style.opacity = lock ? '.5' : '';
   });
 }
 
@@ -23091,6 +23100,14 @@ function enrollHistoryOpen(){
 
   enrollRenderYearOptions('eh-year', true); // includeAll=true — 조회 필터이므로 '전체' 옵션 필요
   populateParishSelect('eh-parish', '전체');
+
+  // [v532] 개별신청 메인화면에서 선택 중인 수양회종류/회차 값을 조회 팝업 필터 기본값으로 반영.
+  // 자동 조회는 하지 않고 값만 채운 채 대기(조회 버튼은 사용자가 직접 클릭).
+  var mainRetreatType = ($id('enroll-retreat-type')||{value:''}).value;
+  var mainEvent        = ($id('enroll-event')||{value:''}).value;
+  var rtSel=$id('eh-retreat-type'), evSel=$id('eh-event');
+  if(rtSel) rtSel.value = mainRetreatType || '';
+  if(evSel) evSel.value = mainEvent || '';
 
   var pSel=$id('eh-parish'), dSel=$id('eh-district');
   if(isDistrict && currentUser.parish && currentUser.district){
