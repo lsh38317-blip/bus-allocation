@@ -1616,7 +1616,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                      font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
             </select>
             <!-- 수양회종류 콤보 -->
-            <select id="busview-sel-season"
+            <!-- [v540] 수양회종류 변경 시 회차 잠금 공통함수(_applySeasonEventLock) 연결 -->
+            <select id="busview-sel-season" onchange="_applySeasonEventLock('busview-sel-season','busview-sel-event')"
               style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
                      font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
               <option value="춘계">춘계</option>
@@ -1960,7 +1961,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               </div>
               <div class="form-group" style="display:flex;align-items:center;gap:8px;flex:1;">
                 <label style="white-space:nowrap;margin-bottom:0;">수양회종류</label>
-                <select id="s-retreat-type" style="flex:1;">
+                <!-- [v541] 수양회종류 변경 시 회차 잠금 공통함수(_applySeasonEventLock) 연결 -->
+                <select id="s-retreat-type" onchange="_applySeasonEventLock('s-retreat-type','s-event')" style="flex:1;">
                   <option value="">전체</option>
                   <option value="춘계">춘계</option>
                   <option value="하계" selected>하계</option>
@@ -2063,7 +2065,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
               style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
                      font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
             </select>
-            <select id="sr-sel-season"
+            <!-- [v541] 수양회종류 변경 시 회차 잠금 공통함수(_applySeasonEventLock) 연결 -->
+            <select id="sr-sel-season" onchange="_applySeasonEventLock('sr-sel-season','sr-sel-event')"
               style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
                      font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
               <option value="춘계">춘계</option>
@@ -2720,7 +2723,8 @@ tbody td{padding:10px 12px;vertical-align:middle;color:var(--text2);}
                    font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;min-width:82px;">
           </select>
           <!-- 수양회종류 콤보 -->
-          <select id="roomview-sel-type"
+          <!-- [v539] 수양회종류 변경 시 회차 잠금 공통함수(_applySeasonEventLock) 연결 -->
+          <select id="roomview-sel-type" onchange="_applySeasonEventLock('roomview-sel-type','roomview-sel-event')"
             style="height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;
                    font-size:.82rem;color:var(--text);background:#fff;cursor:pointer;font-weight:600;">
             <option value="춘계">춘계</option>
@@ -10935,15 +10939,20 @@ function srInit(){
     _codeLoadSelectOptions('sr-sel-event', '회차', '3차', function(){
       // [v402] 교회목표 행사명 자동 매핑 — 버스배정/버스배정현황 화면과 동일한 순서(행사명 적용 → 조회)로 처리.
       // (이 순서를 지키지 않으면 회차가 기본값 "1차"로 남아 실제 진행 중인 회차 데이터가 조회에서 빠짐)
+      // [v541] 수양회종류 기준 회차 잠금 공통함수 — 코드관리 기준 옵션 동적 로드가 모두 끝난 뒤
+      // (그래야 옵션 재구성으로 잠금 상태가 덮어써지지 않음) _busApplyGoalEvent 호출 직후에 적용.
       if(_goalLoaded){
         _busApplyGoalEvent('sr-sel-event', 'sr-sel-year');
+        _applySeasonEventLock('sr-sel-season', 'sr-sel-event');
         srRosterReload();
       } else if(USE_SHEET()){
         _goalFetchFromSheet(function(){
           _busApplyGoalEvent('sr-sel-event', 'sr-sel-year');
+          _applySeasonEventLock('sr-sel-season', 'sr-sel-event');
           srRosterReload();
         }, {});
       } else {
+        _applySeasonEventLock('sr-sel-season', 'sr-sel-event');
         srRosterReload();
       }
     }, true, 'EVENT_ROUND');
@@ -11836,7 +11845,9 @@ function _busRenderSummaryList(listEl, cap, active, unassign, partial, viewBuses
       '<span style="font-size:.78rem;color:var(--text2);">운전자: <strong style="color:var(--text);">'+esc(bus.driverName||'-')+'</strong></span>'+
       '<span style="font-size:.78rem;color:var(--text2);">선탑자: <strong style="color:var(--text);">'+esc(busLeaderName||'미지정')+'</strong></span>'+
       '</div>'+
-      '<span style="background:'+(over?'#fff0f0':'#edf7f2')+';color:'+(over?'#d94040':'#2d8a5a')+';border:1px solid '+(over?'#f5c0c0':'#b8dfc8')+';border-radius:20px;padding:3px 13px;font-weight:700;font-size:.85rem;">'+load+' / '+cap+'명</span>'+
+      // [v546] "○ / ○명" 배지 클릭 시 이 버스의 전체 탑승자 팝업(busRosterOpenForBus, 기존
+      // "버스 배정"/"탑승자 명단" 화면에서 이미 쓰던 공통 함수를 그대로 재사용)을 연다.
+      '<span onclick="busRosterOpenForBus(\''+bus.id+'\',\''+bvwType+'\')" title="클릭하면 이 버스의 전체 탑승자 명단을 볼 수 있습니다" style="background:'+(over?'#fff0f0':'#edf7f2')+';color:'+(over?'#d94040':'#2d8a5a')+';border:1px solid '+(over?'#f5c0c0':'#b8dfc8')+';border-radius:20px;padding:3px 13px;font-weight:700;font-size:.85rem;cursor:pointer;transition:opacity .15s;" onmouseover="this.style.opacity=.82" onmouseout="this.style.opacity=1">'+load+' / '+cap+'명</span>'+
       '</div>'+
       '<div style="background:var(--border2);border-radius:4px;height:6px;margin-bottom:12px;overflow:hidden;"><div style="height:100%;border-radius:4px;width:'+pct+'%;background:'+(over?'#d94040':'linear-gradient(90deg,#4a7fc1,#2d8a5a)')+';transition:width .5s;"></div></div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:6px;">'+
@@ -12410,7 +12421,7 @@ var USE_SHEET   = function(){ return !!API_URL && API_URL.startsWith('http'); };
 // ── 캐시 버전 관리 ─────────────────────────────────────
 // VW_COLS 기준 새 스키마(event/parish/district/group 등)로 변경됐으므로
 // 구형 캐시(hocha/busNum/leaveBusNum 키 사용)를 자동 무효화
-var CACHE_VERSION = 'v538_enroll_form_time_after_date_order';
+var CACHE_VERSION = 'v546_busview_badge_click_roster_popup';
 (function invalidateOldCache(){
   try {
     var savedVer = localStorage.getItem('retreat_cache_ver');
@@ -13237,6 +13248,8 @@ function switchPanel(name, skipRender) {
       initYearSelect();
       // [v242] 로그인 계정 기준 교구/구역 기본값 재적용 (s-parish·s-district 공용 함수)
       applySearchDefaultScope();
+      // [v541] 수양회종류 기준 회차 잠금 공통함수 — 패널 진입 시점에도 즉시 반영
+      _applySeasonEventLock('s-retreat-type', 's-event');
       // [v480] 참석/귀가배정유형 공통코드 캐시 — 개별신청(enrollInit)/버스운행설정(bbInit)과 동일한
       // 캐시(_bbTypeOptionsCache)를 공유한다. "개별신청" 탭을 거치지 않고 이 화면(일괄 신청 및 배정)에
       // 바로 들어와도 캐시를 확보하도록 여기서도 로딩을 트리거하고, 완료 시점에 아직 이 패널에 있다면
@@ -13381,18 +13394,23 @@ function switchPanel(name, skipRender) {
       // ── STEP 2 완료 후 STEP 3 순차 실행 ─────────────────────────
       // busviewReload()는 반드시 _busApplyGoalEvent 완료 후 실행
       // (완료 전 실행 시 busview-sel-event='1차'(기본값)로 필터 → 3차 데이터 전부 제외)
+      // [v540] 교회목표 행사명 적용 직후 수양회종류 기준 회차 잠금 공통함수를 호출해
+      // 패널 진입 시점에도 잠금 상태가 즉시 반영되도록 함(숙소배정과 동일 패턴)
       if(_goalLoaded){
         // 이미 로드됨 → 즉시 행사명 적용 → 즉시 조회
         _busApplyGoalEvent('busview-sel-event', 'busview-sel-year');
+        _applySeasonEventLock('busview-sel-season', 'busview-sel-event');
         busviewReload();
       } else if(USE_SHEET()){
         // 미로드 → fetch 완료 후 행사명 적용 → 조회
         _goalFetchFromSheet(function(){
           _busApplyGoalEvent('busview-sel-event', 'busview-sel-year');
+          _applySeasonEventLock('busview-sel-season', 'busview-sel-event');
           busviewReload();
         }, {});
       } else {
         // 구글시트 미연동 → 행사명 적용 불필요, 즉시 조회
+        _applySeasonEventLock('busview-sel-season', 'busview-sel-event');
         busviewReload();
       }
     }
@@ -13413,15 +13431,20 @@ function switchPanel(name, skipRender) {
       }
       // [v413] 조회(roomRestore/roomRenderView) 실행 전에 반드시 교회목표 행사명을
       // roomview-sel-event(차수)에 먼저 적용 — busview 화면과 동일한 순서/패턴
+      // [v539] 교회목표 행사명 적용 직후 수양회종류 기준 회차 잠금 공통함수를 호출해
+      // 패널 진입 시점에도 잠금 상태가 즉시 반영되도록 함(잠금 규칙이 최종적으로 우선)
       if(_goalLoaded){
         _busApplyGoalEvent('roomview-sel-event', 'roomview-sel-year');
+        _applySeasonEventLock('roomview-sel-type', 'roomview-sel-event');
         if(USE_SHEET()){ roomRestore(roomRenderView); } else { roomRenderView(); }
       } else if(USE_SHEET()){
         _goalFetchFromSheet(function(){
           _busApplyGoalEvent('roomview-sel-event', 'roomview-sel-year');
+          _applySeasonEventLock('roomview-sel-type', 'roomview-sel-event');
           roomRestore(roomRenderView);
         }, {});
       } else {
+        _applySeasonEventLock('roomview-sel-type', 'roomview-sel-event');
         roomRenderView();
       }
     }
@@ -14507,17 +14530,24 @@ function renderTable() {
     // 그 버스만 노출(미배정 옵션 숨김). 캐시가 아직 안 왔으면(fallback) 기존 전체버스 목록으로 폴백.
     var arriveBusOpts = _spBusOptionsFromCache('arrive', arriveAssignDisp, arriveBusDisp);
     var leaveBusOpts  = _spBusOptionsFromCache('leave',  leaveAssignDisp,  leaveBusDisp);
-    var arriveBusDisabled = !canEdit || (arriveDisp||'').trim() !== '버스' || (!arriveBusOpts.fallback && !arriveBusOpts.hasBuses);
-    var leaveBusDisabled  = !canEdit || (leaveDisp||'').trim()  !== '버스' || (!leaveBusOpts.fallback  && !leaveBusOpts.hasBuses);
+    // [v543] 참석/귀가 버스배정은 실제 버스 배정(_rosterFullArr/_rosterFullLv)이 완료되어
+    // 매핑 정보가 있을 때만 수정 가능하도록 잠금. 매핑 전에는 "버스 배정" 화면에서 배정이
+    // 끝나기 전까지 이 화면에서 임의로 먼저 선택할 수 없다.
+    var arriveNotMapped = arriveInfo.status !== 'assigned';
+    var leaveNotMapped  = leaveInfo.status !== 'assigned';
+    var arriveBusDisabled = !canEdit || (arriveDisp||'').trim() !== '버스' || (!arriveBusOpts.fallback && !arriveBusOpts.hasBuses) || arriveNotMapped;
+    var leaveBusDisabled  = !canEdit || (leaveDisp||'').trim()  !== '버스' || (!leaveBusOpts.fallback  && !leaveBusOpts.hasBuses) || leaveNotMapped;
+    var arriveBusLockTitle = (arriveBusDisabled && canEdit && (arriveDisp||'').trim()==='버스' && arriveNotMapped) ? ' title="버스 배정 완료 후 수정 가능합니다"' : '';
+    var leaveBusLockTitle  = (leaveBusDisabled  && canEdit && (leaveDisp||'').trim() ==='버스' && leaveNotMapped)  ? ' title="버스 배정 완료 후 수정 가능합니다"' : '';
     var arriveBusPending = spStagedArriveBus.hasOwnProperty(idStr);
     var leaveBusPending  = spStagedLeaveBus.hasOwnProperty(idStr);
     var arriveBusOptionsHtml = arriveBusOpts.fallback ? busAssignOptionsHtml('arrive',arriveBusDisp,r,'all') : arriveBusOpts.html;
     var leaveBusOptionsHtml  = leaveBusOpts.fallback  ? busAssignOptionsHtml('leave', leaveBusDisp, r,'all') : leaveBusOpts.html;
     var arriveBusCell = canEdit
-      ? '<select id="sp-arrive-bus-'+esc(idStr)+'" '+(arriveBusDisabled?'disabled':'')+' style="font-size:.78rem;border:1.5px solid '+(arriveBusPending?'#8a5a00':'var(--border)')+';'+(arriveBusPending?'border-style:dashed;':'')+'border-radius:6px;padding:2px 4px;'+(arriveBusDisabled?'opacity:.5;':'')+'" onchange="spStageBus(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+arriveBusOptionsHtml+'</select>'
+      ? '<select id="sp-arrive-bus-'+esc(idStr)+'" '+(arriveBusDisabled?'disabled':'')+arriveBusLockTitle+' style="font-size:.78rem;border:1.5px solid '+(arriveBusPending?'#8a5a00':'var(--border)')+';'+(arriveBusPending?'border-style:dashed;':'')+'border-radius:6px;padding:2px 4px;'+(arriveBusDisabled?'opacity:.5;':'')+'" onchange="spStageBus(&quot;'+esc(idStr)+'&quot;,&quot;arrive&quot;,this.value)">'+arriveBusOptionsHtml+'</select>'
       : '<span style="'+arriveBusStyle+'">'+esc(arriveInfo.value)+'</span>';
     var leaveBusCell = canEdit
-      ? '<select id="sp-leave-bus-'+esc(idStr)+'" '+(leaveBusDisabled?'disabled':'')+' style="font-size:.78rem;border:1.5px solid '+(leaveBusPending?'#8a5a00':'var(--border)')+';'+(leaveBusPending?'border-style:dashed;':'')+'border-radius:6px;padding:2px 4px;'+(leaveBusDisabled?'opacity:.5;':'')+'" onchange="spStageBus(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+leaveBusOptionsHtml+'</select>'
+      ? '<select id="sp-leave-bus-'+esc(idStr)+'" '+(leaveBusDisabled?'disabled':'')+leaveBusLockTitle+' style="font-size:.78rem;border:1.5px solid '+(leaveBusPending?'#8a5a00':'var(--border)')+';'+(leaveBusPending?'border-style:dashed;':'')+'border-radius:6px;padding:2px 4px;'+(leaveBusDisabled?'opacity:.5;':'')+'" onchange="spStageBus(&quot;'+esc(idStr)+'&quot;,&quot;leave&quot;,this.value)">'+leaveBusOptionsHtml+'</select>'
       : '<span style="'+leaveBusStyle+'">'+esc(leaveInfo.value)+'</span>';
     // [v535] 출발시간 표시(읽기전용) — 현재 유효한 배정유형(스테이징 우선) 기준으로 캐시에서 동기 조회.
     // 캐시 미로딩(null)이거나 매칭 없으면 빈칸('-').
@@ -16495,10 +16525,24 @@ function openEditMode(id) {
   $id('e-arrive-assign-type').value=r.arriveAssignType||'';
   $id('e-leave-date').value=r.leaveDate||''; $id('e-leave-transport').value=r.leaveTransport||'';
   $id('e-leave-assign-type').value=r.leaveAssignType||'';
-  // [v536] 출발시간은 저장 데이터가 아닌 조회 전용 표시 항목 — v534 개별신청 화면과 동일하게
-  // 모달을 열 때는 자동 재조회하지 않고 빈칸으로 초기화한다(배정유형을 다시 선택해야 표시됨).
+  // [v545] 출발시간은 저장 데이터가 아닌 조회 전용 표시 항목 — 상세정보 모달(openDetail)과 동일하게
+  // 모달을 여는 시점에 저장된 참석/귀가배정유형 기준으로 자동 조회해 표시한다(v536에서는 자동
+  // 재조회하지 않고 빈칸으로 초기화했으나, 상세정보 모달과의 표시 불일치를 없애기 위해 통일함).
+  // 매칭되는 버스운행설정이 없으면 공란 유지. 배정유형 select를 직접 바꾸면 기존 onchange 로직이
+  // 그 값 기준으로 다시 조회한다(변경 없음).
   $set('e-arrive-depart-time', '');
   $set('e-leave-depart-time', '');
+  var _eOpenScope = { year: r.year, season: r.retreatType, event: r.event };
+  if(r.arriveAssignType){
+    _lookupBusScheduleTime(r.arriveAssignType, '참석', _eOpenScope).then(function(t){
+      $set('e-arrive-depart-time', t || '');
+    });
+  }
+  if(r.leaveAssignType){
+    _lookupBusScheduleTime(r.leaveAssignType, '귀가', _eOpenScope).then(function(t){
+      $set('e-leave-depart-time', t || '');
+    });
+  }
   $id('e-contact').value=r.contact||''; $id('e-guardian').value=r.guardian||'';
 
   // [v471] 참석배정/귀가배정(버스 호차) select 채우기 — 자료검색 전용 전체 인덱스(_rosterFullArr·Lv)
@@ -16512,6 +16556,11 @@ function openEditMode(id) {
   var eLvBus =$id('e-leave-bus');  if(eLvBus)  _busApplyAssignTypeFilteredOptions(eLvBus, 'leave', r.leaveAssignType, curLeaveBus);
   var modal=$id('detail-modal');
   if(modal){ modal._prevArriveBus = curArriveBus; modal._prevLeaveBus = curLeaveBus; }
+  // [v544] 참석배정/귀가배정은 실제 버스 배정이 끝나 매핑 정보(_rosterFullArr/_rosterFullLv)가
+  // 있을 때만 수정 가능하도록 잠금(일괄 신청 및 배정 화면 v543과 동일 규칙). rosterArriveIndex/
+  // rosterLeaveIndex 폴백값은 매핑 판단에서 제외하고 _rosterFullArr/_rosterFullLv만 기준으로 함.
+  var arriveHasMapping = !!(rid && _rosterFullArr[rid]);
+  var leaveHasMapping  = !!(rid && _rosterFullLv[rid]);
 
   // [v235] 참석/귀가배정유형: 교통수단=버스일 때만 활성화 (접수인원등록과 동일 규칙, 역할 무관)
   // [v471] 참석배정/귀가배정(버스 호차) select도 동일하게 교통수단=버스일 때만 활성화
@@ -16529,8 +16578,10 @@ function openEditMode(id) {
     // 속성이 아직 없으면(비동기 목록 채우기 전) 일단 열어두고 곧이어 실제 값으로 확정된다.
     if(b){
       var hasBuses = b.getAttribute('data-has-buses') !== '0';
-      var enableBus = isBus && hasBuses;
+      var hasMapping = kind==='leave' ? leaveHasMapping : arriveHasMapping;
+      var enableBus = isBus && hasBuses && hasMapping;
       b.disabled = !enableBus; b.style.opacity = enableBus ? '' : '.5'; if(!isBus) b.value='';
+      b.title = (isBus && hasBuses && !hasMapping) ? '버스 배정 완료 후 수정 가능합니다' : '';
     }
   }
   _toggleAssign('arrive'); _toggleAssign('leave');
@@ -16545,8 +16596,10 @@ function openEditMode(id) {
     _busApplyAssignTypeFilteredOptions($id('e-arrive-bus'), 'arrive', v, $id('e-arrive-bus')?$id('e-arrive-bus').value:'', function(){ _toggleAssign('arrive'); });
     var _eScope = { year: $id('e-year').value, season: $id('e-retreat-type').value, event: $id('e-event').value };
     // [v536] 출발일자 조회 뒤 이어서(순차 체이닝) 출발시간도 조회해 읽기전용 표시 필드에 반영.
+    // [v542] 매칭 없으면(현재 연도+수양회종류+회차 기준) 출발시간과 동일하게 공란 처리 —
+    // 이전에는 매칭 안 될 때 기존 값을 그대로 두어 다른 회차의 날짜가 남아있는 것처럼 보였음.
     _lookupBusScheduleDate(v, '참석', _eScope).then(function(date){
-      if(date) $set('e-arrive-date', date);
+      $set('e-arrive-date', date || '');
       return _lookupBusScheduleTime(v, '참석', _eScope);
     }).then(function(time){ $set('e-arrive-depart-time', time || ''); });
   };
@@ -16556,8 +16609,9 @@ function openEditMode(id) {
     _busApplyAssignTypeFilteredOptions($id('e-leave-bus'), 'leave', v, $id('e-leave-bus')?$id('e-leave-bus').value:'', function(){ _toggleAssign('leave'); });
     var _eScope = { year: $id('e-year').value, season: $id('e-retreat-type').value, event: $id('e-event').value };
     // [v536] 출발일자 조회 뒤 이어서(순차 체이닝) 출발시간도 조회해 읽기전용 표시 필드에 반영.
+    // [v542] 매칭 없으면 출발시간과 동일하게 공란 처리(참석일자와 동일한 이유).
     _lookupBusScheduleDate(v, '귀가', _eScope).then(function(date){
-      if(date) $set('e-leave-date', date);
+      $set('e-leave-date', date || '');
       return _lookupBusScheduleTime(v, '귀가', _eScope);
     }).then(function(time){ $set('e-leave-depart-time', time || ''); });
   };
@@ -19222,6 +19276,27 @@ function _getHomeBadgeFilter(){
 // selId    : 행사명 select 요소 ID ('bus-sel-event' | 'busview-sel-event')
 // yearSelId: 년도  select 요소 ID ('bus-sel-year'   | 'busview-sel-year')
 // _goalRows에서 당해년도 기준 등록일 최신 행사명을 선택
+// [v539] 수양회종류 → 회차 잠금 공통함수.
+// 수양회종류가 '하계'가 아니면(춘계/추계/동계) 회차를 '1차'로 고정하고 선택 불가 처리,
+// '하계'면 회차 선택을 다시 허용한다. 여러 화면에서 재사용 가능하도록 select id를 인자로 받는다.
+function _applySeasonEventLock(typeSelId, eventSelId){
+  var typeSel = $id(typeSelId), eventSel = $id(eventSelId);
+  if(!typeSel || !eventSel) return;
+  if(typeSel.value === '하계'){
+    eventSel.disabled = false;
+    eventSel.style.opacity = '';
+    eventSel.style.cursor = 'pointer';
+  } else {
+    var opts = Array.from(eventSel.options);
+    if(opts.some(function(o){ return o.value === '1차'; })){
+      eventSel.value = '1차';
+    }
+    eventSel.disabled = true;
+    eventSel.style.opacity = '.5';
+    eventSel.style.cursor = 'not-allowed';
+  }
+}
+
 function _busApplyGoalEvent(selId, yearSelId){
   var evSel  = $id(selId);     if(!evSel)  return;
   var yrSel  = $id(yearSelId); if(!yrSel)  return;
@@ -21849,6 +21924,8 @@ document.addEventListener('DOMContentLoaded', function() {
     'roomInputReset','roomSheetResetConfirm','roomResetAll','roomSaveToSheet','roomExportCSV','roomRestore','_getRoomFilter',
     'roomAddBuilding','roomAddGroup','roomAutoAssign','roomRenderBuildings','roomRenderView',
     'roomviewSearch',
+    // [v539] 수양회종류 → 회차 잠금 공통함수 (roomview-sel-type onchange에서 직접 호출)
+    '_applySeasonEventLock',
     'rvOpenRoster','rvOpenBuildingRoster','rvRosterRender','rvRosterFilter','rvRosterClose','rvSortByRoom','_rvSortRoomsAsc',
     'roomRosterOpen','roomRosterClose','roomRosterFilter',
     'busRosterOpen','busRosterOpenForBus','busRosterClose','busRosterFilter',
@@ -21934,6 +22011,7 @@ document.addEventListener('DOMContentLoaded', function() {
     roomAddBuilding:roomAddBuilding, roomAddGroup:roomAddGroup,
     roomAutoAssign:roomAutoAssign, roomRenderBuildings:roomRenderBuildings, roomRenderView:roomRenderView,
     roomviewSearch:roomviewSearch,
+    _applySeasonEventLock:_applySeasonEventLock,
     rvOpenRoster:rvOpenRoster, rvOpenBuildingRoster:rvOpenBuildingRoster, rvRosterRender:rvRosterRender, rvRosterFilter:rvRosterFilter, rvRosterClose:rvRosterClose, rvSortByRoom:rvSortByRoom, _rvSortRoomsAsc:_rvSortRoomsAsc,
     roomRosterOpen:roomRosterOpen, roomRosterClose:roomRosterClose, roomRosterFilter:roomRosterFilter,
     busRosterOpen:busRosterOpen, busRosterOpenForBus:busRosterOpenForBus, busRosterClose:busRosterClose, busRosterFilter:busRosterFilter,
@@ -22864,26 +22942,30 @@ function _enrollScheduleScope(){
   };
 }
 // [v521] 참석배정유형 선택 시 — 버스운행설정(공주행)의 해당 배정유형 출발일자를 참석일자에 자동 반영.
-// 매칭되는 기초정보가 없으면 조용히 무시(기존 값 유지). 참석일자가 바뀌면 귀가일자 +3일 자동계산도 이어서 동작.
+// [v542] 매칭되는 기초정보(현재 연도+수양회종류+회차 기준)가 없으면 출발시간과 동일하게 공란으로
+// 초기화한다(이전에는 기존 값을 그대로 두어, 실제로는 매칭되지 않은 다른 회차의 날짜가 남아있는
+// 것처럼 보이는 문제가 있었음). 참석일자가 채워지면 귀가일자 +3일 자동계산도 이어서 동작.
 function enrollArriveAssignTypeChange(){
   var v = ($id('enroll-arrive-assign-type')||{value:''}).value;
   var scope = _enrollScheduleScope();
   // [v534] 출발일자 조회 뒤 이어서(순차 체이닝 — 동일 시트 동시요청 방지) 출발시간도 조회해
-  // 읽기전용 표시 필드에 반영. 매칭 없으면 빈칸.
+  // 읽기전용 표시 필드에 반영.
   _lookupBusScheduleDate(v, '참석', scope).then(function(date){
-    if(date){ $set('enroll-arrive-date', date); enrollArriveDateChange(); }
+    $set('enroll-arrive-date', date || '');
+    enrollArriveDateChange();
     return _lookupBusScheduleTime(v, '참석', scope);
   }).then(function(time){
     $set('enroll-arrive-depart-time', time || '');
   });
 }
 // [v521] 귀가배정유형 선택 시 — 버스운행설정(서울행)의 해당 배정유형 출발일자를 귀가일자에 자동 반영.
+// [v542] 매칭 없으면 출발시간과 동일하게 공란으로 초기화(참석일자와 동일한 이유).
 function enrollLeaveAssignTypeChange(){
   var v = ($id('enroll-leave-assign-type')||{value:''}).value;
   var scope = _enrollScheduleScope();
   // [v534] 출발일자 조회 뒤 이어서(순차 체이닝) 출발시간도 조회해 읽기전용 표시 필드에 반영.
   _lookupBusScheduleDate(v, '귀가', scope).then(function(date){
-    if(date){ $set('enroll-leave-date', date); }
+    $set('enroll-leave-date', date || '');
     return _lookupBusScheduleTime(v, '귀가', scope);
   }).then(function(time){
     $set('enroll-leave-depart-time', time || '');
@@ -22952,6 +23034,8 @@ function enrollEventOptionsRefresh(){
     return; // 로딩 완료 후 콜백으로 재호출됨 — 지금은 현재 목록(기본값) 유지
   }
   _busApplyGoalEvent('enroll-event', 'enroll-year');
+  // [v541] 수양회종류 기준 회차 잠금 공통함수 — 연도/수양회종류 변경 시(둘 다 이 함수를 onchange로 공유) 재적용
+  _applySeasonEventLock('enroll-retreat-type', 'enroll-event');
 }
 
 // [v437] 개별신청 폼 — 접수ID 기준 필드 잠금.
